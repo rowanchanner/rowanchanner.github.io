@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sharky Movies</title>
+  
+  <!-- Styles and favicon -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="favicon.png">
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Theme color for mobile browsers -->
+  <meta name="theme-color" content="#e50914">
+
+  <!-- Service Worker registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(reg => console.log('Service Worker registered.', reg))
+        .catch(err => console.log('Service Worker registration failed:', err));
+    }
+  </script>
+
+  <style>
+    /* Permanent Warning Banner Styles */
+    .ad-warning {
+      position: sticky;      /* stays at top when scrolling */
+      top: 0;
+      z-index: 1001;         /* above header */
+      background-color: #ffcc00;
+      color: #000;
+      text-align: center;
+      padding: 10px 15px;
+      font-weight: bold;
+      font-size: 14px;
+      border-bottom: 2px solid #e50914;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Floating Support Button */
+    #supportButton {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: none;
+      background-color: #e50914;
+      color: #fff;
+      font-size: 28px;
+      cursor: pointer;
+      z-index: 1002;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: background 0.2s, transform 0.2s;
+    }
+    #supportButton:hover {
+      background-color: #b20710;
+      transform: scale(1.1);
+    }
+
+    /* Hero Discord / Support line */
+    .hero-support {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #e50914;
+      cursor: pointer;
+    }
+    .hero-support img {
+      width: 24px;
+      height: 24px;
+      vertical-align: middle;
+      transition: transform 0.2s;
+    }
+    .hero-support:hover img {
+      transform: scale(1.2);
+    }
+  </style>
+</head>
+<body>
+  <!-- Permanent Warning Banner -->
+  <div class="ad-warning">
+    ⚠️ Note: Some videos are served via third-party providers and may show pop-up ads. These ads are not from Sharky Movies.
+  </div>
+
+  <header>
+    <div class="logo">SHARKY MOVIES</div>
+    <nav>
+      <a href="index.html">Home</a>
+    </nav>
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Search movies or TV shows...">
+    </div>
+  </header>
+
+  <!-- Hero section -->
+  <section class="hero">
+    <h1>Welcome to Sharky Movies</h1>
+    <p>Stream movies and TV shows directly from Sharky Movies. Browse popular titles, search for your favorite films, and enjoy endless entertainment!</p>
+
+    <!-- Separate Discord / Support line -->
+    <p class="hero-support" onclick="window.open('https://discord.gg/wzHZn9zGNv','_blank')">
+      <img src="discord.png" alt="Discord Icon"> Support Us / Join Discord
+    </p>
+  </section>
+
+  <main class="movies">
+    <div id="movieGrid" class="movie-grid"></div>
+  </main>
+
+  <footer>© 2026 Sharky Movies Ultra</footer>
+
+  <!-- Floating Support Button -->
+  <button id="supportButton">💬</button>
+
+  <script src="script.js"></script>
+  <script>
+    // Floating support button click
+    const supportButton = document.getElementById('supportButton');
+    supportButton.addEventListener('click', () => {
+      window.open('support.html', 'Support', 'width=400,height=500,scrollbars=yes');
+    });
+  </script>
+</body>
+</html>

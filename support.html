@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sharky Movies Support</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e50914">
+
+<style>
+  body {
+    background: #141414;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+
+  h1 {
+    color: #e50914;
+    margin-bottom: 20px;
+  }
+
+  form {
+    background: #222;
+    padding: 20px;
+    border: 2px solid #e50914;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  input, textarea {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #e50914;
+    background: #141414;
+    color: #fff;
+    font-size: 14px;
+  }
+
+  button {
+    width: 100%;
+    padding: 12px;
+    background-color: #e50914;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  button:hover {
+    background-color: #ff1c1c;
+  }
+</style>
+</head>
+<body>
+
+<h1>Sharky Movies Support</h1>
+<p>Fill in your email and message below. We'll get back to you!</p>
+
+<form id="supportForm">
+  <input type="email" id="supportEmail" placeholder="Your email" required>
+  <textarea id="supportMessage" rows="5" placeholder="Type your message..." required></textarea>
+  <button type="submit">Send</button>
+</form>
+
+<script>
+const supportForm = document.getElementById('supportForm');
+
+supportForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const email = document.getElementById('supportEmail').value;
+  const message = document.getElementById('supportMessage').value;
+
+  if (!email || !message) {
+    alert('Please fill in both fields.');
+    return;
+  }
+
+  const webhookURL = "https://discord.com/api/webhooks/1476601047014314226/gpa5HA3S4vSITr4PXecW7cmr2ZT3zybB3p6k603Gm4JT6ukBDsGTgWCAX3XDKOTqy0MM";
+
+  fetch(webhookURL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      content: `**Support Request**\nEmail: ${email}\nMessage: ${message}`
+    })
+  })
+  .then(() => {
+    alert('Message sent! Thank you for your support.');
+    supportForm.reset();
+  })
+  .catch(err => {
+    console.error(err);
+    alert('Failed to send message. Try again later.');
+  });
+});
+</script>
+
+</body>
+</html>
