@@ -1,0 +1,242 @@
+/* Global Styles for Sharky Movies */
+html, body {
+  height: auto;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  background-color: #141414;
+  color: #fff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Header for Sharky Movies */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background-color: #1f1f1f;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.8);
+}
+
+.logo {
+  font-size: 28px;
+  font-weight: 900;
+  color: #e50914;
+  user-select: none;
+}
+
+nav a {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  margin-right: 20px;
+  transition: color 0.3s ease;
+}
+
+nav a:hover {
+  color: #e50914;
+}
+
+/* Search Input for Sharky Movies */
+.search-container input {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  width: 230px;
+  transition: box-shadow 0.3s ease;
+}
+
+.search-container input:focus {
+  outline: none;
+  box-shadow: 0 0 8px #e50914;
+  background-color: #222;
+  color: #fff;
+}
+
+/* Hero Section for Sharky Movies */
+.hero {
+  height: 50vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 0 20px;
+  background: linear-gradient(to bottom, rgba(229,9,20,0.8), rgba(20,20,20,0.8)), url('https://images.unsplash.com/photo-1517602302552-471fe67acf66?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+}
+
+.hero h1 {
+  font-size: 48px;
+  margin: 0 0 12px;
+}
+
+.hero p {
+  font-size: 18px;
+  max-width: 800px;
+}
+
+/* Sharky Movies Grid */
+.movies {
+  padding: 20px;
+  padding-bottom: 60px;
+}
+
+.movie-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 24px;
+}
+
+.movie-card {
+  position: relative;
+  height: 330px;
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.85);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  align-items: flex-end;
+  color: #fff;
+  user-select: none;
+}
+
+.movie-card:hover {
+  transform: scale(1.08);
+  box-shadow: 0 14px 30px rgba(229, 9, 20, 0.85);
+  z-index: 5;
+}
+
+.movie-overlay {
+  width: 100%;
+  padding: 12px 12px 16px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.95), transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.movie-overlay h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-shadow: 0 0 4px rgba(0,0,0,0.75);
+}
+
+.movie-overlay p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f5c518;
+  text-shadow: 0 0 3px rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+}
+
+.movie-overlay p::before {
+  content: "⭐";
+  margin-right: 6px;
+  font-size: 13px;
+}
+
+/* Player Section for Sharky Movies */
+.player-section {
+  padding: 30px 20px;
+  max-width: 1200px;
+  margin: 0 auto 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.player-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: 20px 0;
+}
+
+.player-container iframe {
+  width: 90vw;
+  max-width: 1400px;
+  height: calc(90vw * 9 / 16);
+  min-height: 500px;
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 8px 35px rgba(0,0,0,0.7);
+  transition: box-shadow 0.3s ease;
+}
+
+.player-container iframe:hover {
+  box-shadow: 0 10px 50px #e50914;
+}
+
+/* Poster for Sharky Movies */
+.poster {
+  width: 250px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+}
+
+/* Footer for Sharky Movies */
+footer {
+  padding: 15px 20px;
+  text-align: center;
+  background: #1f1f1f;
+  font-size: 14px;
+  color: #666;
+  user-select: none;
+  border-top: 1px solid #222;
+}
+
+/* Scrollbar for Sharky Movies */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #141414;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #e50914;
+  border-radius: 20px;
+}
+
+/* Responsive for Sharky Movies */
+@media (max-width: 600px) {
+  .movie-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+  .movie-card {
+    height: 240px;
+  }
+  .search-container input {
+    width: 150px;
+  }
+  .player-container iframe {
+    width: 95vw;
+    height: calc(95vw * 9 / 16);
+  }
+  .poster {
+    width: 180px;
+  }
+  .hero h1 {
+    font-size: 32px;
+  }
+  .hero p {
+    font-size: 14px;
+  }
+}
