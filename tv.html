@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watch TV Show - Sharky Movies</title>
+
+<link rel="stylesheet" href="style.css">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e50914">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => console.log('Service Worker registered.', reg))
+      .catch(err => console.log('Service Worker registration failed:', err));
+  }
+</script>
+</head>
+
+<body>
+<header>
+  <div class="logo">SHARKY MOVIES</div>
+  <nav><a href="index.html">Home</a></nav>
+</header>
+
+<section class="player-section">
+  <div class="player-top">
+    <div class="poster-wrap">
+      <img id="sharkyTvPoster" class="poster" src="" alt="poster">
+    </div>
+
+    <div class="meta-wrap">
+      <h1 id="sharkyTvTitle">Loading…</h1>
+      <p id="sharkyTvDesc" class="desc"></p>
+
+      <!-- Episode picker -->
+      <div class="server-selector" style="margin-bottom:12px;">
+        <div class="server-title">Episode</div>
+
+        <div class="server-buttons" style="gap:10px; align-items:center;">
+          <select id="seasonSelect" class="server-btn" style="padding:10px 14px;"></select>
+          <select id="episodeSelect" class="server-btn" style="padding:10px 14px;"></select>
+          <button id="goEpisode" class="server-btn active" type="button">Go</button>
+        </div>
+
+        <div class="server-note" id="epNote">Pick a season + episode.</div>
+      </div>
+
+      <!-- Server selector -->
+      <div class="server-selector">
+        <div class="server-title">Servers</div>
+        <div class="server-buttons" id="serverButtons"></div>
+        <div class="server-note">If one server is down, pick another.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="player-container">
+    <div class="player-shell">
+      <div class="player-loading" id="playerLoading">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading player…</div>
+      </div>
+
+      <!-- CLICK SHIELD -->
+      <div id="clickShield" class="click-shield" aria-hidden="true">
+        <div class="click-shield-card">
+          <div class="click-shield-title">Press OK / Click to start</div>
+          <div class="click-shield-sub">Stops accidental redirects on some servers.</div>
+          <button id="clickShieldBtn" class="click-shield-btn" type="button">Start ▶</button>
+        </div>
+      </div>
+
+      <iframe
+        id="sharkyTvPlayer"
+        allowfullscreen
+        allow="fullscreen; autoplay; picture-in-picture"
+        allowtransparency
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<footer>© 2026 Sharky Movies Ultra</footer>
+
+<script>
+const API_KEY = "47745852f22c21e3362f4907231538e1";
+
+const params = new URLSearchParams(location.search);
+const tvId = params.get("id");
+let season = parseInt(params.get("season") || "1", 10);
+let episode = parseInt(params.get("episode") || "1", 10);
+
+// Elements
+const sharkyTvTitle = document.getElementById("sharkyTvTitle");
+const sharkyTvDesc = document.getElementById("sharkyTvDesc");
+const sharkyTvPoster = document.getElementById("sharkyTvPoster");
+const sharkyTvPlayer = document.getElementById("sharkyTvPlayer");
+const serverButtons = document.getElementById("serverButtons");
+const playerLoading = document.getElementById("playerLoading");
+
+const seasonSelect = document.getElementById("seasonSelect");
+const episodeSelect = document.getElementById("episodeSelect");
+const goEpisode = document.getElementById("goEpisode");
+const epNote = document.getElementById("epNote");
+
+const clickShield = document.getElementById("clickShield");
+const clickShieldBtn = document.getElementById("clickShieldBtn");
+
+// =====================
+// Fire TV / Silk: keep screen awake (best-effort)
+// =====================
+let wakeLock = null;
+let keepAliveTimer = null;
+let started = false;
+
+async function requestWakeLock() {
+  try {
+    if (!("wakeLock" in navigator)) return;
+    if (wakeLock) return;
+    wakeLock = await navigator.wakeLock.request("screen");
+  } catch (e) {}
+}
+
+async function releaseWakeLock() {
+  try {
+    if (wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  } catch (e) {}
+}
+
+function startKeepAlive() {
+  stopKeepAlive();
+  keepAliveTimer = setInterval(() => {
+    window.dispatchEvent(new Event("resize"));
+  }, 60 * 1000);
+}
+
+function stopKeepAlive() {
+  if (keepAliveTimer) clearInterval(keepAliveTimer);
+  keepAliveTimer = null;
+}
+
+function startPlaybackPower() {
+  if (started) return;
+  started = true;
+  requestWakeLock();
+  startKeepAlive();
+}
+
+window.addEventListener("pointerdown", startPlaybackPower, { once: true });
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key === "Enter" || e.key === " " || e.key === "OK") startPlaybackPower();
+  },
+  { once: true }
+);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    if (started) requestWakeLock();
+  } else {
+    releaseWakeLock();
+  }
+});
+
+window.addEventListener("pagehide", () => {
+  stopKeepAlive();
+  releaseWakeLock();
+});
+window.addEventListener("beforeunload", () => {
+  stopKeepAlive();
+  releaseWakeLock();
+});
+
+// =====================
+// Helpers
+// =====================
+function showLoading(on) {
+  playerLoading.style.display = on ? "flex" : "none";
+}
+
+let activeServerKey = "vidking";
+
+function setActiveButton() {
+  document.querySelectorAll(".server-btn[data-server]").forEach((b) => b.classList.remove("active"));
+  const btn = document.querySelector(`.server-btn[data-server="${activeServerKey}"]`);
+  if (btn) btn.classList.add("active");
+}
+
+sharkyTvPlayer.addEventListener("load", () => {
+  setTimeout(() => showLoading(false), 350);
+});
+
+function updateUrl() {
+  const url = new URL(location.href);
+  url.searchParams.set("season", String(season));
+  url.searchParams.set("episode", String(episode));
+  history.replaceState({}, "", url.toString());
+}
+
+// =====================
+// CLICK SHIELD (A)
+// =====================
+let shieldArmed = false;
+
+function showShield(on) {
+  shieldArmed = !!on;
+  clickShield.classList.toggle("show", !!on);
+  clickShield.setAttribute("aria-hidden", on ? "false" : "true");
+  if (on) setTimeout(() => clickShieldBtn.focus(), 0);
+}
+
+function disarmShield() {
+  if (!shieldArmed) return;
+  showShield(false);
+
+  // counts as user gesture + helps Firestick
+  startPlaybackPower();
+
+  try { sharkyTvPlayer.focus(); } catch (e) {}
+}
+
+clickShieldBtn.addEventListener("click", disarmShield);
+
+clickShield.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  disarmShield();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (!shieldArmed) return;
+  if (e.key === "Enter" || e.key === " " || e.key === "OK") {
+    e.preventDefault();
+    disarmShield();
+  }
+});
+
+// =====================
+// Per-server iframe policy (B)
+// =====================
+function applyIframePolicy(policy) {
+  sharkyTvPlayer.removeAttribute("sandbox");
+  sharkyTvPlayer.removeAttribute("referrerpolicy");
+
+  sharkyTvPlayer.setAttribute("allow", "fullscreen; autoplay; picture-in-picture");
+
+  if (policy?.sandbox) sharkyTvPlayer.setAttribute("sandbox", policy.sandbox);
+  if (policy?.referrerPolicy) sharkyTvPlayer.setAttribute("referrerpolicy", policy.referrerPolicy);
+}
+
+// =====================
+// Servers
+// =====================
+const SERVERS = [
+  {
+    key: "vidking",
+    name: "VidKing (No Ads/Popups)",
+    build: (id, s, e) =>
+      `https://www.vidking.net/embed/tv/${id}/${s}/${e}?color=e50914&nextEpisode=true&episodeSelector=true`,
+    policy: {
+      sandbox: "allow-scripts allow-forms allow-same-origin allow-presentation",
+    },
+    shield: false,
+  },
+  {
+    key: "vidsrc",
+    name: "Vidsrc (Ads and PopUps)",
+    build: (id, s, e) =>
+      `https://vidsrc-embed.ru/embed/tv/${id}/${s}/${e}`,
+    policy: {
+      referrerPolicy: "strict-origin-when-cross-origin",
+    },
+    shield: true,
+  },
+];
+
+function loadServer(serverKey) {
+  const server = SERVERS.find((s) => s.key === serverKey);
+  if (!server) return;
+
+  activeServerKey = serverKey;
+  setActiveButton();
+  showLoading(true);
+
+  // shield on/off depending on server
+  showShield(!!server.shield);
+
+  // apply policy per server
+  applyIframePolicy(server.policy);
+
+  sharkyTvPlayer.src = "about:blank";
+  setTimeout(() => {
+    const url = server.build(tvId, season, episode);
+    sharkyTvPlayer.src = url;
+
+    console.log("[Sharky] tvId:", tvId);
+    console.log("[Sharky] server:", serverKey);
+    console.log("[Sharky] iframe src:", url);
+  }, 50);
+}
+
+function renderServers() {
+  serverButtons.innerHTML = "";
+  SERVERS.forEach((s) => {
+    const btn = document.createElement("button");
+    btn.className = "server-btn";
+    btn.type = "button";
+    btn.dataset.server = s.key;
+    btn.textContent = s.name;
+    btn.addEventListener("click", () => loadServer(s.key));
+    serverButtons.appendChild(btn);
+  });
+  setActiveButton();
+}
+
+// =====================
+// Episode picker (TMDB)
+// =====================
+async function loadEpisodePicker(tv) {
+  const seasons = (tv.seasons || []).filter(x => x.season_number > 0);
+
+  seasonSelect.innerHTML = "";
+  seasons.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = String(s.season_number);
+    opt.textContent = `Season ${s.season_number}`;
+    seasonSelect.appendChild(opt);
+  });
+
+  const seasonNumbers = seasons.map(s => s.season_number);
+  if (!seasonNumbers.includes(season)) season = seasonNumbers[0] || 1;
+  seasonSelect.value = String(season);
+
+  await loadEpisodesForSeason(tvId, season);
+
+  if (episodeSelect.querySelector(`option[value="${episode}"]`)) {
+    episodeSelect.value = String(episode);
+  } else {
+    episode = parseInt(episodeSelect.value || "1", 10);
+  }
+
+  epNote.textContent = `Now: S${season} · E${episode}`;
+}
+
+async function loadEpisodesForSeason(id, sNum) {
+  episodeSelect.innerHTML = "";
+  epNote.textContent = "Loading episodes…";
+
+  const res = await fetch(`https://api.themoviedb.org/3/tv/${id}/season/${sNum}?api_key=${API_KEY}`);
+  const data = await res.json();
+
+  const eps = data.episodes || [];
+  eps.forEach(e => {
+    const opt = document.createElement("option");
+    opt.value = String(e.episode_number);
+    opt.textContent = `Episode ${e.episode_number}${e.name ? " — " + e.name : ""}`;
+    episodeSelect.appendChild(opt);
+  });
+
+  episodeSelect.value = String(episode);
+  epNote.textContent = `Pick an episode (Season ${sNum})`;
+}
+
+seasonSelect.addEventListener("change", async () => {
+  season = parseInt(seasonSelect.value, 10);
+  episode = 1;
+  await loadEpisodesForSeason(tvId, season);
+  episode = parseInt(episodeSelect.value || "1", 10);
+  epNote.textContent = `Ready: S${season} · E${episode}`;
+});
+
+episodeSelect.addEventListener("change", () => {
+  episode = parseInt(episodeSelect.value, 10);
+  epNote.textContent = `Ready: S${season} · E${episode}`;
+});
+
+goEpisode.addEventListener("click", () => {
+  season = parseInt(seasonSelect.value, 10);
+  episode = parseInt(episodeSelect.value, 10);
+  updateUrl();
+  loadServer(activeServerKey);
+  epNote.textContent = `Now: S${season} · E${episode}`;
+});
+
+// =====================
+// Load TV details + boot
+// =====================
+if (!tvId) {
+  sharkyTvTitle.textContent = "No show selected.";
+  showLoading(false);
+  showShield(false);
+} else {
+  renderServers();
+
+  fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${API_KEY}`)
+    .then((res) => res.json())
+    .then(async (tv) => {
+      sharkyTvTitle.textContent = `${tv.name} (${tv.first_air_date?.split("-")[0] || "—"})`;
+      sharkyTvDesc.textContent = tv.overview || "";
+      sharkyTvPoster.src = tv.poster_path
+        ? "https://image.tmdb.org/t/p/w500" + tv.poster_path
+        : "sharky-512.png";
+
+      await loadEpisodePicker(tv);
+
+      updateUrl();
+      loadServer("vidking");
+    })
+    .catch(() => {
+      sharkyTvTitle.textContent = "Failed to load show.";
+      showLoading(false);
+      showShield(false);
+    });
+}
+</script>
+
+<!-- Minimal CSS for click shield (only affects this page) -->
+<style>
+  .click-shield{
+    position:absolute;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index: 4;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(6px);
+  }
+  .click-shield.show{ display:flex; }
+
+  .click-shield-card{
+    width: min(520px, 92vw);
+    border-radius: 16px;
+    padding: 18px 16px;
+    background: rgba(20,20,20,0.92);
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 18px 70px rgba(0,0,0,0.6);
+    text-align:center;
+  }
+  .click-shield-title{
+    font-weight: 900;
+    font-size: 18px;
+    margin-bottom: 6px;
+    letter-spacing: .2px;
+  }
+  .click-shield-sub{
+    opacity: .85;
+    font-size: 13px;
+    margin-bottom: 14px;
+    line-height: 1.35;
+  }
+  .click-shield-btn{
+    border:none;
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-weight: 900;
+    cursor:pointer;
+    background: #e50914;
+    color:#fff;
+    box-shadow: 0 12px 30px rgba(229,9,20,0.22);
+  }
+  .click-shield-btn:focus{
+    outline: 3px solid rgba(229,9,20,0.35);
+    outline-offset: 3px;
+  }
+</style>
+
+</body>
+</html>

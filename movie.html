@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Watch Movie - Sharky Movies</title>
+
+<link rel="stylesheet" href="style.css" />
+<link rel="icon" type="image/png" href="favicon.png" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#e50914" />
+
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker
+      .register("/service-worker.js")
+      .then((reg) => console.log("Service Worker registered.", reg))
+      .catch((err) => console.log("Service Worker registration failed:", err));
+  }
+</script>
+</head>
+
+<body>
+<header>
+  <div class="logo">SHARKY MOVIES</div>
+  <nav><a href="index.html">Home</a></nav>
+</header>
+
+<section class="player-section">
+  <div class="player-top">
+    <div class="poster-wrap">
+      <img id="sharkyMoviePoster" class="poster" src="" alt="poster" />
+    </div>
+
+    <div class="meta-wrap">
+      <h1 id="sharkyMovieTitle">Loading…</h1>
+      <p id="sharkyMovieDesc" class="desc"></p>
+
+      <div class="server-selector">
+        <div class="server-title">Servers</div>
+        <div class="server-buttons" id="serverButtons"></div>
+        <div class="server-note">If one server is down, pick another.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="player-container">
+    <div class="player-shell">
+      <div class="player-loading" id="playerLoading">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading player…</div>
+      </div>
+
+      <!-- CLICK SHIELD (blocks first click / Enter to reduce ad redirects) -->
+      <div id="clickShield" class="click-shield" aria-hidden="true">
+        <div class="click-shield-card">
+          <div class="click-shield-title">Press OK / Click to start</div>
+          <div class="click-shield-sub">This helps stop random popups on some servers.</div>
+          <button id="clickShieldBtn" class="click-shield-btn" type="button">Start ▶</button>
+        </div>
+      </div>
+
+      <iframe
+        id="sharkyMoviePlayer"
+        allowfullscreen
+        allow="fullscreen; autoplay; picture-in-picture"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<footer>© 2026 Sharky Movies Ultra</footer>
+
+<script>
+const params = new URLSearchParams(location.search);
+const movieId = params.get("id");
+
+// Elements
+const sharkyMovieTitle = document.getElementById("sharkyMovieTitle");
+const sharkyMovieDesc = document.getElementById("sharkyMovieDesc");
+const sharkyMoviePoster = document.getElementById("sharkyMoviePoster");
+const sharkyMoviePlayer = document.getElementById("sharkyMoviePlayer");
+const serverButtons = document.getElementById("serverButtons");
+const playerLoading = document.getElementById("playerLoading");
+
+const clickShield = document.getElementById("clickShield");
+const clickShieldBtn = document.getElementById("clickShieldBtn");
+
+// =====================
+// Fire TV / Silk: keep screen awake (best-effort)
+// =====================
+let wakeLock = null;
+let keepAliveTimer = null;
+let started = false;
+
+async function requestWakeLock() {
+  try {
+    if (!("wakeLock" in navigator)) return;
+    if (wakeLock) return;
+    wakeLock = await navigator.wakeLock.request("screen");
+  } catch (e) {}
+}
+async function releaseWakeLock() {
+  try {
+    if (wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  } catch (e) {}
+}
+function startKeepAlive() {
+  stopKeepAlive();
+  keepAliveTimer = setInterval(() => {
+    window.dispatchEvent(new Event("resize"));
+  }, 60 * 1000);
+}
+function stopKeepAlive() {
+  if (keepAliveTimer) clearInterval(keepAliveTimer);
+  keepAliveTimer = null;
+}
+function startPlaybackPower() {
+  if (started) return;
+  started = true;
+  requestWakeLock();
+  startKeepAlive();
+}
+window.addEventListener("pointerdown", startPlaybackPower, { once: true });
+window.addEventListener("keydown", () => startPlaybackPower(), { once: true });
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    if (started) requestWakeLock();
+  } else {
+    releaseWakeLock();
+  }
+});
+window.addEventListener("pagehide", () => {
+  stopKeepAlive();
+  releaseWakeLock();
+});
+window.addEventListener("beforeunload", () => {
+  stopKeepAlive();
+  releaseWakeLock();
+});
+
+// =====================
+// CLICK SHIELD logic
+// =====================
+let shieldArmed = false;
+
+function showShield(on) {
+  shieldArmed = !!on;
+  clickShield.classList.toggle("show", !!on);
+  clickShield.setAttribute("aria-hidden", on ? "false" : "true");
+  if (on) {
+    // focus button for Firestick remotes
+    setTimeout(() => clickShieldBtn.focus(), 0);
+  }
+}
+
+function disarmShield() {
+  if (!shieldArmed) return;
+  showShield(false);
+
+  // Try to give focus to iframe (some devices will accept it)
+  try { sharkyMoviePlayer.focus(); } catch (e) {}
+
+  // Start wake lock (counts as user gesture)
+  startPlaybackPower();
+}
+
+// Button click
+clickShieldBtn.addEventListener("click", disarmShield);
+
+// Click anywhere on shield
+clickShield.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  disarmShield();
+});
+
+// Remote OK / Enter / Space
+window.addEventListener("keydown", (e) => {
+  if (!shieldArmed) return;
+  if (e.key === "Enter" || e.key === " " || e.key === "OK") {
+    e.preventDefault();
+    disarmShield();
+  }
+});
+
+// =====================
+// IFRAME POLICY PER SERVER
+// =====================
+function applyIframePolicy(policy) {
+  sharkyMoviePlayer.removeAttribute("sandbox");
+  sharkyMoviePlayer.removeAttribute("referrerpolicy");
+
+  sharkyMoviePlayer.setAttribute("allow", "fullscreen; autoplay; picture-in-picture");
+
+  if (policy?.sandbox) sharkyMoviePlayer.setAttribute("sandbox", policy.sandbox);
+  if (policy?.referrerPolicy) sharkyMoviePlayer.setAttribute("referrerpolicy", policy.referrerPolicy);
+}
+
+// =====================
+// Servers
+// =====================
+const SERVERS = [
+  {
+    key: "vidking",
+    name: "VidKing (No ads/Popups)",
+    build: (id) => `https://www.vidking.net/embed/movie/${id}?color=e50914`,
+    policy: {
+      sandbox: "allow-scripts allow-forms allow-same-origin allow-presentation",
+    },
+    shield: false,
+  },
+  {
+    key: "vsembed",
+    name: "Vidsrc (Ads and Popups)",
+    build: (id) => `https://vsembed.ru/embed/movie/${id}`,
+    policy: {
+      referrerPolicy: "strict-origin-when-cross-origin",
+    },
+    shield: true,
+  },
+  {
+    key: "vidsrc_embed",
+    name: "Vidsrc V2 (Ads and Popups))",
+    build: (id) => `https://vidsrc-embed.ru/embed/movie?tmdb=${encodeURIComponent(id)}`,
+    policy: {
+      referrerPolicy: "strict-origin-when-cross-origin",
+    },
+    shield: true,
+  },
+];
+
+let activeServerKey = "vidking";
+
+function setActiveButton() {
+  document.querySelectorAll(".server-btn").forEach((b) => b.classList.remove("active"));
+  const btn = document.querySelector(`.server-btn[data-server="${activeServerKey}"]`);
+  if (btn) btn.classList.add("active");
+}
+
+function showLoading(on) {
+  playerLoading.style.display = on ? "flex" : "none";
+}
+
+function loadServer(serverKey) {
+  const server = SERVERS.find((s) => s.key === serverKey);
+  if (!server) return;
+
+  activeServerKey = serverKey;
+  setActiveButton();
+  showLoading(true);
+
+  // Arm shield for ad-heavy servers
+  showShield(!!server.shield);
+
+  // Apply per-server iframe restrictions BEFORE setting src
+  applyIframePolicy(server.policy);
+
+  // Force reload cleanly
+  sharkyMoviePlayer.src = "about:blank";
+  setTimeout(() => {
+    const url = server.build(movieId);
+    sharkyMoviePlayer.src = url;
+
+    console.log("[Sharky] movieId:", movieId);
+    console.log("[Sharky] server:", serverKey);
+    console.log("[Sharky] iframe src:", url);
+  }, 50);
+}
+
+function renderServers() {
+  serverButtons.innerHTML = "";
+  SERVERS.forEach((s) => {
+    const btn = document.createElement("button");
+    btn.className = "server-btn";
+    btn.type = "button";
+    btn.dataset.server = s.key;
+    btn.textContent = s.name;
+    btn.addEventListener("click", () => loadServer(s.key));
+    serverButtons.appendChild(btn);
+  });
+  setActiveButton();
+}
+
+// Hide loading overlay once iframe loads something
+sharkyMoviePlayer.addEventListener("load", () => {
+  setTimeout(() => showLoading(false), 350);
+});
+
+// =====================
+// Load movie details + set initial player
+// =====================
+if (!movieId) {
+  sharkyMovieTitle.textContent = "No movie selected.";
+  showLoading(false);
+  showShield(false);
+} else {
+  renderServers();
+
+  fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=47745852f22c21e3362f4907231538e1`)
+    .then((res) => res.json())
+    .then((movie) => {
+      sharkyMovieTitle.textContent = `${movie.title} (${movie.release_date?.split("-")[0] || "—"})`;
+      sharkyMovieDesc.textContent = movie.overview || "";
+      sharkyMoviePoster.src = movie.poster_path
+        ? "https://image.tmdb.org/t/p/w500" + movie.poster_path
+        : "sharky-512.png";
+
+      loadServer("vidking");
+    })
+    .catch(() => {
+      sharkyMovieTitle.textContent = "Failed to load movie.";
+      showLoading(false);
+      showShield(false);
+    });
+}
+</script>
+
+<!-- Minimal CSS for the click shield (doesn't affect your main CSS) -->
+<style>
+  .click-shield{
+    position:absolute;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index: 4;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(6px);
+  }
+  .click-shield.show{ display:flex; }
+
+  .click-shield-card{
+    width: min(520px, 92vw);
+    border-radius: 16px;
+    padding: 18px 16px;
+    background: rgba(20,20,20,0.92);
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 18px 70px rgba(0,0,0,0.6);
+    text-align:center;
+  }
+  .click-shield-title{
+    font-weight: 900;
+    font-size: 18px;
+    margin-bottom: 6px;
+    letter-spacing: .2px;
+  }
+  .click-shield-sub{
+    opacity: .85;
+    font-size: 13px;
+    margin-bottom: 14px;
+    line-height: 1.35;
+  }
+  .click-shield-btn{
+    border:none;
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-weight: 900;
+    cursor:pointer;
+    background: #e50914;
+    color:#fff;
+    box-shadow: 0 12px 30px rgba(229,9,20,0.22);
+  }
+  .click-shield-btn:focus{
+    outline: 3px solid rgba(229,9,20,0.35);
+    outline-offset: 3px;
+  }
+</style>
+
+</body>
+</html>
