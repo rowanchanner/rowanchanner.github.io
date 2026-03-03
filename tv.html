@@ -255,8 +255,15 @@ function applyIframePolicy(policy) {
 }
 
 // =====================
-// Servers
+// Servers (UPDATED: urlTemplate support)
 // =====================
+// You can use either:
+//   build: (id, season, episode)=> "..."
+// OR
+//   urlTemplate: "https://example.com/tv/{id}/{season}/{episode}"
+//
+// Placeholders supported: {id} {season} {episode}
+
 const SERVERS = [
   {
     key: "vidking",
@@ -278,10 +285,60 @@ const SERVERS = [
     },
     shield: true,
   },
+
+  // 👇 Paste your new TV embeds here
+  {
+    key: "tv_embed3",
+    name: "TV Embed 3 (paste link)",
+    urlTemplate: "",
+    policy: { referrerPolicy: "strict-origin-when-cross-origin" },
+    shield: true,
+  },
+  {
+    key: "tv_embed4",
+    name: "TV Embed 4 (paste link)",
+    urlTemplate: "",
+    policy: { referrerPolicy: "strict-origin-when-cross-origin" },
+    shield: true,
+  },
+  {
+    key: "tv_embed5",
+    name: "TV Embed 5 (paste link)",
+    urlTemplate: "",
+    policy: { referrerPolicy: "strict-origin-when-cross-origin" },
+    shield: true,
+  },
+  {
+    key: "tv_embed6",
+    name: "TV Embed 6 (paste link)",
+    urlTemplate: "",
+    policy: { referrerPolicy: "strict-origin-when-cross-origin" },
+    shield: true,
+  },
+  {
+    key: "tv_embed7",
+    name: "TV Embed 7 (paste link)",
+    urlTemplate: "",
+    policy: { referrerPolicy: "strict-origin-when-cross-origin" },
+    shield: true,
+  },
 ];
 
+function buildServerUrl(server, id, s, e) {
+  if (typeof server.build === "function") return server.build(id, s, e);
+
+  if (server.urlTemplate && typeof server.urlTemplate === "string") {
+    return server.urlTemplate
+      .replaceAll("{id}", encodeURIComponent(id))
+      .replaceAll("{season}", encodeURIComponent(String(s)))
+      .replaceAll("{episode}", encodeURIComponent(String(e)));
+  }
+
+  return "";
+}
+
 function loadServer(serverKey) {
-  const server = SERVERS.find((s) => s.key === serverKey);
+  const server = SERVERS.find((x) => x.key === serverKey);
   if (!server) return;
 
   activeServerKey = serverKey;
@@ -296,7 +353,14 @@ function loadServer(serverKey) {
 
   sharkyTvPlayer.src = "about:blank";
   setTimeout(() => {
-    const url = server.build(tvId, season, episode);
+    const url = buildServerUrl(server, tvId, season, episode);
+
+    if (!url) {
+      showLoading(false);
+      console.warn("[Sharky] Missing URL for server:", serverKey);
+      return;
+    }
+
     sharkyTvPlayer.src = url;
 
     console.log("[Sharky] tvId:", tvId);
