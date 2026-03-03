@@ -265,6 +265,7 @@ function applyIframePolicy(policy) {
 // Placeholders supported: {id} {season} {episode}
 
 const SERVERS = [
+const SERVERS = [
   {
     key: "vidking",
     name: "VidKing (No Ads/Popups)",
@@ -277,7 +278,7 @@ const SERVERS = [
   },
   {
     key: "vidsrc",
-    name: "Vidsrc (Ads and PopUps)",
+    name: "Vidsrc (has ads)",
     build: (id, s, e) =>
       `https://vidsrc-embed.ru/embed/tv/${id}/${s}/${e}`,
     policy: {
@@ -286,42 +287,43 @@ const SERVERS = [
     shield: true,
   },
 
-  // 👇 Paste your new TV embeds here
+  // ✅ Your new TV servers
   {
-    key: "tv_embed3",
-    name: "TV Embed 3 (paste link)",
-    urlTemplate: "",
+    key: "vidrock_tv",
+    name: "VidRock (has ads)",
+    urlTemplate: "https://vidrock.net/tv/{id}/{season}/{episode}",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
   },
   {
-    key: "tv_embed4",
-    name: "TV Embed 4 (paste link)",
-    urlTemplate: "",
+    key: "videasy_tv",
+    name: "Videasy (has ads)",
+    urlTemplate: "https://player.videasy.net/tv/{id}/{season}/{episode}",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
   },
   {
-    key: "tv_embed5",
-    name: "TV Embed 5 (paste link)",
-    urlTemplate: "",
+    key: "2embed_tv",
+    name: "2Embed (has ads)",
+    urlTemplate: "https://www.2embed.cc/embedtv/{id}&s={season}&e={episode}",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
   },
   {
-    key: "tv_embed6",
-    name: "TV Embed 6 (paste link)",
-    urlTemplate: "",
+    key: "vidup_tv",
+    name: "VidUp (has ads)",
+    urlTemplate: "https://vidup.to/tv/{id}/{season}/{episode}?autoPlay=true",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
   },
   {
-    key: "tv_embed7",
-    name: "TV Embed 7 (paste link)",
-    urlTemplate: "",
+    key: "vidfast_tv",
+    name: "VidFast (has ads)",
+    urlTemplate: "https://vidfast.pro/tv/{id}/{season}/{episode}?autoPlay=true",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
   },
+];
 ];
 
 function buildServerUrl(server, id, s, e) {
@@ -537,3 +539,4 @@ if (!tvId) {
 
 </body>
 </html>
+
