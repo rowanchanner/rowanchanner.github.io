@@ -277,7 +277,7 @@ const SERVERS = [
   },
   {
     key: "vidsrc",
-    name: "Vidsrc (has ads)",
+    name: "Vidsrc (ads)",
     build: (id, s, e) =>
       `https://vidsrc-embed.ru/embed/tv/${id}/${s}/${e}`,
     policy: {
@@ -289,35 +289,35 @@ const SERVERS = [
   // ✅ Your new TV servers
   {
     key: "vidrock_tv",
-    name: "VidRock (has ads)",
+    name: "VidRock (ads)",
     urlTemplate: "https://vidrock.net/tv/{id}/{season}/{episode}",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
   },
   {
     key: "videasy_tv",
-    name: "Videasy (has ads)",
+    name: "Videasy (ads)",
     urlTemplate: "https://player.videasy.net/tv/{id}/{season}/{episode}",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
   },
   {
     key: "2embed_tv",
-    name: "2Embed (has ads)",
+    name: "2Embed (ads)",
     urlTemplate: "https://www.2embed.cc/embedtv/{id}&s={season}&e={episode}",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
   },
   {
     key: "vidup_tv",
-    name: "VidUp (has ads)",
+    name: "VidUp (ads)",
     urlTemplate: "https://vidup.to/tv/{id}/{season}/{episode}?autoPlay=true",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
   },
   {
     key: "vidfast_tv",
-    name: "VidFast (has ads)",
+    name: "VidFast (ads)",
     urlTemplate: "https://vidfast.pro/tv/{id}/{season}/{episode}?autoPlay=true",
     policy: { referrerPolicy: "strict-origin-when-cross-origin" },
     shield: true,
@@ -537,6 +537,7 @@ if (!tvId) {
 
 </body>
 </html>
+
 
 
 
