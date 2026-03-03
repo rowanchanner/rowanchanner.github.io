@@ -201,8 +201,16 @@ function applyIframePolicy(policy) {
 }
 
 // =====================
-// Servers
+// Servers (UPDATED: +6 placeholders)
 // =====================
+// HOW TO FILL PLACEHOLDERS:
+// - Option A: set `urlTemplate` and use {id} where the TMDB id goes
+//   e.g. urlTemplate: "https://example.com/embed/movie/{id}"
+// - Option B: set `build: (id)=> ...` (same as your existing ones)
+//
+// For ad-heavy servers set `shield: true`
+// If a server breaks with sandbox, remove sandbox policy or leave policy:{}.
+
 const SERVERS = [
   {
     key: "vidking",
@@ -224,8 +232,66 @@ const SERVERS = [
   },
   {
     key: "vidsrc_embed",
-    name: "Vidsrc V2 (Ads and Popups))",
+    name: "Vidsrc V2 (Ads and Popups)",
     build: (id) => `https://vidsrc-embed.ru/embed/movie?tmdb=${encodeURIComponent(id)}`,
+    policy: {
+      referrerPolicy: "strict-origin-when-cross-origin",
+    },
+    shield: true,
+  },
+
+  // 👇 Your new embed servers
+  {
+    key: "vidfast",
+    name: "VidFast",
+    urlTemplate: "https://vidfast.pro/movie/{id}",
+    policy: {
+      referrerPolicy: "strict-origin-when-cross-origin",
+    },
+    shield: true,
+  },
+  {
+    key: "vidup",
+    name: "VidUp",
+    urlTemplate: "https://vidup.to/movie/{id}?theme=FF0000",
+    policy: {
+      referrerPolicy: "strict-origin-when-cross-origin",
+    },
+    shield: true,
+  },
+  {
+    key: "2embed",
+    name: "2Embed",
+    urlTemplate: "https://www.2embed.cc/embed/{id}",
+    policy: {
+      referrerPolicy: "strict-origin-when-cross-origin",
+    },
+    shield: true,
+  },
+  {
+    key: "videasy",
+    name: "Videasy",
+    urlTemplate: "https://player.videasy.net/movie/{id}",
+    policy: {
+      referrerPolicy: "strict-origin-when-cross-origin",
+    },
+    shield: true,
+  },
+  {
+    key: "vidrock",
+    name: "VidRock",
+    urlTemplate: "https://vidrock.net/movie/{id}",
+    policy: {
+      referrerPolicy: "strict-origin-when-cross-origin",
+    },
+    shield: true,
+  },
+
+  // 🦈 Extra empty slot for another one later
+  {
+    key: "embed_extra",
+    name: "Embed Extra",
+    urlTemplate: "",
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
     },
@@ -245,6 +311,17 @@ function showLoading(on) {
   playerLoading.style.display = on ? "flex" : "none";
 }
 
+function buildServerUrl(server, id) {
+  if (typeof server.build === "function") return server.build(id);
+
+  // Template mode
+  if (server.urlTemplate && typeof server.urlTemplate === "string") {
+    return server.urlTemplate.replaceAll("{id}", encodeURIComponent(id));
+  }
+
+  return "";
+}
+
 function loadServer(serverKey) {
   const server = SERVERS.find((s) => s.key === serverKey);
   if (!server) return;
@@ -262,7 +339,15 @@ function loadServer(serverKey) {
   // Force reload cleanly
   sharkyMoviePlayer.src = "about:blank";
   setTimeout(() => {
-    const url = server.build(movieId);
+    const url = buildServerUrl(server, movieId);
+
+    if (!url) {
+      showLoading(false);
+      sharkyMovieTitle.textContent = "Server link missing.";
+      console.warn("[Sharky] Missing URL for server:", serverKey);
+      return;
+    }
+
     sharkyMoviePlayer.src = url;
 
     console.log("[Sharky] movieId:", movieId);
