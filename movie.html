@@ -223,7 +223,7 @@ const SERVERS = [
   },
   {
     key: "vsembed",
-    name: "Vidsrc (has ads)",
+    name: "Vidsrc (ads)",
     build: (id) => `https://vsembed.ru/embed/movie/${id}`,
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
@@ -232,7 +232,7 @@ const SERVERS = [
   },
   {
     key: "vidsrc_embed",
-    name: "Vidsrc V2 (has ads)",
+    name: "Vidsrc V2 (ads)",
     build: (id) => `https://vidsrc-embed.ru/embed/movie?tmdb=${encodeURIComponent(id)}`,
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
@@ -243,7 +243,7 @@ const SERVERS = [
   // 👇 Your new embed servers
   {
     key: "vidfast",
-    name: "VidFast (has ads)",
+    name: "VidFast (ads)",
     urlTemplate: "https://vidfast.pro/movie/{id}",
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
@@ -252,7 +252,7 @@ const SERVERS = [
   },
   {
     key: "vidup",
-    name: "VidUp (has ads)",
+    name: "VidUp (ads)",
     urlTemplate: "https://vidup.to/movie/{id}?theme=FF0000",
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
@@ -261,7 +261,7 @@ const SERVERS = [
   },
   {
     key: "2embed",
-    name: "2Embed (has ads)",
+    name: "2Embed (ads)",
     urlTemplate: "https://www.2embed.cc/embed/{id}",
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
@@ -270,7 +270,7 @@ const SERVERS = [
   },
   {
     key: "videasy",
-    name: "Videasy (has ads)",
+    name: "Videasy (ads)",
     urlTemplate: "https://player.videasy.net/movie/{id}",
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
@@ -279,7 +279,7 @@ const SERVERS = [
   },
   {
     key: "vidrock",
-    name: "VidRock (has ads)",
+    name: "VidRock (ads)",
     urlTemplate: "https://vidrock.net/movie/{id}",
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
@@ -446,5 +446,6 @@ if (!movieId) {
 
 </body>
 </html>
+
 
 
