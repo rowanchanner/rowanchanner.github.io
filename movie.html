@@ -214,7 +214,7 @@ function applyIframePolicy(policy) {
 const SERVERS = [
   {
     key: "vidking",
-    name: "VidKing (No ads/Popups)",
+    name: "VidKing",
     build: (id) => `https://www.vidking.net/embed/movie/${id}?color=e50914`,
     policy: {
       sandbox: "allow-scripts allow-forms allow-same-origin allow-presentation",
@@ -223,7 +223,7 @@ const SERVERS = [
   },
   {
     key: "vsembed",
-    name: "Vidsrc (Ads and Popups)",
+    name: "Vidsrc)",
     build: (id) => `https://vsembed.ru/embed/movie/${id}`,
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
@@ -232,7 +232,7 @@ const SERVERS = [
   },
   {
     key: "vidsrc_embed",
-    name: "Vidsrc V2 (Ads and Popups)",
+    name: "Vidsrc V2",
     build: (id) => `https://vidsrc-embed.ru/embed/movie?tmdb=${encodeURIComponent(id)}`,
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
@@ -281,17 +281,6 @@ const SERVERS = [
     key: "vidrock",
     name: "VidRock",
     urlTemplate: "https://vidrock.net/movie/{id}",
-    policy: {
-      referrerPolicy: "strict-origin-when-cross-origin",
-    },
-    shield: true,
-  },
-
-  // 🦈 Extra empty slot for another one later
-  {
-    key: "embed_extra",
-    name: "Embed Extra",
-    urlTemplate: "",
     policy: {
       referrerPolicy: "strict-origin-when-cross-origin",
     },
@@ -457,3 +446,4 @@ if (!movieId) {
 
 </body>
 </html>
+
