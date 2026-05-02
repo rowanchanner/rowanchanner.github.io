@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamFree - Watch Movies Online</title>
+    <style>
+        :root {
+            --primary: #e50914;
+            --dark: #141414;
+            --light: #f5f5f5;
+            --gray: #808080;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--dark);
+            color: var(--light);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 4%;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+            position: fixed;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .logo {
+            color: var(--primary);
+            font-size: 2rem;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .search-bar {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #fff;
+            background: rgba(0,0,0,0.5);
+            color: white;
+        }
+
+        /* Hero Section */
+        .hero {
+            height: 80vh;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            padding: 0 4%;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .hero::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to top, var(--dark), transparent);
+        }
+
+        .hero-content {
+            max-width: 600px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .hero h1 {
+            font-size: 4rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px #000;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            background-color: #b20710;
+        }
+
+        /* Movie Grid */
+        .container {
+            padding: 20px 4%;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            border-left: 4px solid var(--primary);
+            padding-left: 10px;
+        }
+
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .movie-card {
+            background-color: #222;
+            border-radius: 4px;
+            overflow: hidden;
+            transition: transform 0.3s;
+            cursor: pointer;
+        }
+
+        .movie-card:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .movie-card img {
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+        }
+
+        .movie-info {
+            padding: 10px;
+        }
+
+        .movie-info h3 {
+            font-size: 1rem;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rating {
+            color: #46d867;
+            font-size: 0.9rem;
+        }
+
+        /* Modal/Player */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 1000px;
+            background: #000;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+            z-index: 201;
+        }
+
+        iframe {
+            width: 100%;
+            height: 60vh;
+            border: none;
+            background: #000;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem; }
+            iframe { height: 40vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="#" class="logo">StreamFree</a>
+        <input type="text" class="search-bar" placeholder="Search movies..." id="searchInput">
+    </header>
+
+    <div class="hero" id="heroBanner">
+        <div class="hero-content">
+            <h1 id="heroTitle">Loading...</h1>
+            <p id="heroDesc">Watch the best movies from around the world for free.</p>
+            <br>
+            <button class="btn" id="heroBtn" style="display:none;">Play Movie</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Trending Now</h2>
+        <div class="movie-grid" id="movieGrid">
+            <!-- Movies will be injected here by JS -->
+        </div>
+    </div>
+
+    <!-- Video Player Modal -->
+    <div class="modal" id="videoModal">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <div class="modal-content">
+            <h2 id="modalTitle" style="margin-bottom: 10px; color: white;">Movie Title</h2>
+            <div id="playerContainer">
+                <iframe id="videoPlayer" src="" allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Configuration
+        const API_KEY = '47745852f22c21e3362f4907231538e1';
+        const BASE_URL = 'https://api.themoviedb.org/3';
+        const IMG_URL = 'https://image.tmdb.org/t/p/w500';
+        const BACKDROP_URL = 'https://image.tmdb.org/t/p/original';
+        
+        // Updated Video Host
+        const VIDEO_HOST = 'https://www.vidking.net'; 
+
+        // 2. Fetch Data
+        async function getMovies(endpoint) {
+            const apiUrl = endpoint === 'search' 
+                ? `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${document.getElementById('searchInput').value}`
+                : `${BASE_URL}${endpoint}?api_key=${API_KEY}&language=en-US`;
+
+            try {
+                const res = await fetch(apiUrl);
+                const data = await res.json();
+                return data.results;
+            } catch (error) {
+                console.error("Error fetching movies:", error);
+                return [];
+            }
+        }
+
+        // 3. Render Movies
+        function showMovies(movies) {
+            const grid = document.getElementById('movieGrid');
+            grid.innerHTML = '';
+
+            if (!movies || movies.length === 0) {
+                grid.innerHTML = '<p>No movies found.</p>';
+                return;
+            }
+
+            movies.forEach(movie => {
+                const { poster_path, vote_average, overview, id, title } = movie;
+
+                const element = document.createElement('div');
+                element.classList.add('movie-card');
+                element.innerHTML = `
+                    <img src="${poster_path ? IMG_URL + poster_path : 'https://via.placeholder.com/200x300'}" alt="${title}">
+                    <div class="movie-info">
+                        <h3>${title}</h3>
+                        <span class="rating">${vote_average.toFixed(1)} / 10</span>
+                    </div>
+                `;
+                
+                // Click to play
+                element.addEventListener('click', () => openModal(id, title));
+                grid.appendChild(element);
+            });
+        }
+
+        // 4. Player Logic
+        function openModal(id, title) {
+            const modal = document.getElementById('videoModal');
+            const player = document.getElementById('videoPlayer');
+            const modalTitle = document.getElementById('modalTitle');
+            
+            modalTitle.innerText = title;
+            modal.style.display = 'flex';
+
+            // Construct the embed URL: /embed/movie/{tmdbId}
+            const embedUrl = `${VIDEO_HOST}/embed/movie/${id}`;
+            
+            player.src = embedUrl;
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('videoModal');
+            const player = document.getElementById('videoPlayer');
+            player.src = ''; // Stop video
+            modal.style.display = 'none';
+        }
+
+        // 5. Search Functionality
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const val = e.target.value;
+            if(val.length > 2) {
+                getMovies('search').then(movies => showMovies(movies));
+            }
+        });
+
+        // 6. Initialize
+        (async function init() {
+            const movies = await getMovies('/trending/movie/week');
+            showMovies(movies);
+            
+            // Set Hero Background
+            if(movies.length > 0) {
+                const heroMovie = movies[0];
+                const heroImg = heroMovie.backdrop_path;
+                if(heroImg) {
+                    document.getElementById('heroBanner').style.backgroundImage = `url(${BACKDROP_URL + heroImg})`;
+                }
+                document.getElementById('heroTitle').innerText = heroMovie.title;
+                document.getElementById('heroDesc').innerText = heroMovie.overview.substring(0, 150) + "...";
+                
+                const heroBtn = document.getElementById('heroBtn');
+                heroBtn.style.display = 'inline-block';
+                heroBtn.onclick = () => openModal(heroMovie.id, heroMovie.title);
+            }
+        })();
+
+        // Close modal on outside click
+        window.onclick = function(event) {
+            const modal = document.getElementById('videoModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
