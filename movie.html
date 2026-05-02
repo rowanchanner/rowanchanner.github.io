@@ -213,13 +213,13 @@ function applyIframePolicy(policy) {
 
 const SERVERS = [
   {
-    key: "vidking",
-    name: "VidKing (no ads)",
+    key: "vsembed",
+    name: "Vidsrc (ads)",
     build: (id) => `https://www.vidking.net/embed/movie/${id}?color=e50914`,
     policy: {
-      sandbox: "allow-scripts allow-forms allow-same-origin allow-presentation",
+      referrerPolicy: "strict-origin-when-cross-origin",
     },
-    shield: false,
+    shield: true,
   },
   {
     key: "vsembed",
