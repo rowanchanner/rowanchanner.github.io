@@ -115,7 +115,7 @@ nav a:hover {
 }
 
 /* =========================================================
-   ✅ HERO (Cleaner, less red, more Netflix)
+   HERO
    ========================================================= */
 .hero{
   position: relative;
@@ -214,7 +214,7 @@ nav a:hover {
   transform: scale(1.08);
 }
 
-/* ✅ Big red button (Start Watching) */
+/* Hero Buttons */
 .hero-actions{
   margin-top: 16px;
   display:flex;
@@ -267,7 +267,7 @@ nav a:hover {
 }
 
 /* =========================================================
-   NEW: Rows (Continue Watching / Browse titles)
+   Rows
    ========================================================= */
 .content-row{
   margin: 24px 0;
@@ -290,33 +290,48 @@ nav a:hover {
   padding-bottom: 10px;
   scroll-behavior:smooth;
   overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
 }
 
 .row-scroll::-webkit-scrollbar{
   height: 8px;
 }
+
 .row-scroll::-webkit-scrollbar-thumb{
   background: rgba(255,255,255,0.18);
   border-radius: 20px;
 }
+
 .row-scroll::-webkit-scrollbar-thumb:hover{
   background: rgba(229,9,20,0.55);
 }
 
-/* Continue watching cards */
-.continue-card{
+/* =========================================================
+   Continue Watching Cards + Remove X Button
+   ========================================================= */
+
+.continue-card-wrap{
+  position: relative;
   min-width: 180px;
   height: 260px;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.continue-card{
+  width: 100%;
+  height: 100%;
+  display: block;
   border-radius: var(--cardRadius);
   background-size: cover;
   background-position: center;
   position: relative;
-  flex-shrink: 0;
   cursor: pointer;
   transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
   overflow: hidden;
   box-shadow: 0 10px 28px rgba(0,0,0,0.55);
   border: 1px solid rgba(255,255,255,0.06);
+  text-decoration: none;
 }
 
 .continue-card::before{
@@ -328,7 +343,7 @@ nav a:hover {
   pointer-events:none;
 }
 
-.continue-card:hover{
+.continue-card-wrap:hover .continue-card{
   transform: scale(1.06);
   box-shadow: 0 18px 40px rgba(0,0,0,0.75);
   filter: saturate(1.05);
@@ -345,6 +360,46 @@ nav a:hover {
   font-weight: 800;
   color: rgba(255,255,255,0.95);
   text-shadow: 0 10px 25px rgba(0,0,0,0.7);
+  z-index: 2;
+}
+
+.continue-remove{
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 50%;
+
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+
+  cursor: pointer;
+  z-index: 20;
+
+  box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+  transition: transform .12s ease, background .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+
+.continue-remove:hover{
+  background: var(--accent);
+  border-color: rgba(255,255,255,0.25);
+  transform: scale(1.1);
+  box-shadow: 0 0 0 4px rgba(229,9,20,0.18), 0 10px 24px rgba(0,0,0,0.55);
+}
+
+.continue-remove:active{
+  transform: scale(0.95);
 }
 
 .hidden{
@@ -352,7 +407,7 @@ nav a:hover {
 }
 
 /* =========================================================
-   Grid (unchanged structure, just refined)
+   Grid
    ========================================================= */
 .movie-grid {
   display: grid;
@@ -375,6 +430,7 @@ nav a:hover {
   color: #fff;
   user-select: none;
   border: 1px solid rgba(255,255,255,0.06);
+  text-decoration: none;
 }
 
 .movie-card::before{
@@ -507,38 +563,48 @@ footer {
   header{
     padding: 10px 12px;
   }
+
   .logo{
     font-size: 22px;
   }
+
   nav a{
     margin-right: 12px;
   }
+
   .movie-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
   }
+
   .movie-card {
     height: 240px;
   }
+
   .search-container input {
     width: 150px;
   }
+
   .player-container iframe {
     width: 95vw;
     height: calc(95vw * 9 / 16);
     min-height: 240px;
   }
+
   .poster {
     width: 180px;
   }
+
   .hero{
     height: auto;
     padding: 36px 16px;
     min-height: 320px;
   }
+
   .hero h1 {
     font-size: 36px;
   }
+
   .hero p {
     font-size: 14px;
   }
@@ -546,28 +612,35 @@ footer {
   .hero-actions{
     gap: 10px;
   }
+
   .hero-btn{
     width: 100%;
     max-width: 320px;
     justify-content:center;
   }
 
-  /* Continue row smaller cards */
-  .continue-card{
+  .continue-card-wrap{
     min-width: 150px;
     height: 220px;
   }
+
+  .continue-remove{
+    width: 26px;
+    height: 26px;
+    font-size: 20px;
+    top: 7px;
+    right: 7px;
+  }
+
   .row-title{
     font-size: 18px;
   }
 }
 
 /* =========================================================
-   ADD-ONS (SAFE): server buttons, player shell, dropdown fix
-   (These do NOT change your existing site styles)
+   ADD-ONS: server buttons, player shell, dropdown fix
    ========================================================= */
 
-/* Movie page layout helpers (only applies if those classes exist) */
 .player-top {
   width: 100%;
   max-width: 1200px;
@@ -644,7 +717,7 @@ footer {
   color: rgba(255,255,255,0.75);
 }
 
-/* Player shell + loading overlay (only if used) */
+/* Player shell + loading overlay */
 .player-shell {
   position: relative;
   width: 100%;
@@ -684,7 +757,7 @@ footer {
   to { transform: rotate(360deg); }
 }
 
-/* Fix: white dropdowns (TV season/episode selects etc) */
+/* Fix: white dropdowns */
 select {
   background: #1f1f1f;
   color: #fff;
@@ -710,13 +783,14 @@ option {
     grid-template-columns: 1fr;
     text-align: center;
   }
+
   .meta-wrap {
     text-align: center;
   }
 }
 
 /* =========================================================
-   ✅ ADDED: Row header + scroll buttons + Popular row cards
+   Row header + scroll buttons + row cards
    ========================================================= */
 
 .row-head{
@@ -768,6 +842,8 @@ option {
   border: 1px solid rgba(255,255,255,0.06);
   box-shadow: 0 10px 28px rgba(0,0,0,0.55);
   transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+  scroll-snap-align: start;
+  text-decoration: none;
 }
 
 .row-card::before{
@@ -796,11 +872,4 @@ option {
   font-weight:800;
   color: rgba(255,255,255,0.95);
   text-shadow: 0 10px 25px rgba(0,0,0,0.7);
-}
-
-.row-scroll{
-  scroll-snap-type: x mandatory;
-}
-.row-card, .continue-card{
-  scroll-snap-align: start;
 }
