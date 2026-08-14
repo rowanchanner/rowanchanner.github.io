@@ -38,8 +38,8 @@ if %errorlevel%==0 (
     git commit -m "Update Sharky Movies 2 site"
 )
 
-:: Push
-git push -u origin main
+:: Push (force so a fresh local repo can overwrite the remote)
+git push -u origin main --force
 
 if %errorlevel%==0 (
     echo.
