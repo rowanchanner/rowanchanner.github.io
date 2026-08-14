@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Watch Movie - Sharky Movies 2</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="favicon.png" />
+  <meta name="theme-color" content="#ff2a5f" />
+</head>
+<body class="player-page">
+
+  <header class="player-header">
+    <a href="/" class="logo">Sharky Movies 2</a>
+    <a href="/" class="player-home-link">← Back Home</a>
+  </header>
+
+  <main class="watch-layout">
+
+    <!-- ── Sharky Player ── -->
+    <section class="sharky-player-section">
+      <div class="sharky-player-wrap">
+        <div class="sharky-player-loading" id="sharkyLoading">
+          <div class="spinner"></div>
+          <div class="loading-text">Loading Sharky Player...</div>
+        </div>
+        <iframe
+          id="sharkyFrame"
+          allowfullscreen
+          mozallowfullscreen
+          webkitallowfullscreen
+          allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *"
+          referrerpolicy="no-referrer-when-downgrade">
+        </iframe>
+      </div>
+      <div class="sharky-attr">
+        <span class="sharky-attr-dot"></span>
+        Powered by <strong>Sharky Player</strong> &nbsp;·&nbsp; sharky-movies-api.onrender.com
+      </div>
+    </section>
+
+    <!-- ── Movie Info ── -->
+    <section class="watch-top">
+      <img id="poster" class="watch-poster" src="" alt="Movie poster" />
+
+      <div class="watch-meta">
+        <h1 id="title">Loading...</h1>
+
+        <div class="watch-info-line" id="infoLine">
+          <span>Movie</span>
+          <span>HD</span>
+        </div>
+
+        <p id="desc" class="watch-desc"></p>
+        <p class="details-extra" id="genres"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="player-footer">© 2026 Sharky Movies 2</footer>
+
+  <script>
+    const SHARKY_API = 'https://sharky-movies-api.onrender.com';
+    const API_KEY    = '47745852f22c21e3362f4907231538e1';
+
+    const params  = new URLSearchParams(location.search);
+    const movieId = params.get('id');
+
+    const sharkyFrame   = document.getElementById('sharkyFrame');
+    const sharkyLoading = document.getElementById('sharkyLoading');
+    const poster        = document.getElementById('poster');
+    const titleEl       = document.getElementById('title');
+    const descEl        = document.getElementById('desc');
+    const infoLine      = document.getElementById('infoLine');
+    const genresEl      = document.getElementById('genres');
+
+    // ── Load Sharky Player ──────────────────────────────────────────────────
+    if (movieId) {
+      sharkyFrame.src = `${SHARKY_API}/embed/movie/${movieId}`;
+      sharkyFrame.addEventListener('load', () => {
+        sharkyLoading.style.display = 'none';
+      }, { once: true });
+    } else {
+      sharkyLoading.innerHTML = '<p style="color:#888;padding:20px">No movie selected.</p>';
+    }
+
+    // ── Load movie info from TMDB ───────────────────────────────────────────
+    async function loadMovieDetails() {
+      if (!movieId) { titleEl.textContent = 'No movie selected.'; return; }
+
+      try {
+        const res   = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&language=en-US`);
+        const movie = await res.json();
+
+        const year    = movie.release_date ? movie.release_date.slice(0, 4) : 'N/A';
+        const rating  = movie.vote_average ? Number(movie.vote_average).toFixed(1) : 'N/A';
+        const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : '';
+
+        document.title  = `Watch ${movie.title || 'Movie'} - Sharky Movies 2`;
+        titleEl.textContent = `${movie.title || 'Untitled'} (${year})`;
+        descEl.textContent  = movie.overview || 'No overview available.';
+
+        poster.src = movie.poster_path
+          ? 'https://image.tmdb.org/t/p/w500' + movie.poster_path
+          : '';
+
+        infoLine.innerHTML = `
+          <span>Movie</span>
+          <span>${year}</span>
+          <span>HD</span>
+          <span>★ ${rating}</span>
+          ${runtime ? `<span>${runtime}</span>` : ''}
+        `;
+
+        if (movie.genres?.length) {
+          genresEl.textContent = movie.genres.slice(0, 4).map(g => g.name).join(' · ');
+        }
+
+        saveContinueWatching(movie);
+      } catch (err) {
+        console.error(err);
+        titleEl.textContent = 'Failed to load movie.';
+      }
+    }
+
+    function saveContinueWatching(movie) {
+      const key = 'sharky_movies_2_continue_watching';
+      let list = [];
+      try { list = JSON.parse(localStorage.getItem(key)) || []; } catch {}
+      const item = {
+        id: movie.id, media_type: 'movie',
+        sharky_title: movie.title, sharky_date: movie.release_date || '',
+        poster_path: movie.poster_path, backdrop_path: movie.backdrop_path,
+        vote_average: movie.vote_average, overview: movie.overview,
+        lastWatched: Date.now()
+      };
+      const filtered = list.filter(x => !(Number(x.id) === Number(movie.id) && x.media_type === 'movie'));
+      localStorage.setItem(key, JSON.stringify([item, ...filtered].slice(0, 20)));
+    }
+
+    loadMovieDetails();
+  </script>
+</body>
+</html>

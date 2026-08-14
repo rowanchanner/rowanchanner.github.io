@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Sharky Movies 2</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="favicon.png" />
+  <meta name="theme-color" content="#ff2a5f" />
+</head>
+
+<body>
+
+  <header class="navbar" id="navbar">
+    <div class="nav-left">
+      <a href="/" class="logo">Sharky Movies 2</a>
+
+      <nav class="nav-links">
+        <button class="nav-link active" data-jump="home">Home</button>
+        <button class="nav-link" data-jump="movies">Movies</button>
+        <button class="nav-link" data-jump="tv">TV Shows</button>
+        <button class="nav-link" data-jump="continue">Continue Watching</button>
+        <button class="nav-link" data-jump="mylist">My List</button>
+        <a href="old/index.html" class="nav-link old-version-btn" style="text-decoration:none;">Use Old Sharky Movies</a>
+      </nav>
+    </div>
+
+    <div class="nav-right">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" class="search-bar" type="text" placeholder="Search movies or TV..." />
+      </div>
+
+      <div class="profile-icon">S</div>
+    </div>
+  </header>
+
+  <section class="hero" id="heroBanner">
+    <div class="hero-overlay"></div>
+
+    <div class="hero-content">
+      <div class="hero-tag">Featured Today</div>
+
+      <h1 id="heroTitle">Loading...</h1>
+
+      <div class="hero-meta" id="heroMeta">
+        <span>HD</span>
+        <span>Movie</span>
+      </div>
+
+      <p id="heroDesc">Loading Sharky Movies 2...</p>
+
+      <div class="hero-actions">
+        <button class="btn btn-play" id="heroPlayBtn">▶ Play</button>
+        <button class="btn btn-secondary" id="heroListBtn">+ My List</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="sharky-feature-banner">
+    <div class="sfb-inner">
+      <div class="sfb-left">
+        <div class="sfb-tag">⚡ New Player</div>
+        <h2 class="sfb-title">Powered by<br><span>Sharky Player</span></h2>
+        <p class="sfb-desc">Our custom-built streaming engine. Cinematic intro, trailer previews, multiple servers, and less ads — all in one seamless player.</p>
+        <div class="sfb-pills">
+          <span>🎬 Trailer Intros</span>
+          <span>🔇 Less Ads</span>
+          <span>⚡ HD Streaming</span>
+          <span>🖥 Fullscreen</span>
+          <span>📺 Multiple Servers</span>
+        </div>
+      </div>
+      <div class="sfb-right">
+        <div class="sfb-player-preview">
+          <div class="sfb-preview-bar">
+            <span class="sfb-dot r"></span>
+            <span class="sfb-dot y"></span>
+            <span class="sfb-dot g"></span>
+            <span class="sfb-preview-label">sharky-movies-api.onrender.com</span>
+          </div>
+          <div class="sfb-preview-body">
+            <div class="sfb-preview-screen">
+              <div class="sfb-ring"></div>
+              <div class="sfb-brand">🦈</div>
+              <div class="sfb-now-playing">NOW PLAYING</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="page-content">
+
+    <section class="movie-section hidden" id="searchSection">
+      <div class="section-header">
+        <h2 id="searchTitle">Search Results</h2>
+        <button class="clear-search" id="clearSearchBtn">Clear</button>
+      </div>
+
+      <div class="search-grid" id="searchGrid"></div>
+    </section>
+
+    <section class="movie-section" id="rowsSection">
+
+      <div class="movie-row-block hidden" id="continueBlock">
+        <div class="section-header">
+          <h2>Continue Watching</h2>
+          <button class="clear-search" id="clearContinueBtn">Clear</button>
+        </div>
+        <div class="movie-row" id="continueRow"></div>
+      </div>
+
+      <div class="movie-row-block" id="moviesBlock">
+        <div class="section-header">
+          <h2>Trending Movies</h2>
+        </div>
+        <div class="movie-row" id="trendingMoviesRow"></div>
+      </div>
+
+      <div class="movie-row-block">
+        <div class="section-header">
+          <h2>Popular Movies</h2>
+        </div>
+        <div class="movie-row" id="popularMoviesRow"></div>
+      </div>
+
+      <div class="movie-row-block">
+        <div class="section-header">
+          <h2>Top Rated Movies</h2>
+        </div>
+        <div class="movie-row" id="topMoviesRow"></div>
+      </div>
+
+      <div class="movie-row-block" id="tvBlock">
+        <div class="section-header">
+          <h2>Trending TV Shows</h2>
+        </div>
+        <div class="movie-row" id="trendingTvRow"></div>
+      </div>
+
+      <div class="movie-row-block">
+        <div class="section-header">
+          <h2>Popular TV Shows</h2>
+        </div>
+        <div class="movie-row" id="popularTvRow"></div>
+      </div>
+
+      <div class="movie-row-block">
+        <div class="section-header">
+          <h2>Top Rated TV Shows</h2>
+        </div>
+        <div class="movie-row" id="topTvRow"></div>
+      </div>
+
+      <div class="movie-row-block">
+        <div class="section-header">
+          <h2>Action Movies</h2>
+        </div>
+        <div class="movie-row" id="actionRow"></div>
+      </div>
+
+      <div class="movie-row-block">
+        <div class="section-header">
+          <h2>Horror Movies</h2>
+        </div>
+        <div class="movie-row" id="horrorRow"></div>
+      </div>
+
+      <div class="movie-row-block">
+        <div class="section-header">
+          <h2>Comedy Movies</h2>
+        </div>
+        <div class="movie-row" id="comedyRow"></div>
+      </div>
+
+      <div class="movie-row-block hidden" id="myListBlock">
+        <div class="section-header">
+          <h2>My List</h2>
+        </div>
+        <div class="movie-row" id="myListRow"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <div class="details-modal" id="detailsModal">
+    <div class="details-backdrop" id="detailsBackdrop"></div>
+
+    <div class="details-box">
+      <button class="modal-close" id="detailsCloseBtn">&times;</button>
+
+      <div class="details-hero" id="detailsHero">
+        <div class="details-gradient"></div>
+
+        <div class="details-hero-content">
+          <div class="hero-tag" id="detailsTypeTag">Movie</div>
+          <h2 id="detailsTitle">Title</h2>
+
+          <div class="details-meta" id="detailsMeta"></div>
+
+          <div class="details-buttons">
+            <button class="btn btn-play" id="detailsPlayBtn">▶ Play</button>
+            <button class="btn btn-secondary" id="detailsTrailerBtn">Trailer</button>
+            <button class="btn btn-secondary" id="detailsListBtn">+ My List</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="details-body">
+        <div class="details-poster-wrap">
+          <img id="detailsPoster" src="" alt="Poster" />
+        </div>
+
+        <div class="details-text">
+          <p id="detailsOverview">Loading...</p>
+          <p class="details-extra" id="detailsExtra"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
