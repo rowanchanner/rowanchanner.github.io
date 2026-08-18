@@ -1,6 +1,9 @@
 @echo off
 setlocal
 
+:: Always run from the folder this bat lives in
+cd /d "%~dp0"
+
 set REPO=https://github.com/rowanchanner/rowanchanner.github.io.git
 
 echo [sharky] Pushing to %REPO%...
