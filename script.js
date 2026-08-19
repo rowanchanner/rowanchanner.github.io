@@ -162,14 +162,16 @@ function showSkeletonGrid(grid, count = 12) {
 }
 
 /* ── Card ───────────────────────────────────────────────── */
-function createCard(item) {
+function createCard(item, opts = {}) {
   const card = document.createElement("article");
   card.className = "movie-card";
   const typeLabel = item.media_type === "tv" ? "SERIES" : "FILM";
   const year   = getYear(item);
   const rating = getRating(item);
+  const removable = opts.removable || false;   // Continue / My List cards
 
   card.innerHTML = `
+    ${removable ? `<button class="card-remove" title="Remove" aria-label="Remove" data-act="remove">&times;</button>` : ""}
     <img src="${getCardImg(item)}" alt="${escapeHTML(item.sharky_title)}" loading="lazy">
     <div class="card-overlay">
       <h3 class="card-title">${escapeHTML(item.sharky_title)}</h3>
@@ -186,9 +188,16 @@ function createCard(item) {
       </div>
     </div>`;
 
-  // Delegated: play / list / info from the little buttons; card itself = info.
+  // Delegated: play / list / info / remove; card itself = info.
   card.addEventListener("click", (e) => {
     const act = e.target.closest("[data-act]")?.dataset.act;
+    if (act === "remove") {
+      e.stopPropagation();
+      const source = opts.source; // "continue" | "mylist"
+      if (source === "continue") removeContinueItem(item);
+      else if (source === "mylist") { toggleMyList(item); }
+      return;
+    }
     if (act === "play") { e.stopPropagation(); playItem(item); return; }
     if (act === "list") { e.stopPropagation(); toggleMyList(item); return; }
     openDetails(item.id, item.media_type);
@@ -196,7 +205,14 @@ function createCard(item) {
   return card;
 }
 
-function renderRow(row, items) {
+function removeContinueItem(item) {
+  const list = getStorage(STORAGE_CONTINUE)
+    .filter(x => !(Number(x.id) === Number(item.id) && x.media_type === item.media_type));
+  setStorage(STORAGE_CONTINUE, list);
+  renderContinueWatching();
+}
+
+function renderRow(row, items, opts = {}) {
   if (!row) return;
   row.innerHTML = "";
   const filtered = (items || []).filter(i => i.poster_path || i.backdrop_path);
@@ -204,7 +220,7 @@ function renderRow(row, items) {
     row.innerHTML = `<p class="empty-message">Nothing here yet.</p>`;
     return;
   }
-  filtered.forEach(i => row.appendChild(createCard(i)));
+  filtered.forEach(i => row.appendChild(createCard(i, opts)));
 }
 function renderGrid(grid, items) {
   grid.innerHTML = "";
@@ -396,13 +412,13 @@ function renderContinueWatching() {
   const list = getStorage(STORAGE_CONTINUE);
   if (!list.length) { continueBlock.classList.add("hidden"); rowMap.continue.innerHTML = ""; return; }
   continueBlock.classList.remove("hidden");
-  renderRow(rowMap.continue, list);
+  renderRow(rowMap.continue, list, { removable: true, source: "continue" });
 }
 function renderMyList() {
   const list = getStorage(STORAGE_MY_LIST);
   if (!list.length) { myListBlock.classList.add("hidden"); rowMap.myList.innerHTML = ""; return; }
   myListBlock.classList.remove("hidden");
-  renderRow(rowMap.myList, list);
+  renderRow(rowMap.myList, list, { removable: true, source: "mylist" });
 }
 
 /* ── Search ─────────────────────────────────────────────── */
@@ -447,8 +463,22 @@ document.querySelectorAll(".nav-link[data-jump]").forEach(btn => {
     if (jump === "home")     window.scrollTo({ top: 0, behavior: "smooth" });
     if (jump === "movies")   document.getElementById("moviesBlock")?.scrollIntoView({ behavior: "smooth" });
     if (jump === "tv")       document.getElementById("tvBlock")?.scrollIntoView({ behavior: "smooth" });
-    if (jump === "continue") { continueBlock.classList.remove("hidden"); continueBlock.scrollIntoView({ behavior: "smooth" }); }
-    if (jump === "mylist")   { myListBlock.classList.remove("hidden");   myListBlock.scrollIntoView({ behavior: "smooth" }); }
+    if (jump === "continue") {
+      continueBlock.classList.remove("hidden");
+      if (!getStorage(STORAGE_CONTINUE).length) {
+        rowMap.continue.innerHTML =
+          `<p class="empty-message">You haven't started watching anything yet — pick something to begin.</p>`;
+      }
+      continueBlock.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (jump === "mylist") {
+      myListBlock.classList.remove("hidden");
+      if (!getStorage(STORAGE_MY_LIST).length) {
+        rowMap.myList.innerHTML =
+          `<p class="empty-message">Your list is empty — hit &ldquo;+ My List&rdquo; on anything to save it here.</p>`;
+      }
+      myListBlock.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   });
 });
 
@@ -479,6 +509,15 @@ document.querySelectorAll(".row-viewport").forEach(vp => {
 window.addEventListener("scroll", () => {
   navbar.classList.toggle("scrolled", window.scrollY > 40);
 });
+
+/* ── Keep sticky browse-strip flush against the (variable-height) navbar ── */
+function syncNavHeight() {
+  const h = navbar.getBoundingClientRect().height;
+  document.documentElement.style.setProperty("--nav-h", `${Math.round(h)}px`);
+}
+window.addEventListener("resize", syncNavHeight);
+window.addEventListener("load",   syncNavHeight);
+syncNavHeight();
 
 /* ── Init ───────────────────────────────────────────────── */
 async function init() {
