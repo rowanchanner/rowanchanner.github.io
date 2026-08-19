@@ -68,7 +68,6 @@ const rowMap = {
 const continueBlock    = document.getElementById("continueBlock");
 const myListBlock      = document.getElementById("myListBlock");
 const clearContinueBtn = document.getElementById("clearContinueBtn");
-const browseStrip      = document.getElementById("browseStrip");
 
 let currentDetailsItem = null;
 let currentHeroItem    = null;
@@ -479,20 +478,6 @@ document.querySelectorAll(".nav-link[data-jump]").forEach(btn => {
       }
       myListBlock.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  });
-});
-
-/* ── Browse chips (filter visible rows by data-cat token) ── */
-browseStrip.addEventListener("click", e => {
-  const chip = e.target.closest(".browse-chip");
-  if (!chip) return;
-  browseStrip.querySelectorAll(".browse-chip").forEach(c => c.classList.remove("active"));
-  chip.classList.add("active");
-  const filter = chip.dataset.filter;
-  document.querySelectorAll(".movie-row-block[data-cat]").forEach(block => {
-    const cats = block.dataset.cat.split(/\s+/);
-    const show = filter === "all" || cats.includes(filter);
-    block.style.display = show ? "" : "none";
   });
 });
 

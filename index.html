@@ -65,21 +65,6 @@
     <div class="hero-pager" id="heroPager"></div>
   </section>
 
-  <!-- ── BROWSE CHIP ROW ────────────────────────────────── -->
-  <div class="browse-strip" id="browseStrip">
-    <button class="browse-chip active" data-filter="all">All</button>
-    <button class="browse-chip" data-filter="trending">Trending Now</button>
-    <button class="browse-chip" data-filter="movies">Movies</button>
-    <button class="browse-chip" data-filter="tv">TV Shows</button>
-    <button class="browse-chip" data-filter="action">Action</button>
-    <button class="browse-chip" data-filter="comedy">Comedy</button>
-    <button class="browse-chip" data-filter="horror">Horror</button>
-    <button class="browse-chip" data-filter="scifi">Sci-Fi</button>
-    <button class="browse-chip" data-filter="romance">Romance</button>
-    <button class="browse-chip" data-filter="animation">Animation</button>
-    <button class="browse-chip" data-filter="documentary">Documentary</button>
-  </div>
-
   <!-- ── PAGE CONTENT ────────────────────────────────────── -->
   <main class="page-content">
 
@@ -96,9 +81,12 @@
     <section class="movie-section" id="rowsSection">
 
       <div class="movie-row-block hidden" id="continueBlock" data-cat="continue">
-        <div class="section-header">
-          <h2>Continue Watching</h2>
-          <button class="clear-search" id="clearContinueBtn">Clear</button>
+        <div class="section-header section-header-lg">
+          <div class="section-header-title">
+            <span class="section-eyebrow">Pick up where you left off</span>
+            <h2>Continue Watching</h2>
+          </div>
+          <button class="clear-search" id="clearContinueBtn">Clear All</button>
         </div>
         <div class="row-viewport">
           <button class="row-arrow left"  aria-label="Scroll left">&#10094;</button>
@@ -108,8 +96,11 @@
       </div>
 
       <div class="movie-row-block hidden" id="myListBlock" data-cat="mylist">
-        <div class="section-header">
-          <h2>My List</h2>
+        <div class="section-header section-header-lg">
+          <div class="section-header-title">
+            <span class="section-eyebrow">Your saved titles</span>
+            <h2>My List</h2>
+          </div>
         </div>
         <div class="row-viewport">
           <button class="row-arrow left"  aria-label="Scroll left">&#10094;</button>

@@ -352,43 +352,6 @@ img { display: block; max-width: 100%; }
 .btn-icon:hover { border-color: #fff; background: rgba(0,0,0,.5); }
 
 /* ==============================================================
-   BROWSE CHIP ROW — Netflix genre bar
-   ============================================================== */
-
-.browse-strip {
-  position: sticky;
-  top: var(--nav-h, 68px);
-  z-index: 200;
-  padding: 12px 4% 12px;
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  background: linear-gradient(to bottom, rgba(20,20,20,.92) 60%, transparent);
-  backdrop-filter: blur(10px);
-  scrollbar-width: none;
-}
-.browse-strip::-webkit-scrollbar { display: none; }
-.browse-chip {
-  padding: 7px 16px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.05);
-  border: 1px solid var(--line);
-  color: rgba(255,255,255,.75);
-  font-size: .82rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all .18s var(--ease);
-  font-family: inherit;
-}
-.browse-chip:hover { color: #fff; border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.08); }
-.browse-chip.active {
-  background: #fff;
-  color: #000;
-  border-color: #fff;
-}
-
-/* ==============================================================
    PAGE CONTENT / ROWS
    ============================================================== */
 
@@ -422,6 +385,26 @@ img { display: block; max-width: 100%; }
   font-weight: 800;
   letter-spacing: -.3px;
   color: #fff;
+}
+
+/* Larger header used for Continue Watching / My List */
+.section-header-lg { margin-bottom: 16px; align-items: flex-end; }
+.section-header-title { display: flex; flex-direction: column; gap: 4px; }
+.section-header-lg h2 {
+  font-size: 1.85rem;
+  font-weight: 900;
+  letter-spacing: -.6px;
+}
+.section-eyebrow {
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--red);
+}
+@media (max-width: 640px) {
+  .section-header-lg h2 { font-size: 1.4rem; }
+  .section-eyebrow      { font-size: .62rem; letter-spacing: 2px; }
 }
 
 .section-header .see-all {
@@ -825,8 +808,6 @@ img { display: block; max-width: 100%; }
   .logo { font-size: 1.5rem; }
   .profile-icon { display: none; }
   .nav-link { font-size: .82rem; }
-  .browse-strip { padding: 8px 4%; }
-  .browse-chip { padding: 5px 12px; font-size: .76rem; }
   .hero { padding-top: 150px; min-height: 72vh; }
   .hero-content { max-width: 100%; }
   .hero-actions { flex-wrap: wrap; gap: 8px; }
