@@ -358,8 +358,8 @@ img { display: block; max-width: 100%; }
 .page-content {
   position: relative;
   z-index: 5;
-  margin-top: -60px;
-  padding: 0 0 80px;
+  margin-top: 0;
+  padding: 30px 0 80px;
 }
 
 .movie-section {
@@ -367,17 +367,18 @@ img { display: block; max-width: 100%; }
 }
 
 .movie-row-block {
-  margin-bottom: 42px;
+  margin-bottom: 24px;
   position: relative;
-  scroll-margin-top: 140px;   /* clear navbar + sticky browse strip on jumps */
+  scroll-margin-top: 100px;   /* clear the fixed navbar on jump-nav */
 }
 
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
   padding: 0 2px;
+  min-height: 40px;
 }
 
 .section-header h2 {
@@ -447,9 +448,8 @@ img { display: block; max-width: 100%; }
   gap: 8px;
   overflow-x: auto;
   overflow-y: visible;
-  /* generous vertical padding so 1.28× scale isn't clipped by neighbours */
-  padding: 40px 0 40px;
-  margin: -20px 0;
+  /* generous vertical padding so 1.28× hover scale doesn't clip against neighbours */
+  padding: 30px 0;
   scroll-behavior: smooth;
   scrollbar-width: none;
 }
@@ -774,7 +774,7 @@ img { display: block; max-width: 100%; }
   .search-bar { width: 100%; }
   .search-bar:focus { width: 100%; }
   .search-wrap { flex: 1; }
-  .movie-row-block { scroll-margin-top: 180px; }
+  .movie-row-block { scroll-margin-top: 130px; }
   .hero { min-height: 78vh; padding: 160px 4% 100px; }
   .hero h1 { letter-spacing: -1.5px; }
   .movie-card, .skeleton-card { width: 220px; }
