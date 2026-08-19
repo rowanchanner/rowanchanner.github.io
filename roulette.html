@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roulette — Sharky Movies 2</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <meta name="theme-color" content="#e50914" />
+  <style>
+    body { background: #000; overflow: hidden; }
+    .rt-stage {
+      position: fixed; inset: 0;
+      display: grid; place-items: center;
+      background: #000;
+      overflow: hidden;
+    }
+    .rt-video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      transform: scale(1.35);
+      transform-origin: center;
+      border: none;
+      pointer-events: none;
+    }
+    .rt-veil {
+      position: absolute; inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(to bottom, rgba(0,0,0,.9) 0%, rgba(0,0,0,.15) 25%, transparent 45%, rgba(0,0,0,.15) 70%, rgba(0,0,0,.98) 100%);
+    }
+    .rt-header {
+      position: absolute; top: 24px; left: 4%; right: 4%;
+      z-index: 5;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .rt-brand { color: var(--red); font-weight: 900; font-size: 1.4rem; letter-spacing: -.5px; text-decoration: none; }
+    .rt-home  { color: rgba(255,255,255,.75); font-size: .82rem; font-weight: 600; text-decoration: none; }
+    .rt-home:hover { color: #fff; }
+
+    .rt-title-block {
+      position: absolute; left: 5%; right: 5%; bottom: 22%;
+      z-index: 5;
+      max-width: 700px;
+      animation: rtFadeUp .5s var(--ease);
+    }
+    .rt-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 4px 10px; margin-bottom: 12px;
+      background: rgba(229,9,20,.18);
+      border-left: 3px solid var(--red);
+      font-size: .68rem; font-weight: 800; letter-spacing: 3px; text-transform: uppercase;
+      color: #fff;
+    }
+    .rt-live-dot { width:8px; height:8px; border-radius:50%; background:var(--red); animation:rtPulse 1.4s infinite; }
+    @keyframes rtPulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .rt-title {
+      font-size: clamp(2rem, 5vw, 4.5rem);
+      font-weight: 900; letter-spacing: -3px; line-height: .95;
+      color: #fff;
+      text-shadow: 0 6px 30px rgba(0,0,0,.9);
+      margin-bottom: 10px;
+    }
+    .rt-meta {
+      display: flex; gap: 12px; align-items: center;
+      font-size: .9rem; color: #e5e5e5; font-weight: 600;
+    }
+    .rt-meta .rating { color: var(--success); font-weight: 800; }
+    .rt-desc {
+      color: rgba(255,255,255,.85);
+      max-width: 620px;
+      margin-top: 12px;
+      line-height: 1.5;
+      text-shadow: 0 3px 12px rgba(0,0,0,.9);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .rt-controls {
+      position: absolute; left: 5%; right: 5%; bottom: 6%;
+      z-index: 6;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .rt-btn {
+      border: none; border-radius: 4px;
+      padding: 12px 22px;
+      font-family: inherit;
+      font-weight: 800; font-size: .95rem;
+      cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: transform .12s var(--ease), background .18s var(--ease);
+    }
+    .rt-btn:active { transform: scale(.97); }
+    .rt-play  { background: #fff; color: #000; }
+    .rt-play:hover { background: rgba(255,255,255,.78); }
+    .rt-skip  { background: rgba(255,255,255,.14); color: #fff; }
+    .rt-skip:hover { background: rgba(255,255,255,.24); }
+    .rt-sound { background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.2); }
+    .rt-sound.on { background: var(--red); border-color: var(--red); }
+
+    .rt-progress {
+      position: absolute; top: 78px; left: 5%; right: 5%;
+      z-index: 5;
+      display: flex; gap: 3px; height: 3px;
+    }
+    .rt-tick {
+      flex: 1;
+      background: rgba(255,255,255,.15);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+    .rt-tick.done { background: rgba(255,255,255,.5); }
+    .rt-tick.now::before {
+      content: ""; position: absolute; inset: 0; width: 0%;
+      background: var(--red); animation: rtFill var(--dur,60s) linear forwards;
+    }
+    @keyframes rtFill { to { width: 100%; } }
+    @keyframes rtFadeUp { from { opacity:0; transform: translateY(20px);} to {opacity:1; transform:translateY(0);} }
+
+    .rt-loading {
+      color: var(--muted); font-size: .8rem; letter-spacing: 5px; text-transform: uppercase; font-weight: 700;
+    }
+    .rt-empty {
+      color: var(--muted); font-size: 1rem; text-align: center; max-width: 460px;
+      padding: 24px;
+    }
+    .rt-empty a { color: var(--red); font-weight: 700; }
+
+    @media (max-width: 640px) {
+      .rt-title { letter-spacing: -1.5px; }
+      .rt-controls { flex-direction: column; align-items: stretch; }
+      .rt-btn { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="rt-stage" id="stage">
+  <div class="rt-loading" id="loading">Warming up the projector…</div>
+  <div class="rt-veil"></div>
+</div>
+
+<div class="rt-header" style="display:none" id="header">
+  <a href="/" class="rt-brand">SHARKY</a>
+  <a href="/" class="rt-home">&larr; Back Home</a>
+</div>
+
+<div class="rt-progress" id="progress" style="display:none"></div>
+
+<div class="rt-title-block" id="titleBlock" style="display:none">
+  <div class="rt-eyebrow"><span class="rt-live-dot"></span> Sharky TV · Now Showing</div>
+  <div class="rt-title"  id="rtTitle"></div>
+  <div class="rt-meta"   id="rtMeta"></div>
+  <div class="rt-desc"   id="rtDesc"></div>
+</div>
+
+<div class="rt-controls" id="controls" style="display:none">
+  <button class="rt-btn rt-play"  id="btnPlay">&#9654;  Watch This Now</button>
+  <button class="rt-btn rt-skip"  id="btnSkip">&raquo;&raquo;  Skip to Next</button>
+  <button class="rt-btn rt-sound" id="btnSound">&#128263;  Sound Off</button>
+</div>
+
+<script>
+  const API_KEY  = '47745852f22c21e3362f4907231538e1';
+  const BATCH    = 20;      // how many trailers to line up
+  const DURATION = 55000;   // 55 seconds per trailer, then auto-advance
+
+  const stage      = document.getElementById('stage');
+  const loading    = document.getElementById('loading');
+  const header     = document.getElementById('header');
+  const progressEl = document.getElementById('progress');
+  const titleBlock = document.getElementById('titleBlock');
+  const controls   = document.getElementById('controls');
+  const rtTitle    = document.getElementById('rtTitle');
+  const rtMeta     = document.getElementById('rtMeta');
+  const rtDesc     = document.getElementById('rtDesc');
+  const btnPlay    = document.getElementById('btnPlay');
+  const btnSkip    = document.getElementById('btnSkip');
+  const btnSound   = document.getElementById('btnSound');
+
+  let items = [];
+  let idx   = 0;
+  let currentFrame = null;
+  let advanceTimer = null;
+  let muted        = true;
+
+  async function tmdb(p) {
+    const sep = p.includes('?') ? '&' : '?';
+    const r = await fetch(`https://api.themoviedb.org/3${p}${sep}api_key=${API_KEY}&language=en-US`);
+    return r.ok ? r.json() : null;
+  }
+
+  async function loadPool() {
+    const [m1, m2, tv1] = await Promise.all([
+      tmdb('/trending/movie/week'),
+      tmdb('/movie/popular'),
+      tmdb('/trending/tv/week'),
+    ]);
+    const seed = []
+      .concat((m1?.results || []).map(x => ({ ...x, media_type: 'movie' })))
+      .concat((m2?.results || []).map(x => ({ ...x, media_type: 'movie' })))
+      .concat((tv1?.results || []).map(x => ({ ...x, media_type: 'tv' })));
+    // shuffle
+    seed.sort(() => Math.random() - 0.5);
+
+    // Enrich the first N with trailer keys
+    const picks = [];
+    for (const it of seed) {
+      if (picks.length >= BATCH) break;
+      const vids = await tmdb(`/${it.media_type}/${it.id}/videos`);
+      const tr = (vids?.results || []).find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.key)
+              || (vids?.results || []).find(v => v.site === 'YouTube' && v.key);
+      if (tr) picks.push({
+        id: it.id,
+        media_type: it.media_type,
+        title: it.title || it.name,
+        year: (it.release_date || it.first_air_date || '').slice(0,4),
+        rating: it.vote_average ? Number(it.vote_average).toFixed(1) : '',
+        overview: it.overview || '',
+        key: tr.key,
+      });
+    }
+    return picks;
+  }
+
+  function renderProgress() {
+    progressEl.innerHTML = '';
+    items.forEach((_, i) => {
+      const t = document.createElement('div');
+      t.className = 'rt-tick' + (i < idx ? ' done' : i === idx ? ' now' : '');
+      t.style.setProperty('--dur', (DURATION/1000) + 's');
+      progressEl.appendChild(t);
+    });
+  }
+
+  function play(index) {
+    if (!items.length) return;
+    idx = ((index % items.length) + items.length) % items.length;
+    const it = items[idx];
+
+    if (currentFrame) currentFrame.remove();
+    if (advanceTimer) clearTimeout(advanceTimer);
+
+    const iframe = document.createElement('iframe');
+    iframe.className = 'rt-video';
+    iframe.allow = 'autoplay; encrypted-media';
+    iframe.setAttribute('frameborder', '0');
+    iframe.src = `https://www.youtube-nocookie.com/embed/${it.key}`
+               + `?autoplay=1&mute=${muted?1:0}&controls=0&showinfo=0&rel=0`
+               + `&modestbranding=1&playsinline=1&iv_load_policy=3&start=6`
+               + `&enablejsapi=1&playlist=${it.key}`;
+    stage.appendChild(iframe);
+    currentFrame = iframe;
+
+    rtTitle.textContent = it.title;
+    rtMeta.innerHTML = `
+      ${it.rating ? `<span class="rating">&#9733; ${it.rating}</span>` : ''}
+      ${it.year   ? `<span>${it.year}</span>` : ''}
+      <span>${it.media_type === 'tv' ? 'TV Series' : 'Movie'}</span>
+      <span>HD</span>
+    `;
+    rtDesc.textContent = it.overview || '';
+    renderProgress();
+    advanceTimer = setTimeout(() => play(idx + 1), DURATION);
+  }
+
+  function goToWatch() {
+    const it = items[idx];
+    if (!it) return;
+    if (it.media_type === 'tv') location.href = `tv.html?id=${it.id}`;
+    else location.href = `movie.html?id=${it.id}`;
+  }
+
+  btnPlay.addEventListener('click', goToWatch);
+  btnSkip.addEventListener('click', () => play(idx + 1));
+  btnSound.addEventListener('click', () => {
+    muted = !muted;
+    btnSound.classList.toggle('on', !muted);
+    btnSound.innerHTML = muted ? '&#128263;  Sound Off' : '&#128266;  Sound On';
+    play(idx);   // reload with new mute state
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); play(idx + 1); }
+    if (e.key === 'ArrowLeft')                    play(idx - 1);
+    if (e.key === 'Enter')                        goToWatch();
+    if (e.key === 'm' || e.key === 'M')           btnSound.click();
+  });
+
+  (async () => {
+    try {
+      items = await loadPool();
+      loading.remove();
+      if (!items.length) {
+        stage.innerHTML = `<div class="rt-empty">No trailers available right now. <a href="/">Back home →</a></div>`;
+        return;
+      }
+      header.style.display    = 'flex';
+      progressEl.style.display= 'flex';
+      titleBlock.style.display= 'block';
+      controls.style.display  = 'flex';
+      play(0);
+    } catch (err) {
+      console.error(err);
+      stage.innerHTML = `<div class="rt-empty">Something went wrong. <a href="/">Back home →</a></div>`;
+    }
+  })();
+</script>
+</body>
+</html>

@@ -47,6 +47,16 @@
         <div class="watch-info-line" id="infoLine">
           <span>TV Series</span><span>HD</span>
         </div>
+
+        <div class="watch-actions">
+          <button class="watch-action-btn" id="downloadBtn"><span class="ic">&#x2913;</span> <span id="downloadLabel">Download Episode</span></button>
+          <button class="watch-action-btn" id="gwBtn"><span class="ic">&#9749;</span> Group Watch</button>
+          <span class="download-status" id="downloadStatus">
+            <span id="downloadStatusText">Downloading…</span>
+            <span class="download-bar"><span class="download-bar-fill" id="downloadBarFill"></span></span>
+          </span>
+        </div>
+
         <p id="desc" class="watch-desc"></p>
         <p class="details-extra" id="genres"></p>
       </div>
@@ -54,6 +64,23 @@
         <div class="side-title">Details</div>
       </aside>
     </section>
+
+    <aside class="gw-panel" id="gwPanel">
+      <div class="gw-head">
+        <div class="gw-title">Group Watch<small>Chat & Presence</small></div>
+        <button class="gw-close" id="gwClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="gw-code">
+        <span>Room <b class="code" id="gwCode">—</b></span>
+        <button id="gwCopy">Copy Link</button>
+      </div>
+      <div class="gw-presence" id="gwPresence"></div>
+      <div class="gw-chat" id="gwChat"></div>
+      <div class="gw-input">
+        <input id="gwInput" type="text" placeholder="Say something…" maxlength="240">
+        <button id="gwSend">Send</button>
+      </div>
+    </aside>
 
     <!-- Netflix-style episode picker -->
     <section class="tv-picker">
@@ -71,6 +98,8 @@
     Content indexed via <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>. All streams sourced from third-party providers.
   </footer>
 
+  <script src="downloads.js"></script>
+  <script src="groupwatch.js"></script>
   <script>
     const SHARKY_API   = 'https://sharky-movies-api.onrender.com';
     const API_KEY      = '47745852f22c21e3362f4907231538e1';
@@ -272,6 +301,139 @@
     }
 
     loadShowDetails();
+
+    // ── Download (per episode) ────────────────────────────
+    const downloadBtn   = document.getElementById('downloadBtn');
+    const downloadLabel = document.getElementById('downloadLabel');
+    const downloadStatus= document.getElementById('downloadStatus');
+    const downloadFill  = document.getElementById('downloadBarFill');
+    const downloadText  = document.getElementById('downloadStatusText');
+
+    async function refreshDownloadBtn() {
+      if (!window.SharkyDownloads || !tvId) return;
+      const stub = { id: tvId, media_type: 'tv', season: selectedSeason, episode: selectedEpisode };
+      const on = await window.SharkyDownloads.isDownloaded(stub);
+      downloadLabel.textContent = on
+        ? `Remove S${selectedSeason}E${selectedEpisode}`
+        : `Download S${selectedSeason}E${selectedEpisode}`;
+      downloadBtn.classList.toggle('primary', !on);
+    }
+
+    downloadBtn?.addEventListener('click', async () => {
+      if (!tvId) return;
+      const meta = {
+        id: tvId, media_type: 'tv',
+        season: selectedSeason, episode: selectedEpisode,
+        sharky_title: (currentShow?.name || 'Show') + ` S${selectedSeason}E${selectedEpisode}`,
+        poster_path:  currentShow?.poster_path,
+        backdrop_path:currentShow?.backdrop_path,
+        vote_average: currentShow?.vote_average,
+        overview:     currentShow?.overview,
+      };
+      if (await window.SharkyDownloads.isDownloaded(meta)) {
+        await window.SharkyDownloads.deleteDownload(meta);
+        refreshDownloadBtn();
+        return;
+      }
+      downloadBtn.disabled = true;
+      downloadStatus.classList.add('on');
+      downloadFill.style.width = '0%';
+      try {
+        await window.SharkyDownloads.startDownload(meta, (p) => {
+          if (p.phase === 'connecting') downloadText.textContent = 'Connecting…';
+          if (p.phase === 'downloading') {
+            downloadText.textContent = p.pct != null
+              ? `${p.pct}%`
+              : `${(p.received/1024/1024).toFixed(1)} MB`;
+            if (p.pct != null) downloadFill.style.width = p.pct + '%';
+          }
+          if (p.phase === 'done') { downloadText.textContent = 'Saved offline ✓'; downloadFill.style.width = '100%'; }
+        });
+      } catch (err) {
+        downloadText.textContent = 'Failed: ' + err.message;
+        console.error(err);
+      } finally {
+        downloadBtn.disabled = false;
+        refreshDownloadBtn();
+        setTimeout(() => downloadStatus.classList.remove('on'), 3000);
+      }
+    });
+
+    // Refresh download label when episode changes
+    const _origLoadSharky = loadSharkyPlayer;
+    loadSharkyPlayer = function() { _origLoadSharky(); refreshDownloadBtn(); };
+    refreshDownloadBtn();
+
+    // ── Group Watch (chat + presence) ─────────────────────
+    const gwPanel = document.getElementById('gwPanel');
+    const gwBtn   = document.getElementById('gwBtn');
+    const gwClose = document.getElementById('gwClose');
+    const gwCodeEl= document.getElementById('gwCode');
+    const gwCopy  = document.getElementById('gwCopy');
+    const gwChat  = document.getElementById('gwChat');
+    const gwInput = document.getElementById('gwInput');
+    const gwSend  = document.getElementById('gwSend');
+    const gwPresenceEl = document.getElementById('gwPresence');
+    let room = null;
+    const participants = new Map();
+
+    function addChatLine(html, cls) {
+      const div = document.createElement('div');
+      div.className = 'gw-msg' + (cls ? ' ' + cls : '');
+      div.innerHTML = html;
+      gwChat.appendChild(div);
+      gwChat.scrollTop = gwChat.scrollHeight;
+    }
+    function refreshPresence() {
+      gwPresenceEl.innerHTML = [...participants.values()]
+        .map(u => `<span class="pill">${esc(u)}</span>`).join('');
+    }
+
+    function openRoom(code) {
+      room = window.GroupWatch.joinRoom(code);
+      gwCodeEl.textContent = code;
+      gwPanel.classList.add('on');
+      gwChat.innerHTML = '';
+      participants.clear();
+      participants.set(room.selfId, room.self + ' (you)');
+      refreshPresence();
+      addChatLine(`Joined room <b style="color:var(--red);display:inline">${code}</b>. Share the link so friends can join.`, 'system');
+      room.on('presence', (m) => {
+        if (m.action === 'join') { participants.set(m.from, m.user); addChatLine(`${esc(m.user)} joined.`, 'system'); }
+        if (m.action === 'leave') { participants.delete(m.from); addChatLine(`${esc(m.user)} left.`, 'system'); }
+        refreshPresence();
+      });
+      room.on('chat', (m) => addChatLine(`<b>${esc(m.user)}</b>${esc(m.text)}`));
+      room.connect();
+      const q = new URLSearchParams(location.search);
+      q.set('room', code);
+      history.replaceState(null, '', `?${q.toString()}`);
+    }
+
+    gwBtn?.addEventListener('click', () => {
+      if (room) { gwPanel.classList.toggle('on'); return; }
+      const existing = new URLSearchParams(location.search).get('room');
+      openRoom(existing || window.GroupWatch.createCode());
+    });
+    gwClose?.addEventListener('click', () => gwPanel.classList.remove('on'));
+    gwCopy?.addEventListener('click', () => {
+      navigator.clipboard?.writeText(location.href);
+      gwCopy.textContent = 'Copied!';
+      setTimeout(() => gwCopy.textContent = 'Copy Link', 1200);
+    });
+    function sendChat() {
+      const t = gwInput.value.trim();
+      if (!t || !room) return;
+      addChatLine(`<b>${esc(room.self)} (you)</b>${esc(t)}`);
+      room.emit('chat', { text: t });
+      gwInput.value = '';
+    }
+    gwSend?.addEventListener('click', sendChat);
+    gwInput?.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+    if (new URLSearchParams(location.search).get('room')) {
+      setTimeout(() => openRoom(new URLSearchParams(location.search).get('room')), 400);
+    }
+    window.addEventListener('beforeunload', () => { try { room?.close(); } catch {} });
   </script>
 </body>
 </html>

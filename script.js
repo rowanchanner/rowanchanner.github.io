@@ -68,6 +68,9 @@ const rowMap = {
 const continueBlock    = document.getElementById("continueBlock");
 const myListBlock      = document.getElementById("myListBlock");
 const clearContinueBtn = document.getElementById("clearContinueBtn");
+const downloadsBlock   = document.getElementById("downloadsBlock");
+const downloadsRow     = document.getElementById("downloadsRow");
+const downloadsQuota   = document.getElementById("downloadsQuota");
 
 let currentDetailsItem = null;
 let currentHeroItem    = null;
@@ -232,7 +235,52 @@ function renderGrid(grid, items) {
 }
 
 /* ── HERO ───────────────────────────────────────────────── */
+let heroTrailerIframe = null;
+let heroTrailerTimer  = null;
+
+function killHeroTrailer() {
+  if (heroTrailerTimer) { clearTimeout(heroTrailerTimer); heroTrailerTimer = null; }
+  if (heroTrailerIframe) {
+    heroTrailerIframe.remove();
+    heroTrailerIframe = null;
+    heroBanner.classList.remove("has-trailer");
+  }
+}
+
+async function fetchTrailerKey(item) {
+  // TMDB videos endpoint — pick first YouTube trailer, else any YouTube video
+  const type = item.media_type || (item.name ? "tv" : "movie");
+  const data = await fetchTMDB(`/${type}/${item.id}/videos`);
+  const vids = data?.results || [];
+  const pick = vids.find(v => v.site === "YouTube" && v.type === "Trailer" && v.key)
+            || vids.find(v => v.site === "YouTube" && v.key);
+  return pick?.key || null;
+}
+
+async function armHeroTrailer(item) {
+  const heroIdxAtSchedule = heroIdx;
+  const key = await fetchTrailerKey(item);
+  // Bail if hero moved on while we were fetching
+  if (!key || heroIdx !== heroIdxAtSchedule || currentHeroItem?.id !== item.id) return;
+  heroTrailerTimer = setTimeout(() => {
+    // Bail again — user may have paged the hero in the last 3s
+    if (heroIdx !== heroIdxAtSchedule || currentHeroItem?.id !== item.id) return;
+    const iframe = document.createElement("iframe");
+    iframe.className = "hero-trailer";
+    iframe.allow = "autoplay; encrypted-media";
+    iframe.setAttribute("frameborder", "0");
+    // start=8 skips studio idents; playlist={key} makes loop work
+    iframe.src = `https://www.youtube-nocookie.com/embed/${key}`
+               + `?autoplay=1&mute=1&controls=0&showinfo=0&rel=0`
+               + `&modestbranding=1&playsinline=1&loop=1&playlist=${key}&start=8&iv_load_policy=3`;
+    heroBanner.appendChild(iframe);
+    heroTrailerIframe = iframe;
+    heroBanner.classList.add("has-trailer");
+  }, 3000);
+}
+
 function setHero(item, idx = 0) {
+  killHeroTrailer();
   currentHeroItem = item;
   heroIdx = idx;
 
@@ -243,6 +291,7 @@ function setHero(item, idx = 0) {
 
   heroTitle.textContent = item.sharky_title;
   heroDesc.textContent  = truncate(item.overview, 220);
+  armHeroTrailer(item);
 
   const year   = getYear(item);
   const rating = getRating(item);
@@ -420,6 +469,73 @@ function renderMyList() {
   renderRow(rowMap.myList, list, { removable: true, source: "mylist" });
 }
 
+/* ── Downloaded row ─────────────────────────────────────── */
+async function renderDownloads() {
+  if (!downloadsBlock || !window.SharkyDownloads) return;
+  const list = window.SharkyDownloads.list();
+  if (!list.length) {
+    downloadsBlock.classList.add("hidden");
+    if (downloadsRow) downloadsRow.innerHTML = "";
+    if (downloadsQuota) downloadsQuota.textContent = "";
+    return;
+  }
+  downloadsBlock.classList.remove("hidden");
+  downloadsRow.innerHTML = "";
+  list.forEach(meta => {
+    const card = createCard(meta, { removable: true, source: "download" });
+    // Override click: play offline instead of routing to shark
+    card.addEventListener("click", async (e) => {
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (act === "remove") { e.stopPropagation(); await window.SharkyDownloads.deleteDownload(meta); renderDownloads(); return; }
+      if (act === "list" || act === "info") return; // let default handlers fire
+      if (act === "play" || !act) {
+        e.stopPropagation();
+        try {
+          const url = await window.SharkyDownloads.playOffline(meta);
+          openOfflinePlayer(meta, url);
+        } catch (err) { alert("Offline playback failed: " + err.message); }
+      }
+    }, true);
+    downloadsRow.appendChild(card);
+  });
+  // Quota text
+  try {
+    const est = await window.SharkyDownloads.estimate();
+    if (est) {
+      const mb = (est.usage / (1024*1024)).toFixed(0);
+      const quotaMb = (est.quota / (1024*1024)).toFixed(0);
+      downloadsQuota.textContent = `${list.length} title${list.length===1?"":"s"} · ${mb} MB used of ~${quotaMb} MB`;
+    }
+  } catch {}
+}
+if (window.SharkyDownloads) window.SharkyDownloads.onChange(renderDownloads);
+
+/* Full-screen native <video> for offline playback */
+function openOfflinePlayer(meta, blobUrl) {
+  let modal = document.getElementById("offlineModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "offlineModal";
+    modal.className = "offline-modal";
+    modal.innerHTML = `
+      <button class="offline-close" aria-label="Close">&times;</button>
+      <video id="offlineVideo" controls autoplay playsinline></video>
+    `;
+    document.body.appendChild(modal);
+    modal.querySelector(".offline-close").onclick = () => {
+      const v = modal.querySelector("video");
+      try { v.pause(); URL.revokeObjectURL(v.src); v.removeAttribute("src"); v.load(); } catch {}
+      modal.classList.remove("active");
+    };
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape" && modal.classList.contains("active")) modal.querySelector(".offline-close").click();
+    });
+  }
+  const v = modal.querySelector("video");
+  v.src = blobUrl;
+  modal.classList.add("active");
+}
+
 /* ── Search ─────────────────────────────────────────────── */
 async function runSearch() {
   const q = searchInput.value.trim();
@@ -477,6 +593,16 @@ document.querySelectorAll(".nav-link[data-jump]").forEach(btn => {
           `<p class="empty-message">Your list is empty — hit &ldquo;+ My List&rdquo; on anything to save it here.</p>`;
       }
       myListBlock.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (jump === "downloads") {
+      if (downloadsBlock) {
+        downloadsBlock.classList.remove("hidden");
+        if (!(window.SharkyDownloads?.list() || []).length) {
+          downloadsRow.innerHTML =
+            `<p class="empty-message">No downloads yet — open a movie and hit &ldquo;⬇ Download&rdquo; on the player page to save it for offline.</p>`;
+        }
+        downloadsBlock.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
   });
 });
@@ -546,6 +672,7 @@ async function init() {
 
   renderContinueWatching();
   renderMyList();
+  renderDownloads();
 
   // Hero — rotate through top trending
   const heroPool = (trendingAll.length ? trendingAll : trendingMovies)
