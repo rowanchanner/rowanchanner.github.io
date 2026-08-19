@@ -3,123 +3,185 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Watch Movie - Sharky Movies 2</title>
+  <title>Watch — Sharky Movies 2</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="favicon.png" />
-  <meta name="theme-color" content="#ff2a5f" />
+  <meta name="theme-color" content="#e50914" />
 </head>
 <body class="player-page">
 
   <header class="player-header">
-    <a href="/" class="logo">Sharky Movies 2</a>
-    <a href="/" class="player-home-link">← Back Home</a>
+    <a href="/" class="logo">SHARKY</a>
+    <a href="/" class="player-home-link">&larr; Browse</a>
   </header>
+
+  <section class="watch-hero">
+    <div class="watch-hero-bg" id="watchBg"></div>
+    <div class="watch-hero-overlay"></div>
+  </section>
 
   <main class="watch-layout">
 
-    <!-- ── Sharky Player ── -->
     <section class="sharky-player-section">
       <div class="sharky-player-wrap">
         <div class="sharky-player-loading" id="sharkyLoading">
           <div class="spinner"></div>
-          <div class="loading-text">Loading Sharky Player...</div>
+          <div class="loading-text">Loading Stream</div>
         </div>
-        <iframe
-          id="sharkyFrame"
-          allowfullscreen
-          mozallowfullscreen
-          webkitallowfullscreen
+        <iframe id="sharkyFrame"
+          allowfullscreen mozallowfullscreen webkitallowfullscreen
           allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *"
-          referrerpolicy="no-referrer-when-downgrade">
-        </iframe>
+          referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
       <div class="sharky-attr">
         <span class="sharky-attr-dot"></span>
-        Powered by <strong>Sharky Player</strong> &nbsp;·&nbsp; sharky-movies-api.onrender.com
+        Powered by <strong>Sharky Player</strong> &nbsp;·&nbsp; <a href="https://sharky-movies-api.onrender.com" target="_blank" rel="noopener">sharky-movies-api.onrender.com</a>
       </div>
     </section>
 
-    <!-- ── Movie Info ── -->
     <section class="watch-top">
-      <img id="poster" class="watch-poster" src="" alt="Movie poster" />
-
       <div class="watch-meta">
-        <h1 id="title">Loading...</h1>
-
+        <h1 id="title">Loading&hellip;</h1>
         <div class="watch-info-line" id="infoLine">
-          <span>Movie</span>
-          <span>HD</span>
+          <span>Movie</span><span>HD</span>
         </div>
-
         <p id="desc" class="watch-desc"></p>
         <p class="details-extra" id="genres"></p>
       </div>
+      <aside class="watch-side" id="sidePanel">
+        <div class="side-title">Details</div>
+      </aside>
     </section>
 
+    <section class="movie-section" id="relatedSection" style="padding:0">
+      <div class="section-header">
+        <h2>More Like This</h2>
+      </div>
+      <div class="row-viewport">
+        <button class="row-arrow left" aria-label="Scroll left">&#10094;</button>
+        <div class="movie-row" id="relatedRow"></div>
+        <button class="row-arrow right" aria-label="Scroll right">&#10095;</button>
+      </div>
+    </section>
   </main>
 
-  <footer class="player-footer">© 2026 Sharky Movies 2</footer>
+  <footer class="player-footer">
+    &copy; 2026 Sharky Movies 2 &nbsp;·&nbsp;
+    Content indexed via <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>. All streams sourced from third-party providers.
+  </footer>
 
   <script>
     const SHARKY_API = 'https://sharky-movies-api.onrender.com';
     const API_KEY    = '47745852f22c21e3362f4907231538e1';
+    const POSTER_URL = 'https://image.tmdb.org/t/p/w500';
+    const BACKDROP_URL = 'https://image.tmdb.org/t/p/original';
+    const IMG_URL    = 'https://image.tmdb.org/t/p/w780';
 
     const params  = new URLSearchParams(location.search);
     const movieId = params.get('id');
 
     const sharkyFrame   = document.getElementById('sharkyFrame');
     const sharkyLoading = document.getElementById('sharkyLoading');
-    const poster        = document.getElementById('poster');
+    const watchBg       = document.getElementById('watchBg');
     const titleEl       = document.getElementById('title');
     const descEl        = document.getElementById('desc');
     const infoLine      = document.getElementById('infoLine');
     const genresEl      = document.getElementById('genres');
+    const sidePanel     = document.getElementById('sidePanel');
+    const relatedRow    = document.getElementById('relatedRow');
 
-    // ── Load Sharky Player ──────────────────────────────────────────────────
+    // ── Player ────────────────────────────────────────────
     if (movieId) {
       sharkyFrame.src = `${SHARKY_API}/embed/movie/${movieId}`;
-      sharkyFrame.addEventListener('load', () => {
-        sharkyLoading.style.display = 'none';
-      }, { once: true });
+      sharkyFrame.addEventListener('load',
+        () => { sharkyLoading.style.display = 'none'; }, { once: true });
     } else {
       sharkyLoading.innerHTML = '<p style="color:#888;padding:20px">No movie selected.</p>';
     }
 
-    // ── Load movie info from TMDB ───────────────────────────────────────────
+    // ── Row arrows (same pattern as index) ────────────────
+    document.querySelectorAll('.row-viewport').forEach(vp => {
+      const row = vp.querySelector('.movie-row');
+      vp.querySelector('.row-arrow.left')?.addEventListener('click',
+        () => row.scrollBy({ left: -row.clientWidth * .8, behavior: 'smooth' }));
+      vp.querySelector('.row-arrow.right')?.addEventListener('click',
+        () => row.scrollBy({ left:  row.clientWidth * .8, behavior: 'smooth' }));
+    });
+
+    function esc(v){ return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+
+    // ── Details ───────────────────────────────────────────
     async function loadMovieDetails() {
       if (!movieId) { titleEl.textContent = 'No movie selected.'; return; }
-
       try {
-        const res   = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&language=en-US`);
-        const movie = await res.json();
+        const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&append_to_response=credits,recommendations&language=en-US`);
+        const m = await res.json();
 
-        const year    = movie.release_date ? movie.release_date.slice(0, 4) : 'N/A';
-        const rating  = movie.vote_average ? Number(movie.vote_average).toFixed(1) : 'N/A';
-        const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : '';
+        const year    = m.release_date ? m.release_date.slice(0,4) : '';
+        const rating  = m.vote_average ? Number(m.vote_average).toFixed(1) : '';
+        const runtime = m.runtime ? `${Math.floor(m.runtime/60)}h ${m.runtime%60}m` : '';
 
-        document.title  = `Watch ${movie.title || 'Movie'} - Sharky Movies 2`;
-        titleEl.textContent = `${movie.title || 'Untitled'} (${year})`;
-        descEl.textContent  = movie.overview || 'No overview available.';
+        document.title  = `${m.title || 'Movie'} — Sharky Movies 2`;
+        titleEl.textContent = m.title || 'Untitled';
+        descEl.textContent  = m.overview || 'No overview available.';
 
-        poster.src = movie.poster_path
-          ? 'https://image.tmdb.org/t/p/w500' + movie.poster_path
-          : '';
+        if (m.backdrop_path) watchBg.style.backgroundImage = `url("${BACKDROP_URL}${m.backdrop_path}")`;
 
         infoLine.innerHTML = `
+          ${rating ? `<span class="rating">&#9733; ${rating}</span>` : ''}
+          ${year   ? `<span>${year}</span>` : ''}
           <span>Movie</span>
-          <span>${year}</span>
           <span>HD</span>
-          <span>★ ${rating}</span>
           ${runtime ? `<span>${runtime}</span>` : ''}
         `;
 
-        if (movie.genres?.length) {
-          genresEl.textContent = movie.genres.slice(0, 4).map(g => g.name).join(' · ');
+        if (m.genres?.length) genresEl.textContent = m.genres.slice(0,4).map(g=>g.name).join(' · ');
+
+        // Side panel
+        const cast = (m.credits?.cast || []).slice(0,4).map(c=>c.name).join(', ');
+        const dir  = (m.credits?.crew || []).filter(c=>c.job==='Director').map(c=>c.name).join(', ');
+        const country = (m.production_countries || [])[0]?.name || '';
+        const genresStr = (m.genres || []).slice(0,4).map(g=>g.name).join(', ');
+        sidePanel.innerHTML = `
+          <div class="side-title">Details</div>
+          ${dir     ? `<div class="side-row"><b>Director</b><span>${esc(dir)}</span></div>` : ''}
+          ${cast    ? `<div class="side-row"><b>Cast</b><span>${esc(cast)}</span></div>` : ''}
+          ${genresStr ? `<div class="side-row"><b>Genres</b><span>${esc(genresStr)}</span></div>` : ''}
+          ${country ? `<div class="side-row"><b>Origin</b><span>${esc(country)}</span></div>` : ''}
+          ${year    ? `<div class="side-row"><b>Year</b><span>${year}</span></div>` : ''}
+        `;
+
+        // Related row
+        const recs = (m.recommendations?.results || []).filter(r => r.backdrop_path || r.poster_path).slice(0,18);
+        relatedRow.innerHTML = '';
+        if (!recs.length) {
+          document.getElementById('relatedSection').style.display = 'none';
+        } else {
+          recs.forEach(r => {
+            const card = document.createElement('article');
+            card.className = 'movie-card';
+            const img = r.backdrop_path ? IMG_URL + r.backdrop_path : POSTER_URL + r.poster_path;
+            const yr  = (r.release_date || '').slice(0,4);
+            const rt  = r.vote_average ? Number(r.vote_average).toFixed(1) : '';
+            card.innerHTML = `
+              <img src="${img}" alt="${esc(r.title)}" loading="lazy">
+              <div class="card-overlay">
+                <h3 class="card-title">${esc(r.title || 'Untitled')}</h3>
+                <div class="card-actions"><button class="card-ic play" data-act="play">&#9654;</button></div>
+                <div class="card-meta">
+                  ${rt ? `<span class="card-rating">&#9733; ${rt}</span>` : ''}
+                  ${yr ? `<span>${yr}</span>` : ''}
+                  <span class="card-badge">FILM</span>
+                </div>
+              </div>`;
+            card.addEventListener('click', () => location.href = `movie.html?id=${r.id}`);
+            relatedRow.appendChild(card);
+          });
         }
 
-        saveContinueWatching(movie);
+        saveContinueWatching(m);
       } catch (err) {
         console.error(err);
         titleEl.textContent = 'Failed to load movie.';

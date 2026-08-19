@@ -3,199 +3,270 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>Sharky Movies 2</title>
 
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="favicon.png" />
-  <meta name="theme-color" content="#ff2a5f" />
+  <meta name="theme-color" content="#e50914" />
+  <meta name="description" content="Sharky Movies 2 — stream movies and TV in HD with the Sharky Player, less ads, multi-server fallback." />
 </head>
 
 <body>
 
+  <!-- ── NAVBAR ────────────────────────────────────────────── -->
   <header class="navbar" id="navbar">
     <div class="nav-left">
-      <a href="/" class="logo">Sharky Movies 2</a>
+      <a href="/" class="logo">SHARKY</a>
 
       <nav class="nav-links">
         <button class="nav-link active" data-jump="home">Home</button>
         <button class="nav-link" data-jump="movies">Movies</button>
         <button class="nav-link" data-jump="tv">TV Shows</button>
-        <button class="nav-link" data-jump="continue">Continue Watching</button>
         <button class="nav-link" data-jump="mylist">My List</button>
-        <a href="old/index.html" class="nav-link old-version-btn" style="text-decoration:none;">Use Old Sharky Movies</a>
+        <button class="nav-link" data-jump="continue">Continue</button>
+        <a href="old/index.html" class="nav-link old-version-btn">Old Site</a>
       </nav>
     </div>
 
     <div class="nav-right">
       <div class="search-wrap">
-        <span class="search-icon">⌕</span>
-        <input id="searchInput" class="search-bar" type="text" placeholder="Search movies or TV..." />
+        <span class="search-icon">&#9906;</span>
+        <input id="searchInput" class="search-bar" type="text" placeholder="Titles, people, genres" />
       </div>
-
-      <div class="profile-icon">S</div>
+      <div class="profile-icon" title="Profile">S</div>
     </div>
   </header>
 
+  <!-- ── HERO (rotates through top trending) ─────────────── -->
   <section class="hero" id="heroBanner">
+    <div class="hero-bg" id="heroBg"></div>
     <div class="hero-overlay"></div>
 
     <div class="hero-content">
-      <div class="hero-tag">Featured Today</div>
-
-      <h1 id="heroTitle">Loading...</h1>
-
+      <div class="hero-tag" id="heroTag">&#9679; Sharky Original</div>
+      <h1 id="heroTitle">Loading&hellip;</h1>
       <div class="hero-meta" id="heroMeta">
-        <span>HD</span>
-        <span>Movie</span>
+        <span>HD</span><span>Movie</span>
       </div>
-
-      <p id="heroDesc">Loading Sharky Movies 2...</p>
-
+      <p id="heroDesc">Loading Sharky Movies 2&hellip;</p>
       <div class="hero-actions">
-        <button class="btn btn-play" id="heroPlayBtn">▶ Play</button>
-        <button class="btn btn-secondary" id="heroListBtn">+ My List</button>
+        <button class="btn btn-play" id="heroPlayBtn">
+          <span style="font-size:1.15em">&#9654;</span> Play
+        </button>
+        <button class="btn btn-secondary" id="heroInfoBtn">
+          <span style="font-size:1.05em">&#9432;</span> More Info
+        </button>
+        <button class="btn btn-icon" id="heroListBtn" title="Add to My List">+</button>
       </div>
     </div>
-    <div class="sharky-badge-card">
-      <div class="sbc-tag">⚡ Sharky Player</div>
-      <div class="sbc-pills">
-        <span>🎬 Trailer Intros</span>
-        <span>🔇 Less Ads</span>
-        <span>⚡ HD</span>
-        <span>📺 Multi-Server</span>
-      </div>
-    </div>
+
+    <div class="hero-pager" id="heroPager"></div>
   </section>
 
+  <!-- ── BROWSE CHIP ROW ────────────────────────────────── -->
+  <div class="browse-strip" id="browseStrip">
+    <button class="browse-chip active" data-filter="all">All</button>
+    <button class="browse-chip" data-filter="trending">Trending Now</button>
+    <button class="browse-chip" data-filter="movies">Movies</button>
+    <button class="browse-chip" data-filter="tv">TV Shows</button>
+    <button class="browse-chip" data-filter="action">Action</button>
+    <button class="browse-chip" data-filter="comedy">Comedy</button>
+    <button class="browse-chip" data-filter="horror">Horror</button>
+    <button class="browse-chip" data-filter="scifi">Sci-Fi</button>
+    <button class="browse-chip" data-filter="romance">Romance</button>
+    <button class="browse-chip" data-filter="animation">Animation</button>
+    <button class="browse-chip" data-filter="documentary">Documentary</button>
+  </div>
+
+  <!-- ── PAGE CONTENT ────────────────────────────────────── -->
   <main class="page-content">
 
+    <!-- Search results grid -->
     <section class="movie-section hidden" id="searchSection">
       <div class="section-header">
         <h2 id="searchTitle">Search Results</h2>
         <button class="clear-search" id="clearSearchBtn">Clear</button>
       </div>
-
       <div class="search-grid" id="searchGrid"></div>
     </section>
 
+    <!-- Rows -->
     <section class="movie-section" id="rowsSection">
 
-      <div class="movie-row-block hidden" id="continueBlock">
+      <div class="movie-row-block hidden" id="continueBlock" data-cat="continue">
         <div class="section-header">
           <h2>Continue Watching</h2>
           <button class="clear-search" id="clearContinueBtn">Clear</button>
         </div>
-        <div class="movie-row" id="continueRow"></div>
-      </div>
-
-      <div class="movie-row-block" id="moviesBlock">
-        <div class="section-header">
-          <h2>Trending Movies</h2>
+        <div class="row-viewport">
+          <button class="row-arrow left"  aria-label="Scroll left">&#10094;</button>
+          <div class="movie-row" id="continueRow"></div>
+          <button class="row-arrow right" aria-label="Scroll right">&#10095;</button>
         </div>
-        <div class="movie-row" id="trendingMoviesRow"></div>
       </div>
 
-      <div class="movie-row-block">
-        <div class="section-header">
-          <h2>Popular Movies</h2>
-        </div>
-        <div class="movie-row" id="popularMoviesRow"></div>
-      </div>
-
-      <div class="movie-row-block">
-        <div class="section-header">
-          <h2>Top Rated Movies</h2>
-        </div>
-        <div class="movie-row" id="topMoviesRow"></div>
-      </div>
-
-      <div class="movie-row-block" id="tvBlock">
-        <div class="section-header">
-          <h2>Trending TV Shows</h2>
-        </div>
-        <div class="movie-row" id="trendingTvRow"></div>
-      </div>
-
-      <div class="movie-row-block">
-        <div class="section-header">
-          <h2>Popular TV Shows</h2>
-        </div>
-        <div class="movie-row" id="popularTvRow"></div>
-      </div>
-
-      <div class="movie-row-block">
-        <div class="section-header">
-          <h2>Top Rated TV Shows</h2>
-        </div>
-        <div class="movie-row" id="topTvRow"></div>
-      </div>
-
-      <div class="movie-row-block">
-        <div class="section-header">
-          <h2>Action Movies</h2>
-        </div>
-        <div class="movie-row" id="actionRow"></div>
-      </div>
-
-      <div class="movie-row-block">
-        <div class="section-header">
-          <h2>Horror Movies</h2>
-        </div>
-        <div class="movie-row" id="horrorRow"></div>
-      </div>
-
-      <div class="movie-row-block">
-        <div class="section-header">
-          <h2>Comedy Movies</h2>
-        </div>
-        <div class="movie-row" id="comedyRow"></div>
-      </div>
-
-      <div class="movie-row-block hidden" id="myListBlock">
+      <div class="movie-row-block hidden" id="myListBlock" data-cat="mylist">
         <div class="section-header">
           <h2>My List</h2>
         </div>
-        <div class="movie-row" id="myListRow"></div>
+        <div class="row-viewport">
+          <button class="row-arrow left"  aria-label="Scroll left">&#10094;</button>
+          <div class="movie-row" id="myListRow"></div>
+          <button class="row-arrow right" aria-label="Scroll right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" id="moviesBlock" data-cat="trending movies">
+        <div class="section-header"><h2>Trending Now</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="trendingMoviesRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="movies">
+        <div class="section-header"><h2>Popular Movies</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="popularMoviesRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="movies">
+        <div class="section-header"><h2>Top 10 Movies</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="topMoviesRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" id="tvBlock" data-cat="trending tv">
+        <div class="section-header"><h2>Trending TV Shows</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="trendingTvRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="tv">
+        <div class="section-header"><h2>Popular TV Shows</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="popularTvRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="tv">
+        <div class="section-header"><h2>Top 10 TV Shows</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="topTvRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="movies action">
+        <div class="section-header"><h2>Action &amp; Adventure</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="actionRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="movies comedy">
+        <div class="section-header"><h2>Laugh Out Loud</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="comedyRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="movies horror">
+        <div class="section-header"><h2>Watch With The Lights Off</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="horrorRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="movies scifi">
+        <div class="section-header"><h2>Sci-Fi &amp; Fantasy</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="scifiRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="movies romance">
+        <div class="section-header"><h2>Romantic Picks</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="romanceRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="movies animation">
+        <div class="section-header"><h2>Family &amp; Animation</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="animationRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block" data-cat="movies documentary">
+        <div class="section-header"><h2>Documentaries</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="docRow"></div>
+          <button class="row-arrow right">&#10095;</button>
+        </div>
       </div>
 
     </section>
   </main>
 
-  <div class="details-modal" id="detailsModal">
+  <!-- ── DETAILS MODAL ───────────────────────────────────── -->
+  <div class="details-modal" id="detailsModal" role="dialog" aria-modal="true">
     <div class="details-backdrop" id="detailsBackdrop"></div>
 
     <div class="details-box">
-      <button class="modal-close" id="detailsCloseBtn">&times;</button>
+      <button class="modal-close" id="detailsCloseBtn" aria-label="Close">&times;</button>
 
       <div class="details-hero" id="detailsHero">
         <div class="details-gradient"></div>
-
         <div class="details-hero-content">
           <div class="hero-tag" id="detailsTypeTag">Movie</div>
           <h2 id="detailsTitle">Title</h2>
-
           <div class="details-meta" id="detailsMeta"></div>
-
           <div class="details-buttons">
-            <button class="btn btn-play" id="detailsPlayBtn">▶ Play</button>
+            <button class="btn btn-play"      id="detailsPlayBtn">
+              <span style="font-size:1.15em">&#9654;</span> Play
+            </button>
             <button class="btn btn-secondary" id="detailsTrailerBtn">Trailer</button>
-            <button class="btn btn-secondary" id="detailsListBtn">+ My List</button>
+            <button class="btn btn-icon"      id="detailsListBtn" title="Add to My List">+</button>
           </div>
         </div>
       </div>
 
       <div class="details-body">
-        <div class="details-poster-wrap">
-          <img id="detailsPoster" src="" alt="Poster" />
-        </div>
-
         <div class="details-text">
-          <p id="detailsOverview">Loading...</p>
+          <p id="detailsOverview">Loading&hellip;</p>
           <p class="details-extra" id="detailsExtra"></p>
         </div>
+        <aside class="details-side" id="detailsSide"></aside>
       </div>
     </div>
   </div>

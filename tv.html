@@ -3,73 +3,79 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Watch TV Show - Sharky Movies 2</title>
+  <title>Watch TV — Sharky Movies 2</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="favicon.png" />
-  <meta name="theme-color" content="#ff2a5f" />
+  <meta name="theme-color" content="#e50914" />
 </head>
 <body class="player-page">
 
   <header class="player-header">
-    <a href="/" class="logo">Sharky Movies 2</a>
-    <a href="/" class="player-home-link">← Back Home</a>
+    <a href="/" class="logo">SHARKY</a>
+    <a href="/" class="player-home-link">&larr; Browse</a>
   </header>
+
+  <section class="watch-hero">
+    <div class="watch-hero-bg" id="watchBg"></div>
+    <div class="watch-hero-overlay"></div>
+  </section>
 
   <main class="watch-layout">
 
-    <!-- ── Sharky Player ── -->
     <section class="sharky-player-section">
       <div class="sharky-player-wrap">
         <div class="sharky-player-loading" id="sharkyLoading">
           <div class="spinner"></div>
-          <div class="loading-text">Loading Sharky Player...</div>
+          <div class="loading-text">Loading Stream</div>
         </div>
-        <iframe
-          id="sharkyFrame"
-          allowfullscreen
-          mozallowfullscreen
-          webkitallowfullscreen
+        <iframe id="sharkyFrame"
+          allowfullscreen mozallowfullscreen webkitallowfullscreen
           allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *"
-          referrerpolicy="no-referrer-when-downgrade">
-        </iframe>
+          referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
       <div class="sharky-attr">
         <span class="sharky-attr-dot"></span>
-        Powered by <strong>Sharky Player</strong> &nbsp;·&nbsp; sharky-movies-api.onrender.com
+        Powered by <strong>Sharky Player</strong> &nbsp;·&nbsp; <a href="https://sharky-movies-api.onrender.com" target="_blank" rel="noopener">sharky-movies-api.onrender.com</a>
       </div>
     </section>
 
-    <!-- ── TV Info + Episode Picker ── -->
     <section class="watch-top">
-      <img id="poster" class="watch-poster" src="" alt="TV poster" />
-
       <div class="watch-meta">
-        <h1 id="title">Loading...</h1>
-
+        <h1 id="title">Loading&hellip;</h1>
         <div class="watch-info-line" id="infoLine">
-          <span>TV Show</span>
-          <span>HD</span>
+          <span>TV Series</span><span>HD</span>
         </div>
-
         <p id="desc" class="watch-desc"></p>
         <p class="details-extra" id="genres"></p>
-
-        <div class="tv-controls">
-          <select id="seasonSelect" class="tv-select"></select>
-          <select id="episodeSelect" class="tv-select"></select>
-        </div>
       </div>
+      <aside class="watch-side" id="sidePanel">
+        <div class="side-title">Details</div>
+      </aside>
+    </section>
+
+    <!-- Netflix-style episode picker -->
+    <section class="tv-picker">
+      <div class="tv-picker-head">
+        <h2>Episodes</h2>
+        <select id="seasonSelect" class="tv-select"></select>
+      </div>
+      <div class="episode-list" id="episodeList"></div>
     </section>
 
   </main>
 
-  <footer class="player-footer">© 2026 Sharky Movies 2</footer>
+  <footer class="player-footer">
+    &copy; 2026 Sharky Movies 2 &nbsp;·&nbsp;
+    Content indexed via <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>. All streams sourced from third-party providers.
+  </footer>
 
   <script>
-    const SHARKY_API = 'https://sharky-movies-api.onrender.com';
-    const API_KEY    = '47745852f22c21e3362f4907231538e1';
+    const SHARKY_API   = 'https://sharky-movies-api.onrender.com';
+    const API_KEY      = '47745852f22c21e3362f4907231538e1';
+    const IMG_URL      = 'https://image.tmdb.org/t/p/w300';
+    const BACKDROP_URL = 'https://image.tmdb.org/t/p/original';
 
     const params    = new URLSearchParams(location.search);
     const tvId      = params.get('id');
@@ -78,13 +84,14 @@
 
     const sharkyFrame   = document.getElementById('sharkyFrame');
     const sharkyLoading = document.getElementById('sharkyLoading');
-    const poster        = document.getElementById('poster');
+    const watchBg       = document.getElementById('watchBg');
     const titleEl       = document.getElementById('title');
     const descEl        = document.getElementById('desc');
     const infoLine      = document.getElementById('infoLine');
     const genresEl      = document.getElementById('genres');
+    const sidePanel     = document.getElementById('sidePanel');
     const seasonSelect  = document.getElementById('seasonSelect');
-    const episodeSelect = document.getElementById('episodeSelect');
+    const episodeList   = document.getElementById('episodeList');
 
     const STORAGE_CONTINUE    = 'sharky_movies_2_continue_watching';
     const STORAGE_TV_PROGRESS = 'sharky_movies_2_tv_progress';
@@ -93,7 +100,8 @@
     let selectedSeason  = urlSeason;
     let selectedEpisode = urlEp;
 
-    // ── Load Sharky Player ──────────────────────────────────────────────────
+    function esc(v){ return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+
     function loadSharkyPlayer() {
       if (!tvId) return;
       sharkyLoading.style.display = 'flex';
@@ -101,26 +109,23 @@
       sharkyFrame.src = '';
       setTimeout(() => {
         sharkyFrame.src = url;
-        sharkyFrame.addEventListener('load', () => {
-          sharkyLoading.style.display = 'none';
-        }, { once: true });
+        sharkyFrame.addEventListener('load',
+          () => { sharkyLoading.style.display = 'none'; }, { once: true });
       }, 80);
       saveContinueWatching();
+      saveTvProgress();
       updateUrl();
     }
 
-    // ── URL helpers ─────────────────────────────────────────────────────────
     function updateUrl() {
       if (!tvId) return;
       history.replaceState(null, '', `tv.html?id=${tvId}&s=${selectedSeason}&e=${selectedEpisode}`);
     }
 
-    // ── Progress storage ────────────────────────────────────────────────────
     function getStoredProgress() {
       try { return (JSON.parse(localStorage.getItem(STORAGE_TV_PROGRESS)) || {})[tvId] || null; }
       catch { return null; }
     }
-
     function saveTvProgress() {
       if (!tvId) return;
       let all = {};
@@ -128,7 +133,6 @@
       all[tvId] = { season: selectedSeason, episode: selectedEpisode, updatedAt: Date.now() };
       localStorage.setItem(STORAGE_TV_PROGRESS, JSON.stringify(all));
     }
-
     function saveContinueWatching() {
       if (!currentShow) return;
       let list = [];
@@ -142,53 +146,70 @@
       };
       const filtered = list.filter(x => !(Number(x.id) === Number(currentShow.id) && x.media_type === 'tv'));
       localStorage.setItem(STORAGE_CONTINUE, JSON.stringify([item, ...filtered].slice(0, 20)));
-      saveTvProgress();
     }
 
-    // ── Episode list ─────────────────────────────────────────────────────────
     async function loadEpisodes(seasonNum, preferEp = 1) {
-      episodeSelect.innerHTML = '<option>Loading...</option>';
+      episodeList.innerHTML = `<div class="episode-item" style="grid-template-columns:1fr;padding:40px;color:var(--muted);text-align:center">Loading episodes…</div>`;
       try {
         const res  = await fetch(`https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?api_key=${API_KEY}&language=en-US`);
         const data = await res.json();
         const eps  = data.episodes || [];
 
-        episodeSelect.innerHTML = '';
+        const exists   = eps.some(ep => Number(ep.episode_number) === Number(preferEp));
+        selectedEpisode = exists ? Number(preferEp) : Number(eps[0]?.episode_number || 1);
+
+        episodeList.innerHTML = '';
         (eps.length ? eps : [{ episode_number: 1, name: 'Episode 1' }]).forEach(ep => {
-          const o = document.createElement('option');
-          o.value       = ep.episode_number;
-          o.textContent = `Ep ${ep.episode_number}: ${ep.name || 'Untitled'}`;
-          episodeSelect.appendChild(o);
+          const li = document.createElement('div');
+          li.className = 'episode-item' + (Number(ep.episode_number) === selectedEpisode ? ' playing' : '');
+          li.dataset.ep = ep.episode_number;
+          const thumb = ep.still_path
+            ? `background-image:url("${IMG_URL}${ep.still_path}")`
+            : 'background:#0a0a0a';
+          const runtime = ep.runtime ? `${ep.runtime}m` : '';
+          li.innerHTML = `
+            <div class="ep-num">${ep.episode_number}</div>
+            <div class="ep-thumb" style="${thumb}"></div>
+            <div class="ep-info">
+              <div class="ep-title">
+                <span>${esc(ep.name || 'Untitled')}</span>
+                ${runtime ? `<span class="ep-runtime">${runtime}</span>` : ''}
+              </div>
+              <div class="ep-desc">${esc(ep.overview || '')}</div>
+            </div>
+            <div class="ep-chevron">&#10095;</div>
+          `;
+          li.addEventListener('click', () => {
+            selectedEpisode = Number(ep.episode_number);
+            document.querySelectorAll('.episode-item').forEach(x => x.classList.remove('playing'));
+            li.classList.add('playing');
+            loadSharkyPlayer();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          });
+          episodeList.appendChild(li);
         });
 
-        const exists  = eps.some(ep => Number(ep.episode_number) === Number(preferEp));
-        selectedEpisode = exists ? Number(preferEp) : Number(eps[0]?.episode_number || 1);
-        episodeSelect.value = selectedEpisode;
-
         loadSharkyPlayer();
-      } catch {
-        episodeSelect.innerHTML = '<option>Failed to load</option>';
+      } catch (err) {
+        episodeList.innerHTML = `<div class="episode-item" style="grid-template-columns:1fr;padding:40px;color:var(--muted);text-align:center">Failed to load episodes.</div>`;
+        console.error(err);
       }
     }
 
-    // ── Season list ──────────────────────────────────────────────────────────
     function renderSeasons(show) {
       seasonSelect.innerHTML = '';
       const seasons = (show.seasons || []).filter(s => s.season_number > 0);
-
       (seasons.length ? seasons : [{ season_number: 1 }]).forEach(s => {
         const o = document.createElement('option');
-        o.value       = s.season_number;
+        o.value = s.season_number;
         o.textContent = `Season ${s.season_number}`;
         seasonSelect.appendChild(o);
       });
 
-      // Restore saved progress if no URL params
       if (!params.get('s')) {
         const prog = getStoredProgress();
         if (prog) { selectedSeason = Number(prog.season) || 1; selectedEpisode = Number(prog.episode) || 1; }
       }
-
       const valid = seasons.some(s => Number(s.season_number) === selectedSeason);
       selectedSeason = valid ? selectedSeason : Number(seasons[0]?.season_number || 1);
       seasonSelect.value = selectedSeason;
@@ -204,43 +225,49 @@
       loadEpisodes(selectedSeason, 1);
     });
 
-    episodeSelect.addEventListener('change', () => {
-      selectedEpisode = Number(episodeSelect.value);
-      loadSharkyPlayer();
-    });
-
-    // ── Show details ─────────────────────────────────────────────────────────
     async function loadShowDetails() {
       if (!tvId) { titleEl.textContent = 'No TV show selected.'; return; }
       try {
-        const res  = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${API_KEY}&language=en-US`);
+        const res  = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${API_KEY}&append_to_response=credits&language=en-US`);
         const show = await res.json();
         currentShow = show;
 
-        const year    = show.first_air_date ? show.first_air_date.slice(0, 4) : 'N/A';
-        const rating  = show.vote_average ? Number(show.vote_average).toFixed(1) : 'N/A';
+        const year    = show.first_air_date ? show.first_air_date.slice(0,4) : '';
+        const rating  = show.vote_average ? Number(show.vote_average).toFixed(1) : '';
         const seasons = show.number_of_seasons || 0;
 
-        document.title      = `Watch ${show.name || 'TV Show'} - Sharky Movies 2`;
-        titleEl.textContent = `${show.name || 'Untitled'} (${year})`;
+        document.title      = `${show.name || 'TV Show'} — Sharky Movies 2`;
+        titleEl.textContent = show.name || 'Untitled';
         descEl.textContent  = show.overview || 'No overview available.';
 
-        poster.src = show.poster_path
-          ? 'https://image.tmdb.org/t/p/w500' + show.poster_path : '';
+        if (show.backdrop_path) watchBg.style.backgroundImage = `url("${BACKDROP_URL}${show.backdrop_path}")`;
 
         infoLine.innerHTML = `
-          <span>TV Show</span><span>${year}</span><span>HD</span>
-          <span>★ ${rating}</span>
-          <span>${seasons} season${seasons === 1 ? '' : 's'}</span>
+          ${rating ? `<span class="rating">&#9733; ${rating}</span>` : ''}
+          ${year   ? `<span>${year}</span>` : ''}
+          <span>TV Series</span>
+          <span>HD</span>
+          ${seasons ? `<span>${seasons} Season${seasons===1?'':'s'}</span>` : ''}
+        `;
+        if (show.genres?.length) genresEl.textContent = show.genres.slice(0,4).map(g=>g.name).join(' · ');
+
+        const cast = (show.credits?.cast || []).slice(0,4).map(c=>c.name).join(', ');
+        const creators = (show.created_by || []).map(c => c.name).join(', ');
+        const country  = (show.production_countries || [])[0]?.name || '';
+        const gStr = (show.genres || []).slice(0,4).map(g=>g.name).join(', ');
+        sidePanel.innerHTML = `
+          <div class="side-title">Details</div>
+          ${creators ? `<div class="side-row"><b>Creator</b><span>${esc(creators)}</span></div>` : ''}
+          ${cast     ? `<div class="side-row"><b>Cast</b><span>${esc(cast)}</span></div>` : ''}
+          ${gStr     ? `<div class="side-row"><b>Genres</b><span>${esc(gStr)}</span></div>` : ''}
+          ${country  ? `<div class="side-row"><b>Origin</b><span>${esc(country)}</span></div>` : ''}
+          ${year     ? `<div class="side-row"><b>First Aired</b><span>${year}</span></div>` : ''}
         `;
 
-        if (show.genres?.length) {
-          genresEl.textContent = show.genres.slice(0, 4).map(g => g.name).join(' · ');
-        }
-
         renderSeasons(show);
-      } catch {
+      } catch (err) {
         titleEl.textContent = 'Failed to load TV show.';
+        console.error(err);
       }
     }
 
