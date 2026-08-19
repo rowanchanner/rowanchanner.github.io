@@ -164,30 +164,27 @@ function showSkeletonGrid(grid, count = 12) {
 function createCard(item, opts = {}) {
   const card = document.createElement("article");
   card.className = "movie-card";
-  const year    = getYear(item);
-  const rating  = getRating(item);
-  // Fake a Netflix "Match %" from TMDB vote_average (65–99% range)
-  const match   = rating ? Math.round(60 + Number(rating) * 4) : null;
-  const maturity= item.media_type === "tv" ? "TV-14" : "PG-13";
-  const removable = opts.removable || false;
+  const typeLabel = item.media_type === "tv" ? "SERIES" : "FILM";
+  const year   = getYear(item);
+  const rating = getRating(item);
+  const removable = opts.removable || false;   // Continue / My List cards
 
   card.innerHTML = `
     ${removable ? `<button class="card-remove" title="Remove" aria-label="Remove" data-act="remove">&times;</button>` : ""}
     <img src="${getCardImg(item)}" alt="${escapeHTML(item.sharky_title)}" loading="lazy">
-    <div class="card-preview">
-      <div class="preview-actions">
-        <button class="card-ic play"          title="Play"      data-act="play">&#9654;</button>
-        <button class="card-ic"               title="My List"   data-act="list">+</button>
-        <button class="card-ic"               title="Like"      data-act="like">&#128077;</button>
-        <button class="card-ic spacer"        title="More Info" data-act="info">&#9662;</button>
+    <div class="card-overlay">
+      <h3 class="card-title">${escapeHTML(item.sharky_title)}</h3>
+      <div class="card-actions">
+        <button class="card-ic play"  title="Play"       data-act="play">&#9654;</button>
+        <button class="card-ic"       title="My List"    data-act="list">+</button>
+        <button class="card-ic"       title="More Info"  data-act="info">&#9432;</button>
       </div>
-      <div class="preview-meta">
-        ${match ? `<span class="match">${match}% Match</span>` : ""}
-        <span class="maturity">${maturity}</span>
-        ${year ? `<span>${year}</span>` : ""}
-        <span class="hd">HD</span>
+      <div class="card-meta">
+        ${rating ? `<span class="card-rating">&#9733; ${rating}</span>` : ""}
+        ${year   ? `<span>${year}</span>` : ""}
+        <span class="card-badge">${typeLabel}</span>
+        <span class="card-badge">HD</span>
       </div>
-      <div class="preview-genres">${escapeHTML(item.sharky_title)}</div>
     </div>`;
 
   // Delegated: play / list / info / remove; card itself = info.
@@ -249,13 +246,11 @@ function setHero(item, idx = 0) {
 
   const year   = getYear(item);
   const rating = getRating(item);
-  const match  = rating ? Math.round(60 + Number(rating) * 4) : null;
-  const maturity = item.media_type === "tv" ? "TV-14" : "PG-13";
   heroMeta.innerHTML = `
-    ${match ? `<span class="rating">${match}% Match</span>` : ""}
-    ${year  ? `<span>${year}</span>` : ""}
-    <span class="maturity">${maturity}</span>
-    <span class="hd">HD</span>
+    ${rating ? `<span class="rating">&#9733; ${rating}</span>` : ""}
+    ${year   ? `<span>${year}</span>` : ""}
+    <span>${item.media_type === "tv" ? "TV Series" : "Movie"}</span>
+    <span>HD</span>
   `;
 
   heroPlayBtn.onclick = () => playItem(item);
@@ -308,15 +303,12 @@ async function openDetails(id, type) {
 
   const year   = getYear(item);
   const rating = getRating(item);
-  const match  = rating ? Math.round(60 + Number(rating) * 4) : null;
-  const maturity = type === "tv" ? "TV-14" : "PG-13";
-  const runtime = getRuntimeText(item);
   detailsMeta.innerHTML = `
-    ${match ? `<span class="rating">${match}% Match</span>` : ""}
-    ${year  ? `<span>${year}</span>` : ""}
-    <span class="maturity">${maturity}</span>
-    ${runtime ? `<span>${runtime}</span>` : ""}
-    <span class="hd">HD</span>
+    ${rating ? `<span class="rating">&#9733; ${rating}</span>` : ""}
+    ${year   ? `<span>${year}</span>` : ""}
+    <span>${type === "tv" ? "TV Series" : "Movie"}</span>
+    <span>HD</span>
+    ${getRuntimeText(item) ? `<span>${getRuntimeText(item)}</span>` : ""}
   `;
 
   const genres = item.genres?.slice(0, 4).map(g => g.name).join(" · ") || "";
