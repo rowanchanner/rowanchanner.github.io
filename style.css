@@ -387,25 +387,6 @@ img { display: block; max-width: 100%; }
   color: #fff;
 }
 
-/* Larger header used for Continue Watching / My List */
-.section-header-lg { margin-bottom: 16px; align-items: flex-end; }
-.section-header-title { display: flex; flex-direction: column; gap: 4px; }
-.section-header-lg h2 {
-  font-size: 1.85rem;
-  font-weight: 900;
-  letter-spacing: -.6px;
-}
-.section-eyebrow {
-  font-size: .7rem;
-  font-weight: 800;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: var(--red);
-}
-@media (max-width: 640px) {
-  .section-header-lg h2 { font-size: 1.4rem; }
-  .section-eyebrow      { font-size: .62rem; letter-spacing: 2px; }
-}
 
 .section-header .see-all {
   color: var(--muted);
