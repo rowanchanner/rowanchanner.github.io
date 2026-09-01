@@ -1081,9 +1081,21 @@ img { display: block; max-width: 100%; }
   width: 200px;
   aspect-ratio: 16 / 9;
   border-radius: 6px;
-  background: #0a0a0a center/cover;
+  background-color: #0a0a0a;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
+}
+.ep-thumb.no-image::before {
+  content: "\1F4FA";
+  position: absolute;
+  inset: 0;
+  display: grid; place-items: center;
+  font-size: 2rem;
+  color: rgba(255,255,255,.2);
 }
 .ep-thumb::after {
   content: "▶";

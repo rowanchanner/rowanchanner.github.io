@@ -192,13 +192,15 @@
           const li = document.createElement('div');
           li.className = 'episode-item' + (Number(ep.episode_number) === selectedEpisode ? ' playing' : '');
           li.dataset.ep = ep.episode_number;
-          const thumb = ep.still_path
+          const hasThumb = !!ep.still_path;
+          const thumb = hasThumb
             ? `background-image:url("${IMG_URL}${ep.still_path}")`
-            : 'background:#0a0a0a';
+            : '';
+          const thumbClass = hasThumb ? '' : 'no-image';
           const runtime = ep.runtime ? `${ep.runtime}m` : '';
           li.innerHTML = `
             <div class="ep-num">${ep.episode_number}</div>
-            <div class="ep-thumb" style="${thumb}"></div>
+            <div class="ep-thumb ${thumbClass}" style="${thumb}"></div>
             <div class="ep-info">
               <div class="ep-title">
                 <span>${esc(ep.name || 'Untitled')}</span>
@@ -212,6 +214,9 @@
             selectedEpisode = Number(ep.episode_number);
             document.querySelectorAll('.episode-item').forEach(x => x.classList.remove('playing'));
             li.classList.add('playing');
+            saveTvProgress();
+            saveContinueWatching();
+            updateUrl();
             loadSharkyPlayer();
             window.scrollTo({ top: 0, behavior: 'smooth' });
           });
