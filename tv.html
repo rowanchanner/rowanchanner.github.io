@@ -176,6 +176,56 @@
       try { localStorage.setItem(STORAGE_WATCHED, JSON.stringify(all)); } catch {}
     }
 
+    /* Exact origin of the embedded player, for validating postMessage. */
+    const PLAYER_ORIGIN = (function () {
+      try { return new URL(SHARKY_API).origin; } catch (e) { return ''; }
+    })();
+
+    /* ---- messages from the player iframe ----
+       The player is on another origin, so it cannot write to this site's
+       storage directly. It posts its position out instead, and we record it
+       here — that is what puts a real progress bar on an episode row rather
+       than a flat "started" marker. */
+    window.addEventListener('message', (ev) => {
+      const d = ev.data;
+      if (!d || typeof d !== 'object') return;
+      /* Only trust messages from the player origin we embedded. Anything
+         else on the page (an ad frame, an extension) can post here too. */
+      if (PLAYER_ORIGIN && ev.origin !== PLAYER_ORIGIN) return;
+
+      if (d.type === 'sharky:progress' && d.kind === 'tv' && String(d.id) === String(tvId)) {
+        markWatched(d.season, d.episode, d.pct);
+        const row = episodeList.querySelector('.episode-item[data-ep="' + d.episode + '"]');
+        if (row && Number(d.season) === Number(selectedSeason)) {
+          row.classList.add('watched');
+          let bar = row.querySelector('.ep-progress');
+          if (!bar && d.pct > 0) {
+            bar = document.createElement('span');
+            bar.className = 'ep-progress';
+            bar.innerHTML = '<i></i>';
+            const th = row.querySelector('.ep-thumb');
+            if (th) th.appendChild(bar);
+          }
+          const fill = bar && bar.querySelector('i');
+          if (fill) fill.style.width = Math.max(2, Math.min(100, d.pct)) + '%';
+        }
+      }
+
+      if (d.type === 'sharky:next-episode' && String(d.id) === String(tvId)) {
+        /* The player rolled into the next episode on its own — keep this page
+           in step so the list highlight and the URL do not go stale. */
+        selectedEpisode = Number(d.episode);
+        selectedSeason  = Number(d.season) || selectedSeason;
+        document.querySelectorAll('.episode-item').forEach(x => x.classList.remove('playing'));
+        const row = episodeList.querySelector('.episode-item[data-ep="' + selectedEpisode + '"]');
+        if (row) { row.classList.add('playing', 'watched'); row.scrollIntoView({block:'nearest', behavior:'smooth'}); }
+        markWatched(selectedSeason, selectedEpisode, 0);
+        saveTvProgress();
+        saveContinueWatching();
+        updateUrl();
+      }
+    });
+
     function getStoredProgress() {
       try { return (JSON.parse(localStorage.getItem(STORAGE_TV_PROGRESS)) || {})[tvId] || null; }
       catch { return null; }
