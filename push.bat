@@ -39,6 +39,18 @@ if exist ".git\index.lock" (
     echo [sharky] Removing stale git lock...
     del /f /q ".git\index.lock"
 )
+if exist ".git\HEAD.lock" (
+    echo [sharky] Removing stale HEAD lock...
+    del /f /q ".git\HEAD.lock"
+)
+if exist ".git\objects\maintenance.lock" (
+    echo [sharky] Removing stale maintenance lock...
+    del /f /q ".git\objects\maintenance.lock"
+)
+if exist "_to_delete" (
+    echo [sharky] Clearing _to_delete scratch folder...
+    rmdir /s /q "_to_delete"
+)
 
 :: Stage everything in the folder
 git add .
