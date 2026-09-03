@@ -763,9 +763,27 @@ img { display: block; max-width: 100%; }
     gap: 10px;
   }
   .nav-left, .nav-right { width: 100%; justify-content: space-between; gap: 12px; }
-  .nav-links { gap: 14px; overflow-x: auto; scrollbar-width: none; padding: 0; }
+  /* The row is meant to scroll sideways, but flex items shrink by default,
+     so "TV Shows" and "My List" wrapped onto two lines and the later links
+     (Downloads, Roulette) were pushed out of reach entirely. Stop them
+     shrinking and wrapping and the overflow scroll actually works. */
+  .nav-links {
+    gap: 18px; padding: 2px 0 4px;
+    overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    /* let it bleed to the screen edge so it reads as scrollable */
+    margin-inline: -4%; padding-inline: 4%;
+    scroll-padding-inline: 4%;
+  }
   .nav-links::-webkit-scrollbar { display: none; }
-  .nav-link.old-version-btn { display: none; }
+  .nav-link {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
+  .nav-link.old-version-btn { display: inline-flex; }
   .search-bar { width: 100%; }
   .search-bar:focus { width: 100%; }
   .search-wrap { flex: 1; }
@@ -783,7 +801,12 @@ img { display: block; max-width: 100%; }
 @media (max-width: 640px) {
   .logo { font-size: 1.5rem; }
   .profile-icon { display: none; }
-  .nav-link { font-size: .82rem; }
+  .nav-link { font-size: .84rem; }
+  /* Nav sits above the search on a phone: two comfortable rows beat one
+     cramped one. */
+  .navbar { gap: 8px; }
+  .nav-left { flex-direction: column; align-items: stretch; gap: 8px; }
+  .nav-left .logo { align-self: flex-start; }
   .hero { padding-top: 150px; min-height: 72vh; }
   .hero-content { max-width: 100%; }
   .hero-actions { flex-wrap: wrap; gap: 8px; }
@@ -1529,4 +1552,139 @@ img { display: block; max-width: 100%; }
   .sharky-player-section { margin: 0 0 12px; }
   .watch-hero { padding: 0; }
   .sharky-attr { display: none; }
+}
+
+
+/* ==============================================================
+   INTRO — Netflix-style cold open
+   Big red wordmark on black: letters rise in, hold, then the whole
+   thing pushes toward you and fades. Once per session only.
+   ============================================================== */
+.intro {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #000;
+  display: grid; place-content: center; justify-items: center;
+  gap: 10px;
+  cursor: pointer;
+  animation: introBg .35s ease both;
+}
+@keyframes introBg { from { opacity: 0 } to { opacity: 1 } }
+
+.intro-word {
+  display: flex;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: clamp(3.2rem, 15vw, 9rem);
+  line-height: .9;
+  letter-spacing: -.02em;
+  color: var(--red);
+  /* The glow is what sells it as a title card rather than plain text. */
+  text-shadow:
+    0 0 18px rgba(229,9,20,.55),
+    0 0 60px rgba(229,9,20,.35),
+    0 6px 40px rgba(0,0,0,.9);
+}
+.intro-word span {
+  display: inline-block;
+  transform: translateY(120%) scaleY(1.4);
+  opacity: 0;
+  animation: introLetter .62s cubic-bezier(.2,.8,.2,1) forwards;
+}
+/* Stagger so the word assembles left to right. */
+.intro-word span:nth-child(1) { animation-delay: .06s }
+.intro-word span:nth-child(2) { animation-delay: .13s }
+.intro-word span:nth-child(3) { animation-delay: .20s }
+.intro-word span:nth-child(4) { animation-delay: .27s }
+.intro-word span:nth-child(5) { animation-delay: .34s }
+.intro-word span:nth-child(6) { animation-delay: .41s }
+@keyframes introLetter {
+  from { transform: translateY(120%) scaleY(1.4); opacity: 0 }
+  to   { transform: translateY(0) scaleY(1);      opacity: 1 }
+}
+
+.intro-sub {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: clamp(.6rem, 2.2vw, .95rem);
+  font-weight: 700;
+  letter-spacing: .55em;
+  text-indent: .55em;              /* balance the trailing letter-space */
+  color: rgba(255,255,255,.62);
+  opacity: 0;
+  animation: introSub .7s ease .62s forwards;
+}
+@keyframes introSub {
+  from { opacity: 0; transform: translateY(8px) }
+  to   { opacity: .95; transform: translateY(0) }
+}
+
+/* The exit: push past the viewer, like the Netflix ident. */
+.intro.is-out {
+  animation: introOut .65s cubic-bezier(.6,0,.9,.3) forwards;
+  pointer-events: none;
+}
+@keyframes introOut {
+  from { opacity: 1; transform: scale(1) }
+  to   { opacity: 0; transform: scale(1.35) }
+}
+
+/* Hold the page still underneath while it plays. */
+body.intro-playing { overflow: hidden; }
+/* Reveal the page as the intro clears. */
+body.intro-done .navbar,
+body.intro-done .hero { animation: introReveal .7s ease both; }
+@keyframes introReveal { from { opacity: 0 } to { opacity: 1 } }
+
+@media (prefers-reduced-motion: reduce) {
+  .intro, .intro-word span, .intro-sub { animation: none !important; opacity: 1 }
+  body.intro-done .navbar, body.intro-done .hero { animation: none }
+}
+
+
+/* ==============================================================
+   HERO LOADING STATE
+   The hero used to sit as bare "Loading…" text over an empty dark
+   panel, which reads as broken rather than busy. Shimmer bars in the
+   shape of the real content make the wait legible.
+   ============================================================== */
+.hero.is-loading .hero-tag,
+.hero.is-loading #heroTitle,
+.hero.is-loading .hero-meta,
+.hero.is-loading #heroDesc,
+.hero.is-loading .hero-actions {
+  /* Hide the placeholder copy completely — colour alone still leaves a
+     ghost from text-shadow and borders. */
+  color: transparent !important;
+  text-shadow: none !important;
+  border-color: transparent !important;
+  position: relative;
+  border-radius: 6px;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,.05) 0%, rgba(255,255,255,.11) 50%, rgba(255,255,255,.05) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  pointer-events: none;
+  user-select: none;
+}
+/* Hide the real children so only the bar shows. */
+.hero.is-loading .hero-tag > *,
+.hero.is-loading .hero-meta > *,
+.hero.is-loading .hero-actions > *,
+.hero.is-loading .hero-meta span,
+.hero.is-loading .hero-tag::before { visibility: hidden; }
+
+.hero.is-loading .hero-tag   { width: 190px; height: 30px; }
+.hero.is-loading #heroTitle  { width: min(60%, 460px); height: clamp(46px, 8vw, 92px); margin-bottom: 14px; }
+.hero.is-loading .hero-meta  { width: 260px; height: 28px; }
+.hero.is-loading #heroDesc   { width: min(80%, 560px); height: 68px; }
+.hero.is-loading .hero-actions { width: 330px; height: 48px; }
+.hero.is-loading .hero-bg { opacity: .25; }
+
+@media (max-width: 640px) {
+  .hero.is-loading #heroTitle    { width: 78%; }
+  .hero.is-loading #heroDesc     { width: 92%; height: 56px; }
+  .hero.is-loading .hero-actions { width: 92%; }
+
+  /* The hero ran tall with a dead gap under the buttons on a phone. */
+  .hero { min-height: 62vh; padding-top: 132px; padding-bottom: 56px; }
+  .hero-pager { bottom: 14px; }
 }

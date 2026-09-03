@@ -280,6 +280,9 @@ async function armHeroTrailer(item) {
 }
 
 function setHero(item, idx = 0) {
+  /* First real item — drop the skeleton. */
+  const heroSection = document.getElementById('heroBanner');
+  if (heroSection) heroSection.classList.remove('is-loading');
   killHeroTrailer();
   currentHeroItem = item;
   heroIdx = idx;

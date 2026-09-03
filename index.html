@@ -16,6 +16,42 @@
 
 <body>
 
+  <!-- ── INTRO ─────────────────────────────────────────────────
+       Netflix-style cold open. Shown once per browser session so it is a
+       moment of theatre on arrival, not a toll booth on every click. -->
+  <div id="intro" class="intro" aria-hidden="true">
+    <div class="intro-word">
+      <span>S</span><span>H</span><span>A</span><span>R</span><span>K</span><span>Y</span>
+    </div>
+    <div class="intro-sub">M O V I E S</div>
+  </div>
+  <script>
+    /* Runs before the rest of the page so there is no flash of content
+       behind it. sessionStorage, so a reload during the same visit skips it. */
+    (function () {
+      var el = document.getElementById('intro');
+      if (!el) return;
+      var seen = false;
+      try { seen = sessionStorage.getItem('sharky_intro_seen') === '1'; } catch (e) {}
+      var reduce = window.matchMedia &&
+                   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (seen || reduce) { el.remove(); document.body.classList.add('intro-done'); return; }
+      try { sessionStorage.setItem('sharky_intro_seen', '1'); } catch (e) {}
+      document.body.classList.add('intro-playing');
+      var done = function () {
+        if (!el.parentNode) return;
+        el.classList.add('is-out');
+        document.body.classList.remove('intro-playing');
+        document.body.classList.add('intro-done');
+        setTimeout(function () { el.remove(); }, 700);
+      };
+      setTimeout(done, 2600);
+      /* Never trap anyone behind it. */
+      el.addEventListener('click', done);
+      window.addEventListener('keydown', done, { once: true });
+    })();
+  </script>
+
   <!-- ── NAVBAR ────────────────────────────────────────────── -->
   <header class="navbar" id="navbar">
     <div class="nav-left">
@@ -43,7 +79,7 @@
   </header>
 
   <!-- ── HERO (rotates through top trending) ─────────────── -->
-  <section class="hero" id="heroBanner">
+  <section class="hero is-loading" id="heroBanner">
     <div class="hero-bg" id="heroBg"></div>
     <div class="hero-overlay"></div>
 
