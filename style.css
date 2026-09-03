@@ -916,7 +916,8 @@ img { display: block; max-width: 100%; }
 .sharky-attr {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;          /* without this it collapses into ragged columns */
+  gap: 4px 8px;
   margin-top: 12px;
   font-size: .74rem;
   color: var(--muted-2);
@@ -1403,4 +1404,70 @@ img { display: block; max-width: 100%; }
 
 @media (max-width: 640px) {
   .gw-panel { width: 100%; top: auto; height: 60vh; border-left: none; border-top: 1px solid var(--line); }
+}
+
+
+/* ==============================================================
+   PLAYER ON PHONES
+   The embed was locked to `aspect-ratio: 16/9` inside a container
+   with 4% side padding, so on a 390px phone the iframe was only
+   359x202. The Sharky player puts its source/quality row BELOW the
+   video stage, so at 202px tall the picture was squeezed to ~150px
+   and the whole thing looked broken. Two changes: go edge-to-edge
+   (the width is free), and add room for that row instead of
+   letting it eat the picture.
+   ============================================================== */
+@media (max-width: 640px) {
+  .sharky-player-section { margin: 4px 0 18px; }
+
+  .sharky-player-wrap {
+    /* Break out of .watch-layout's 4% padding — full-bleed like every
+       other mobile player. 390px wide instead of 359px, and it reads as
+       deliberate rather than cramped. */
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    border-radius: 0;
+    /* 16:9 picture PLUS the player's own control row underneath it. */
+    aspect-ratio: auto;
+    height: calc(100vw * 9 / 16 + 58px);
+  }
+
+  /* Tighten the dead space above the player. */
+  .watch-hero { padding: 18px 4% 6px; }
+
+  .sharky-attr {
+    font-size: .66rem;
+    margin-top: 8px;
+    padding-left: 0;
+    justify-content: center;
+  }
+  /* The full API URL is what forced the ragged wrap; keep the credit,
+     and drop its separator too so no orphan dot is left behind. */
+  .sharky-attr a,
+  .sharky-attr-sep { display: none; }
+}
+
+/* Phone held sideways: the player was 437px tall in a 390px viewport, so
+   it ran off the bottom of the screen and had to be scrolled. Fit it. */
+@media (max-height: 500px) and (orientation: landscape) {
+  /* The header has a fixed height:68px, which pushed the player off the
+     bottom of a 390px-tall screen — padding alone cannot shrink it. */
+  .player-header { height: 44px; padding: 0 4%; }
+  .player-header .logo { font-size: 1.15rem; }
+  .player-home-link { font-size: .78rem; }
+
+  .sharky-player-wrap {
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    border-radius: 0;
+    aspect-ratio: auto;
+    /* Fill what's left under the header rather than overflowing past it. */
+    height: calc(100dvh - 44px);      /* exactly the slimmed header */
+    max-height: calc(100dvh - 44px);
+  }
+  .sharky-player-section { margin: 0 0 12px; }
+  .watch-hero { padding: 0; }
+  .sharky-attr { display: none; }
 }
