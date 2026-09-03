@@ -125,6 +125,10 @@
 
     const STORAGE_CONTINUE    = 'sharky_movies_2_continue_watching';
     const STORAGE_TV_PROGRESS = 'sharky_movies_2_tv_progress';
+    /* Per-episode watch state, kept in the VISITOR's own browser — nothing is
+       stored server-side, so this costs the site nothing and works without
+       anyone signing in. Shape: { "<tvId>": { "s1e4": {at, pct} } } */
+    const STORAGE_WATCHED     = 'sharky_movies_2_watched_eps';
 
     let currentShow     = null;
     let selectedSeason  = urlSeason;
@@ -150,6 +154,26 @@
     function updateUrl() {
       if (!tvId) return;
       history.replaceState(null, '', `tv.html?id=${tvId}&s=${selectedSeason}&e=${selectedEpisode}`);
+    }
+
+    /* ---- per-episode watch state (visitor-local) ---- */
+    function epKey(s, e) { return 's' + Number(s) + 'e' + Number(e); }
+    function getWatchedAll() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_WATCHED)) || {}; }
+      catch { return {}; }
+    }
+    function getWatched() { return getWatchedAll()[tvId] || {}; }
+    function markWatched(s, e, pct) {
+      if (!tvId) return;
+      const all = getWatchedAll();
+      const show = all[tvId] || (all[tvId] = {});
+      const k = epKey(s, e);
+      const prev = show[k] || {};
+      show[k] = { at: Date.now(), pct: Math.max(prev.pct || 0, Math.min(100, pct || 0)) };
+      /* Don't let one visitor's history grow without bound. */
+      const keys = Object.keys(all);
+      if (keys.length > 60) delete all[keys[0]];
+      try { localStorage.setItem(STORAGE_WATCHED, JSON.stringify(all)); } catch {}
     }
 
     function getStoredProgress() {
@@ -178,6 +202,18 @@
       localStorage.setItem(STORAGE_CONTINUE, JSON.stringify([item, ...filtered].slice(0, 20)));
     }
 
+    /* Give still-less episode tiles the show backdrop (dimmed so it reads as
+       a placeholder, not a real still). Safe to call more than once. */
+    function applyBackdropFallback() {
+      if (!currentShow || !currentShow.backdrop_path) return;
+      const bg = `linear-gradient(rgba(8,8,12,.58),rgba(8,8,12,.58)),url("${IMG_URL}${currentShow.backdrop_path}")`;
+      document.querySelectorAll('.ep-thumb.no-image').forEach(el => {
+        el.classList.remove('no-image');
+        el.classList.add('is-fallback');
+        el.style.backgroundImage = bg;
+      });
+    }
+
     async function loadEpisodes(seasonNum, preferEp = 1) {
       episodeList.innerHTML = `<div class="episode-item" style="grid-template-columns:1fr;padding:40px;color:var(--muted);text-align:center">Loading episodes…</div>`;
       try {
@@ -193,15 +229,34 @@
           const li = document.createElement('div');
           li.className = 'episode-item' + (Number(ep.episode_number) === selectedEpisode ? ' playing' : '');
           li.dataset.ep = ep.episode_number;
-          const hasThumb = !!ep.still_path;
-          const thumb = hasThumb
-            ? `background-image:url("${IMG_URL}${ep.still_path}")`
-            : '';
-          const thumbClass = hasThumb ? '' : 'no-image';
+          /* TMDB often has no still for newer or smaller shows, which left a
+             black rectangle on every row. Fall back to the show backdrop
+             (dimmed, so it reads as a placeholder rather than a real still),
+             then to a plain gradient with the episode number. */
+          const showBackdrop = currentShow && currentShow.backdrop_path;
+          let thumb = '', thumbClass = '';
+          if (ep.still_path) {
+            thumb = `background-image:url("${IMG_URL}${ep.still_path}")`;
+          } else if (showBackdrop) {
+            thumb = `background-image:linear-gradient(rgba(8,8,12,.58),rgba(8,8,12,.58)),url("${IMG_URL}${showBackdrop}")`;
+            thumbClass = 'is-fallback';
+          } else {
+            thumbClass = 'no-image';
+          }
+
+          const w = getWatched()[epKey(seasonNum, ep.episode_number)];
+          const isWatched = !!w;
+          const pct = w && w.pct ? Math.max(2, Math.min(100, w.pct)) : 0;
+          if (isWatched) li.classList.add('watched');
+
           const runtime = ep.runtime ? `${ep.runtime}m` : '';
           li.innerHTML = `
             <div class="ep-num">${ep.episode_number}</div>
-            <div class="ep-thumb ${thumbClass}" style="${thumb}"></div>
+            <div class="ep-thumb ${thumbClass}" style="${thumb}">
+              ${thumbClass ? `<span class="ep-thumb-num">${ep.episode_number}</span>` : ''}
+              ${pct ? `<span class="ep-progress"><i style="width:${pct}%"></i></span>` : ''}
+              ${isWatched && !pct ? '<span class="ep-tick">&#10003;</span>' : ''}
+            </div>
             <div class="ep-info">
               <div class="ep-title">
                 <span>${esc(ep.name || 'Untitled')}</span>
@@ -215,6 +270,8 @@
             selectedEpisode = Number(ep.episode_number);
             document.querySelectorAll('.episode-item').forEach(x => x.classList.remove('playing'));
             li.classList.add('playing');
+            li.classList.add('watched');
+            markWatched(seasonNum, ep.episode_number, 0);
             saveTvProgress();
             saveContinueWatching();
             updateUrl();
@@ -223,6 +280,12 @@
           });
           episodeList.appendChild(li);
         });
+
+        applyBackdropFallback();
+        /* Opening the page on an episode counts as starting it. */
+        markWatched(seasonNum, selectedEpisode, 0);
+        const cur = episodeList.querySelector('.episode-item.playing');
+        if (cur) cur.classList.add('watched');
 
         loadSharkyPlayer();
       } catch (err) {
@@ -266,6 +329,10 @@
         const res  = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${API_KEY}&append_to_response=credits&language=en-US`);
         const show = await res.json();
         currentShow = show;
+        /* Episodes may have rendered before this resolved, in which case any
+           still-less rows fell back to the plain gradient. Upgrade them to the
+           show backdrop now that we have it. */
+        applyBackdropFallback();
 
         const year    = show.first_air_date ? show.first_air_date.slice(0,4) : '';
         const rating  = show.vote_average ? Number(show.vote_average).toFixed(1) : '';

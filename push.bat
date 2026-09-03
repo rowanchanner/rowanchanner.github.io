@@ -30,6 +30,16 @@ if %errorlevel%==0 (
     git remote add origin %REPO%
 )
 
+:: Clear a stale index.lock. Git writes one whenever it refreshes the index
+:: and normally deletes it again, but if anything is holding the folder (a
+:: sync client, an editor, a tool without delete rights) it survives and every
+:: later push dies with "index.lock: File exists" while still printing
+:: "Nothing new to commit" -- so the push looks fine and silently does nothing.
+if exist ".git\index.lock" (
+    echo [sharky] Removing stale git lock...
+    del /f /q ".git\index.lock"
+)
+
 :: Stage everything in the folder
 git add .
 
