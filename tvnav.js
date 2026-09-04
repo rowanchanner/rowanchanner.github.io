@@ -307,6 +307,11 @@
   document.addEventListener('keydown', function (e) {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
 
+    /* While the fullscreen player is up it owns every key - player.js hands
+       them to the video. Navigating the page underneath would be invisible
+       and would steal the remote from the thing actually on screen. */
+    if (document.body && document.body.classList.contains('player-open')) return;
+
     var key = e.key, code = e.keyCode || e.which || 0;
     var dir = DIR_KEY[key] || DIR_CODE[code];
     var ok = isIn(OK_KEY, key) || isIn(OK_CODE, code);

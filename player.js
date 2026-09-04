@@ -124,16 +124,32 @@
     if (d && d.type === 'sharky:back') hide();
   });
 
-  /* Safety net for mouse and keyboard users: the overlay has focus inside a
-     cross-origin frame, so this only fires when focus is back on the page. */
+  /* A television's WebView will not reliably move keyboard focus into a
+     cross-origin iframe, so on a Fire TV the remote sails straight past the
+     player and it can't be controlled at all. Rather than fight the focus
+     model, the page keeps receiving the keys and forwards each one to the
+     player, which treats them as its own. When focus genuinely is inside the
+     frame this handler never fires, so nothing is handled twice. */
   document.addEventListener('keydown', function (e) {
     if (!isOpen) return;
     var code = e.keyCode || e.which || 0;
-    if (e.key === 'Escape' || e.key === 'Backspace' || code === 27 || code === 4 || code === 461) {
-      e.preventDefault();
+
+    var sent = false;
+    if (frame && frame.contentWindow) {
+      try {
+        frame.contentWindow.postMessage(
+          { type: 'sharky:key', key: e.key, keyCode: code }, '*');
+        sent = true;
+      } catch (err) {}
+    }
+
+    /* If the player is unreachable, at least let people out of it. */
+    if (!sent && (e.key === 'Escape' || e.key === 'Backspace' ||
+                  code === 27 || code === 4 || code === 461)) {
       hide();
     }
-  });
+    e.preventDefault();
+  }, true);
 
   window.SharkyPlayer = {
     open: show,

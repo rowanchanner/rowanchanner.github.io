@@ -248,9 +248,16 @@
       if (window.SharkyTV && window.SharkyTV.focus) window.SharkyTV.focus(row);
     });
 
+    /* Play on a series means "which episode?", not "start something" - so it
+       takes you to the list and puts the highlight on where you're up to.
+       Choosing an episode is what opens the fullscreen player. */
     const playBtn = document.getElementById('playBtn');
     if (playBtn) playBtn.addEventListener('click', () => {
-      if (currentPlayUrl && window.SharkyPlayer) window.SharkyPlayer.open(currentPlayUrl);
+      const row = episodeList.querySelector('.episode-item.playing')
+               || episodeList.querySelector('.episode-item');
+      if (!row) return;
+      row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (window.SharkyTV && window.SharkyTV.focus) window.SharkyTV.focus(row);
     });
 
     function getStoredProgress() {
