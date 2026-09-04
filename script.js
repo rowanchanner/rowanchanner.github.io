@@ -98,6 +98,27 @@ async function getList(endpoint, type) {
   return (data?.results || []).map(item => normalizeItem(item, type));
 }
 
+function endpointWithPage(endpoint, page) {
+  const clean = endpoint.replace(/([?&])page=\d+(&?)/, (m, p1, p2) => p2 ? p1 : '');
+  return clean + (clean.includes("?") ? "&" : "?") + "page=" + page;
+}
+
+async function getListPages(endpoint, type, pages = 5) {
+  const batches = await Promise.all(
+    Array.from({ length: pages }, (_, i) => getList(endpointWithPage(endpoint, i + 1), type))
+  );
+  const seen = new Set();
+  const out = [];
+  batches.flat().forEach(item => {
+    const key = mediaKey(item);
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      out.push(item);
+    }
+  });
+  return out;
+}
+
 function normalizeItem(item, type) {
   return {
     ...item,
@@ -118,6 +139,7 @@ const getBackdrop = i => i.backdrop_path ? BACKDROP_URL + i.backdrop_path : PLAC
 const getCardImg  = i => i.backdrop_path ? IMG_URL      + i.backdrop_path
                        : i.poster_path   ? POSTER_URL   + i.poster_path
                        : PLACEHOLDER_BACKDROP;
+const mediaKey = i => i && i.id != null ? `${i.media_type || (i.name ? "tv" : "movie")}:${i.id}` : "";
 
 function truncate(text, len = 170) {
   if (!text) return "No overview available.";
@@ -234,6 +256,13 @@ async function libraryAvailable(items) {
   if (!list.length) return new Set();
 
   const keep = new Set();
+  const byId = new Map();
+  list.forEach(x => {
+    const id = String(x.id);
+    if (!byId.has(id)) byId.set(id, []);
+    byId.get(id).push(mediaKey(x));
+  });
+  let answered = false;
   for (let i = 0; i < list.length; i += 60) {
     const chunk = list.slice(i, i + 60).map(x => ({
       id: x.id,
@@ -247,30 +276,53 @@ async function libraryAvailable(items) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: chunk })
       });
-      if (!r.ok) return null;
+      if (!r.ok) {
+        console.warn('[sharky] library check chunk failed', r.status);
+        continue;
+      }
+      answered = true;
       const d = await r.json();
-      (d.available || []).forEach(id => keep.add(String(id)));
+      if (Array.isArray(d.available_keys)) {
+        d.available_keys.forEach(key => keep.add(String(key)));
+      } else {
+        (d.available || []).forEach(id => (byId.get(String(id)) || []).forEach(key => keep.add(key)));
+      }
     } catch (e) {
-      console.warn('[sharky] library check unavailable — showing everything', e);
-      return null;
+      console.warn('[sharky] library check chunk unavailable', e);
     }
   }
-  return keep;
+  if (answered) return keep;
+  console.warn('[sharky] library check unavailable - showing everything');
+  return null;
 }
 
 /* Render a homepage row, dropping anything not in the library. An empty row
    is hidden outright rather than left saying "Nothing here yet". */
-function renderLibraryRow(row, items, keep) {
+function playableOnly(items, keep) {
+  return keep ? (items || []).filter(i => keep.has(mediaKey(i))) : (items || []);
+}
+
+function renderLibraryRow(row, items, keep, fallback = [], target = 8) {
   if (!row) return;
-  const list = keep ? (items || []).filter(i => keep.has(String(i.id))) : (items || []);
+  const list = playableOnly(items, keep);
+  const filled = list.slice();
+  const seen = new Set(filled.map(mediaKey));
+  for (const item of fallback) {
+    const key = mediaKey(item);
+    if (filled.length >= target) break;
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      filled.push(item);
+    }
+  }
   const block = row.closest('.movie-row-block');
-  if (!list.length) {
+  if (!filled.length) {
     row.innerHTML = '';
     if (block) block.classList.add('hidden');
     return;
   }
   if (block) block.classList.remove('hidden');
-  renderRow(row, list);
+  renderRow(row, filled);
 }
 
 function renderRow(row, items, opts = {}) {
@@ -696,26 +748,27 @@ syncNavHeight();
 async function init() {
   Object.values(rowMap).forEach(r => showSkeletonRow(r, 8));
 
+  const ROW_PAGES = 6;
   const [
     trendingAll,
     trendingMovies, popularMovies, topMovies,
     trendingTv, popularTv, topTv,
     action, comedy, horror, scifi, romance, animation, doc,
   ] = await Promise.all([
-    getList("/trending/all/day"),
-    getList("/trending/movie/week", "movie"),
-    getList("/movie/popular", "movie"),
-    getList("/movie/top_rated", "movie"),
-    getList("/trending/tv/week", "tv"),
-    getList("/tv/popular", "tv"),
-    getList("/tv/top_rated", "tv"),
-    getList("/discover/movie?with_genres=28&sort_by=popularity.desc", "movie"),
-    getList("/discover/movie?with_genres=35&sort_by=popularity.desc", "movie"),
-    getList("/discover/movie?with_genres=27&sort_by=popularity.desc", "movie"),
-    getList("/discover/movie?with_genres=878&sort_by=popularity.desc", "movie"),
-    getList("/discover/movie?with_genres=10749&sort_by=popularity.desc", "movie"),
-    getList("/discover/movie?with_genres=16&sort_by=popularity.desc", "movie"),
-    getList("/discover/movie?with_genres=99&sort_by=popularity.desc", "movie"),
+    getListPages("/trending/all/day", undefined, 3),
+    getListPages("/trending/movie/week", "movie", ROW_PAGES),
+    getListPages("/movie/popular", "movie", ROW_PAGES),
+    getListPages("/movie/top_rated", "movie", ROW_PAGES),
+    getListPages("/trending/tv/week", "tv", ROW_PAGES),
+    getListPages("/tv/popular", "tv", ROW_PAGES),
+    getListPages("/tv/top_rated", "tv", ROW_PAGES),
+    getListPages("/discover/movie?with_genres=28&sort_by=popularity.desc", "movie", ROW_PAGES),
+    getListPages("/discover/movie?with_genres=35&sort_by=popularity.desc", "movie", ROW_PAGES),
+    getListPages("/discover/movie?with_genres=27&sort_by=popularity.desc", "movie", ROW_PAGES),
+    getListPages("/discover/movie?with_genres=878&sort_by=popularity.desc", "movie", ROW_PAGES),
+    getListPages("/discover/movie?with_genres=10749&sort_by=popularity.desc", "movie", ROW_PAGES),
+    getListPages("/discover/movie?with_genres=16&sort_by=popularity.desc", "movie", ROW_PAGES),
+    getListPages("/discover/movie?with_genres=99&sort_by=popularity.desc", "movie", ROW_PAGES),
   ]);
 
   /* One round trip for the whole page, then render each row from the answer.
@@ -726,19 +779,25 @@ async function init() {
     ...action, ...comedy, ...horror, ...scifi, ...romance, ...animation, ...doc
   ]);
 
-  renderLibraryRow(rowMap.trendingMovies, trendingMovies, keep);
-  renderLibraryRow(rowMap.popularMovies,  popularMovies,  keep);
-  renderLibraryRow(rowMap.topMovies,      topMovies,      keep);
-  renderLibraryRow(rowMap.trendingTv,     trendingTv,     keep);
-  renderLibraryRow(rowMap.popularTv,      popularTv,      keep);
-  renderLibraryRow(rowMap.topTv,          topTv,          keep);
-  renderLibraryRow(rowMap.action,    action,    keep);
-  renderLibraryRow(rowMap.comedy,    comedy,    keep);
-  renderLibraryRow(rowMap.horror,    horror,    keep);
-  renderLibraryRow(rowMap.scifi,     scifi,     keep);
-  renderLibraryRow(rowMap.romance,   romance,   keep);
-  renderLibraryRow(rowMap.animation, animation, keep);
-  renderLibraryRow(rowMap.doc,       doc,       keep);
+  const movieFallback = playableOnly([
+    ...trendingMovies, ...popularMovies, ...topMovies,
+    ...action, ...comedy, ...horror, ...scifi, ...romance, ...animation, ...doc
+  ], keep);
+  const tvFallback = playableOnly([...trendingTv, ...popularTv, ...topTv], keep);
+
+  renderLibraryRow(rowMap.trendingMovies, trendingMovies, keep, movieFallback);
+  renderLibraryRow(rowMap.popularMovies,  popularMovies,  keep, movieFallback);
+  renderLibraryRow(rowMap.topMovies,      topMovies,      keep, movieFallback);
+  renderLibraryRow(rowMap.trendingTv,     trendingTv,     keep, tvFallback);
+  renderLibraryRow(rowMap.popularTv,      popularTv,      keep, tvFallback);
+  renderLibraryRow(rowMap.topTv,          topTv,          keep, tvFallback);
+  renderLibraryRow(rowMap.action,    action,    keep, movieFallback);
+  renderLibraryRow(rowMap.comedy,    comedy,    keep, movieFallback);
+  renderLibraryRow(rowMap.horror,    horror,    keep, movieFallback);
+  renderLibraryRow(rowMap.scifi,     scifi,     keep, movieFallback);
+  renderLibraryRow(rowMap.romance,   romance,   keep, movieFallback);
+  renderLibraryRow(rowMap.animation, animation, keep, movieFallback);
+  renderLibraryRow(rowMap.doc,       doc,       keep, movieFallback);
 
   renderContinueWatching();
   renderMyList();
@@ -752,7 +811,7 @@ async function init() {
   let heroPool = (trendingAll.length ? trendingAll : trendingMovies)
     .filter(i => i.backdrop_path && i.overview);
   if (keep) {
-    const owned = heroPool.filter(i => keep.has(String(i.id)));
+    const owned = heroPool.filter(i => keep.has(mediaKey(i)));
     if (owned.length) heroPool = owned;
   }
   startHeroCarousel(heroPool);
