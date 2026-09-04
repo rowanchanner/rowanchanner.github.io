@@ -1688,3 +1688,48 @@ body.intro-done .hero { animation: introReveal .7s ease both; }
   .hero { min-height: 62vh; padding-top: 132px; padding-bottom: 56px; }
   .hero-pager { bottom: 14px; }
 }
+
+/* ==========================================================================
+   TV remote / D-pad navigation  (tvnav.js)
+   The highlight is only ever applied by keyboard or remote, never by a mouse,
+   so it can be bold without spoiling the pointer experience.
+   ========================================================================== */
+
+.tv-focus {
+  outline: 3px solid var(--red);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.movie-card.tv-focus {
+  transform: scale(1.08);
+  z-index: 30;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, .75), 0 0 0 2px rgba(229, 9, 20, .35);
+}
+
+/* Reveal the card's hover overlay when the remote lands on it, so the title
+   and buttons are readable without a pointer. */
+.movie-card.tv-focus .card-overlay { opacity: 1; }
+
+.episode-item.tv-focus {
+  background: rgba(229, 9, 20, .14);
+  outline-offset: -3px;
+}
+
+.nav-link.tv-focus,
+.btn.tv-focus,
+.see-all.tv-focus {
+  outline-offset: 4px;
+}
+
+.search-bar.tv-focus { outline-offset: 2px; }
+
+/* On an actual telly the viewer is three metres away: make it unmissable, and
+   drop hover-only affordances that a remote can never trigger. */
+body.tv-mode .tv-focus { outline-width: 4px; }
+body.tv-mode .movie-card.tv-focus { transform: scale(1.12); }
+body.tv-mode .row-arrow { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .movie-card.tv-focus { transform: none; }
+}
