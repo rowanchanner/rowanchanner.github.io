@@ -151,6 +151,16 @@
     e.preventDefault();
   }, true);
 
+  /* Claim the page as soon as we load, rather than waiting for the first
+     play. The page still carries the old inline player area, and now that
+     nothing auto-starts a stream its spinner would sit there saying "Loading
+     Stream" for ever - looking exactly like a hung player. */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', build);
+  } else {
+    build();
+  }
+
   window.SharkyPlayer = {
     open: show,
     close: hide,
