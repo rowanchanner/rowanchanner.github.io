@@ -68,6 +68,7 @@
         <button class="nav-link" data-jump="continue">Continue</button>
         <button class="nav-link" data-jump="downloads">Downloads</button>
         <a href="roulette.html" class="nav-link">Roulette</a>
+        <a href="https://discord.gg/F7PP27VXnh" class="nav-link discord-link" target="_blank" rel="noopener">Discord</a>
         <a href="old/index.html" class="nav-link old-version-btn">Old Site</a>
       </nav>
     </div>
@@ -131,6 +132,15 @@
           <button class="row-arrow left"  aria-label="Scroll left">&#10094;</button>
           <div class="movie-row" id="continueRow"></div>
           <button class="row-arrow right" aria-label="Scroll right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block hidden" id="becauseBlock" data-cat="recommendations">
+        <div class="section-header"><h2 id="becauseTitle">Because You Watched</h2><span class="see-all">See All &rsaquo;</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left">&#10094;</button>
+          <div class="movie-row" id="becauseRow"></div>
+          <button class="row-arrow right">&#10095;</button>
         </div>
       </div>
 
@@ -311,6 +321,6 @@
   </div>
 
   <script src="downloads.js"></script>
-  <script src="script.js?v=20260904-homepage-subs"></script>
+  <script src="script.js?v=20260904-because-dedupe"></script>
 </body>
 </html>

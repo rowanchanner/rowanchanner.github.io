@@ -49,6 +49,7 @@ const detailsListBtn  = document.getElementById("detailsListBtn");
 
 const rowMap = {
   continue:       document.getElementById("continueRow"),
+  because:        document.getElementById("becauseRow"),
   trendingMovies: document.getElementById("trendingMoviesRow"),
   popularMovies:  document.getElementById("popularMoviesRow"),
   topMovies:      document.getElementById("topMoviesRow"),
@@ -66,6 +67,8 @@ const rowMap = {
 };
 
 const continueBlock    = document.getElementById("continueBlock");
+const becauseBlock     = document.getElementById("becauseBlock");
+const becauseTitle     = document.getElementById("becauseTitle");
 const myListBlock      = document.getElementById("myListBlock");
 const clearContinueBtn = document.getElementById("clearContinueBtn");
 const downloadsBlock   = document.getElementById("downloadsBlock");
@@ -78,6 +81,8 @@ let heroItems          = [];
 let heroIdx            = 0;
 let heroTimer          = null;
 let searchTimer        = null;
+let homepagePools      = [];
+let homepageKeep       = null;
 
 /* ── Fetch helpers ───────────────────────────────────────── */
 async function fetchTMDB(endpoint) {
@@ -140,6 +145,11 @@ const getCardImg  = i => i.backdrop_path ? IMG_URL      + i.backdrop_path
                        : i.poster_path   ? POSTER_URL   + i.poster_path
                        : PLACEHOLDER_BACKDROP;
 const mediaKey = i => i && i.id != null ? `${i.media_type || (i.name ? "tv" : "movie")}:${i.id}` : "";
+const titleKey = i => String((i && (i.sharky_title || i.title || i.name)) || "")
+  .toLowerCase()
+  .replace(/&/g, "and")
+  .replace(/[^a-z0-9]+/g, " ")
+  .trim();
 
 function truncate(text, len = 170) {
   if (!text) return "No overview available.";
@@ -234,6 +244,7 @@ function removeContinueItem(item) {
     .filter(x => !(Number(x.id) === Number(item.id) && x.media_type === item.media_type));
   setStorage(STORAGE_CONTINUE, list);
   renderContinueWatching();
+  refreshBecauseWatched();
 }
 
 const SHARKY_API = 'https://sharky-movies-api.onrender.com';
@@ -263,8 +274,9 @@ async function libraryAvailable(items) {
     byId.get(id).push(mediaKey(x));
   });
   let answered = false;
-  for (let i = 0; i < list.length; i += 60) {
-    const chunk = list.slice(i, i + 60).map(x => ({
+  const CHUNK_SIZE = 12;
+  for (let i = 0; i < list.length; i += CHUNK_SIZE) {
+    const chunk = list.slice(i, i + CHUNK_SIZE).map(x => ({
       id: x.id,
       title: x.sharky_title || x.title || x.name || '',
       year: getYear(x) || '',
@@ -302,27 +314,48 @@ function playableOnly(items, keep) {
   return keep ? (items || []).filter(i => keep.has(mediaKey(i))) : (items || []);
 }
 
-function renderLibraryRow(row, items, keep, fallback = [], target = 8) {
+function renderLibraryRow(row, items, keep, fallback = [], target = 8, avoidTitles = new Set()) {
   if (!row) return;
-  const list = playableOnly(items, keep);
-  const filled = list.slice();
-  const seen = new Set(filled.map(mediaKey));
-  for (const item of fallback) {
+  const filled = [];
+  const seenMedia = new Set();
+  const seenTitles = new Set();
+  const addUnique = item => {
     const key = mediaKey(item);
+    const title = titleKey(item);
+    if (!key || seenMedia.has(key) || (title && seenTitles.has(title))) return false;
+    seenMedia.add(key);
+    if (title) seenTitles.add(title);
+    filled.push(item);
+    return true;
+  };
+  playableOnly(items, keep).forEach(addUnique);
+  for (const item of fallback) {
     if (filled.length >= target) break;
-    if (key && !seen.has(key)) {
-      seen.add(key);
-      filled.push(item);
+    addUnique(item);
+  }
+  if (filled.length < target) {
+    for (const item of fallback) {
+      if (filled.length >= target) break;
+      const key = mediaKey(item);
+      if (key && !seenMedia.has(key)) {
+        seenMedia.add(key);
+        filled.push(item);
+      }
     }
   }
+  const fresh = [];
+  const repeats = [];
+  filled.forEach(item => (avoidTitles.has(titleKey(item)) ? repeats : fresh).push(item));
+  const finalList = fresh.length >= target ? fresh : fresh.concat(repeats.slice(0, target - fresh.length));
   const block = row.closest('.movie-row-block');
-  if (!filled.length) {
+  if (!finalList.length) {
     row.innerHTML = '';
     if (block) block.classList.add('hidden');
     return;
   }
   if (block) block.classList.remove('hidden');
-  renderRow(row, filled);
+  renderRow(row, finalList);
+  return finalList;
 }
 
 function renderRow(row, items, opts = {}) {
@@ -335,6 +368,19 @@ function renderRow(row, items, opts = {}) {
   }
   filtered.forEach(i => row.appendChild(createCard(i, opts)));
 }
+
+function rememberRow(recentRows, items, keepRows = 2) {
+  const titles = new Set((items || []).map(titleKey).filter(Boolean));
+  if (titles.size) recentRows.push(titles);
+  while (recentRows.length > keepRows) recentRows.shift();
+}
+
+function recentTitleSet(recentRows) {
+  const out = new Set();
+  recentRows.forEach(row => row.forEach(title => out.add(title)));
+  return out;
+}
+
 function renderGrid(grid, items) {
   grid.innerHTML = "";
   const filtered = (items || []).filter(i => i.poster_path || i.backdrop_path);
@@ -562,6 +608,7 @@ function cleanStorageItem(item) {
     sharky_title: item.sharky_title, sharky_date: item.sharky_date,
     poster_path: item.poster_path, backdrop_path: item.backdrop_path,
     vote_average: item.vote_average, overview: item.overview,
+    genre_ids: item.genre_ids || [],
   };
 }
 function saveContinueWatching(item) {
@@ -575,6 +622,44 @@ function renderContinueWatching() {
   if (!list.length) { continueBlock.classList.add("hidden"); rowMap.continue.innerHTML = ""; return; }
   continueBlock.classList.remove("hidden");
   renderRow(rowMap.continue, list, { removable: true, source: "continue" });
+}
+function refreshBecauseWatched() {
+  return renderBecauseWatched(homepagePools, homepageKeep);
+}
+function renderBecauseWatched(pools, keep, avoidTitles = new Set()) {
+  if (!becauseBlock || !rowMap.because) return [];
+  const watched = getStorage(STORAGE_CONTINUE);
+  if (!watched.length) {
+    becauseBlock.classList.add("hidden");
+    rowMap.because.innerHTML = "";
+    return [];
+  }
+
+  const seed = watched[0];
+  const seedGenres = new Set(seed.genre_ids || []);
+  const watchedKeys = new Set(watched.map(mediaKey));
+  const candidates = playableOnly(pools, keep)
+    .filter(item => !watchedKeys.has(mediaKey(item)))
+    .map(item => {
+      const itemGenres = item.genre_ids || [];
+      const genreScore = itemGenres.filter(g => seedGenres.has(g)).length;
+      const sameType = item.media_type === seed.media_type ? 2 : 0;
+      const rating = Number(item.vote_average || 0) / 10;
+      return { item, score: genreScore * 4 + sameType + rating };
+    })
+    .filter(x => x.score > 0 || x.item.media_type === seed.media_type)
+    .sort((a, b) => b.score - a.score)
+    .map(x => x.item);
+
+  const rendered = renderLibraryRow(rowMap.because, candidates.slice(0, 24), keep, candidates, 8, avoidTitles) || [];
+  if (!rendered.length) {
+    becauseBlock.classList.add("hidden");
+    return [];
+  }
+  becauseBlock.classList.remove("hidden");
+  const name = seed.sharky_title || seed.title || seed.name || "";
+  becauseTitle.textContent = name ? `Because You Watched ${name}` : "Because You Watched";
+  return rendered;
 }
 function renderMyList() {
   const list = getStorage(STORAGE_MY_LIST);
@@ -785,21 +870,43 @@ async function init() {
   ], keep);
   const tvFallback = playableOnly([...trendingTv, ...popularTv, ...topTv], keep);
 
-  renderLibraryRow(rowMap.trendingMovies, trendingMovies, keep, movieFallback);
-  renderLibraryRow(rowMap.popularMovies,  popularMovies,  keep, movieFallback);
-  renderLibraryRow(rowMap.topMovies,      topMovies,      keep, movieFallback);
-  renderLibraryRow(rowMap.trendingTv,     trendingTv,     keep, tvFallback);
-  renderLibraryRow(rowMap.popularTv,      popularTv,      keep, tvFallback);
-  renderLibraryRow(rowMap.topTv,          topTv,          keep, tvFallback);
-  renderLibraryRow(rowMap.action,    action,    keep, movieFallback);
-  renderLibraryRow(rowMap.comedy,    comedy,    keep, movieFallback);
-  renderLibraryRow(rowMap.horror,    horror,    keep, movieFallback);
-  renderLibraryRow(rowMap.scifi,     scifi,     keep, movieFallback);
-  renderLibraryRow(rowMap.romance,   romance,   keep, movieFallback);
-  renderLibraryRow(rowMap.animation, animation, keep, movieFallback);
-  renderLibraryRow(rowMap.doc,       doc,       keep, movieFallback);
-
   renderContinueWatching();
+  const movieRecentRows = [];
+  const tvRecentRows = [];
+  const allPlayable = [...movieFallback, ...tvFallback];
+  homepagePools = allPlayable;
+  homepageKeep = keep;
+  const becauseItems = refreshBecauseWatched();
+  rememberRow(movieRecentRows, becauseItems.filter(i => i.media_type !== "tv"));
+  rememberRow(tvRecentRows, becauseItems.filter(i => i.media_type === "tv"));
+
+  let rendered = renderLibraryRow(rowMap.trendingMovies, trendingMovies, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.popularMovies, popularMovies, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.topMovies, topMovies, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.trendingTv, trendingTv, keep, tvFallback, 8, recentTitleSet(tvRecentRows));
+  rememberRow(tvRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.popularTv, popularTv, keep, tvFallback, 8, recentTitleSet(tvRecentRows));
+  rememberRow(tvRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.topTv, topTv, keep, tvFallback, 8, recentTitleSet(tvRecentRows));
+  rememberRow(tvRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.action, action, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.comedy, comedy, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.horror, horror, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.scifi, scifi, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.romance, romance, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.animation, animation, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+  rendered = renderLibraryRow(rowMap.doc, doc, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
+  rememberRow(movieRecentRows, rendered);
+
   renderMyList();
   renderDownloads();
 

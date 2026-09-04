@@ -130,6 +130,18 @@ img { display: block; max-width: 100%; }
   background: rgba(255,255,255,.06);
 }
 .nav-link.old-version-btn::after { display: none; }
+.nav-link.discord-link {
+  color: #fff;
+  background: #5865f2;
+  border: 1px solid rgba(255,255,255,.14);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 800;
+}
+.nav-link.discord-link:hover {
+  background: #6f7aff;
+}
+.nav-link.discord-link::after { display: none; }
 
 /* Search */
 .search-wrap {
@@ -845,6 +857,11 @@ img { display: block; max-width: 100%; }
   border-bottom: 1px solid var(--line);
 }
 .player-header .logo { font-size: 1.7rem; }
+.player-header-links {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
 .player-home-link {
   color: rgba(255,255,255,.75);
   font-size: .88rem;
@@ -855,6 +872,20 @@ img { display: block; max-width: 100%; }
   transition: color .18s var(--ease);
 }
 .player-home-link:hover { color: #fff; }
+.player-discord-link {
+  color: #fff;
+  background: #5865f2;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: .82rem;
+  font-weight: 800;
+  transition: background .18s var(--ease), transform .18s var(--ease);
+}
+.player-discord-link:hover {
+  background: #6f7aff;
+  transform: translateY(-1px);
+}
 
 /* Cinematic watch hero */
 .watch-hero {
