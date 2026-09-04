@@ -214,6 +214,65 @@ function removeContinueItem(item) {
   renderContinueWatching();
 }
 
+const SHARKY_API = 'https://sharky-movies-api.onrender.com';
+
+/* ── Only show what we can actually play ──────────────────────────────────
+   The homepage used to list whatever TMDB was promoting, most of which had to
+   be scraped on demand and could simply fail. These rows are filtered down to
+   what the debrid library already holds, so everything on the front page
+   plays immediately. Search is deliberately NOT filtered - it still reaches
+   the whole catalogue and scrapes on demand.
+
+   Fails OPEN: if the check errors or times out we show everything, because a
+   full homepage with some duds is a great deal better than an empty one. */
+async function libraryAvailable(items) {
+  const uniq = new Map();
+  (items || []).forEach(i => {
+    if (i && i.id != null) uniq.set(`${i.media_type || 'movie'}:${i.id}`, i);
+  });
+  const list = [...uniq.values()];
+  if (!list.length) return new Set();
+
+  const keep = new Set();
+  for (let i = 0; i < list.length; i += 60) {
+    const chunk = list.slice(i, i + 60).map(x => ({
+      id: x.id,
+      title: x.sharky_title || x.title || x.name || '',
+      year: getYear(x) || '',
+      kind: x.media_type === 'tv' ? 'tv' : 'movie'
+    }));
+    try {
+      const r = await fetch(`${SHARKY_API}/library/filter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: chunk })
+      });
+      if (!r.ok) return null;
+      const d = await r.json();
+      (d.available || []).forEach(id => keep.add(String(id)));
+    } catch (e) {
+      console.warn('[sharky] library check unavailable — showing everything', e);
+      return null;
+    }
+  }
+  return keep;
+}
+
+/* Render a homepage row, dropping anything not in the library. An empty row
+   is hidden outright rather than left saying "Nothing here yet". */
+function renderLibraryRow(row, items, keep) {
+  if (!row) return;
+  const list = keep ? (items || []).filter(i => keep.has(String(i.id))) : (items || []);
+  const block = row.closest('.movie-row-block');
+  if (!list.length) {
+    row.innerHTML = '';
+    if (block) block.classList.add('hidden');
+    return;
+  }
+  if (block) block.classList.remove('hidden');
+  renderRow(row, list);
+}
+
 function renderRow(row, items, opts = {}) {
   if (!row) return;
   row.innerHTML = "";
@@ -659,27 +718,43 @@ async function init() {
     getList("/discover/movie?with_genres=99&sort_by=popularity.desc", "movie"),
   ]);
 
-  renderRow(rowMap.trendingMovies, trendingMovies);
-  renderRow(rowMap.popularMovies,  popularMovies);
-  renderRow(rowMap.topMovies,      topMovies);
-  renderRow(rowMap.trendingTv,     trendingTv);
-  renderRow(rowMap.popularTv,      popularTv);
-  renderRow(rowMap.topTv,          topTv);
-  renderRow(rowMap.action,    action);
-  renderRow(rowMap.comedy,    comedy);
-  renderRow(rowMap.horror,    horror);
-  renderRow(rowMap.scifi,     scifi);
-  renderRow(rowMap.romance,   romance);
-  renderRow(rowMap.animation, animation);
-  renderRow(rowMap.doc,       doc);
+  /* One round trip for the whole page, then render each row from the answer.
+     Doing it per row would be a dozen requests against a single-CPU box. */
+  const keep = await libraryAvailable([
+    ...trendingMovies, ...popularMovies, ...topMovies,
+    ...trendingTv, ...popularTv, ...topTv,
+    ...action, ...comedy, ...horror, ...scifi, ...romance, ...animation, ...doc
+  ]);
+
+  renderLibraryRow(rowMap.trendingMovies, trendingMovies, keep);
+  renderLibraryRow(rowMap.popularMovies,  popularMovies,  keep);
+  renderLibraryRow(rowMap.topMovies,      topMovies,      keep);
+  renderLibraryRow(rowMap.trendingTv,     trendingTv,     keep);
+  renderLibraryRow(rowMap.popularTv,      popularTv,      keep);
+  renderLibraryRow(rowMap.topTv,          topTv,          keep);
+  renderLibraryRow(rowMap.action,    action,    keep);
+  renderLibraryRow(rowMap.comedy,    comedy,    keep);
+  renderLibraryRow(rowMap.horror,    horror,    keep);
+  renderLibraryRow(rowMap.scifi,     scifi,     keep);
+  renderLibraryRow(rowMap.romance,   romance,   keep);
+  renderLibraryRow(rowMap.animation, animation, keep);
+  renderLibraryRow(rowMap.doc,       doc,       keep);
 
   renderContinueWatching();
   renderMyList();
   renderDownloads();
 
   // Hero — rotate through top trending
-  const heroPool = (trendingAll.length ? trendingAll : trendingMovies)
+  /* The hero is the biggest Play button on the page, so it must never offer
+     something we can't actually serve. Same library filter as the rows, with
+     the same fail-open: if the check didn't answer, fall back to the old
+     behaviour rather than showing no hero at all. */
+  let heroPool = (trendingAll.length ? trendingAll : trendingMovies)
     .filter(i => i.backdrop_path && i.overview);
+  if (keep) {
+    const owned = heroPool.filter(i => keep.has(String(i.id)));
+    if (owned.length) heroPool = owned;
+  }
   startHeroCarousel(heroPool);
 }
 
