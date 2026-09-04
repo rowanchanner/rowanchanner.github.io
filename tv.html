@@ -10,6 +10,9 @@
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
   <link rel="apple-touch-icon" href="favicon.ico" />
   <meta name="theme-color" content="#e50914" />
+  <!-- TV remote / D-pad navigation. Loaded early so page
+       scripts can read window.SharkyTV when building URLs. -->
+  <script src="tvnav.js"></script>
 </head>
 <body class="player-page">
 
@@ -139,7 +142,7 @@
     function loadSharkyPlayer() {
       if (!tvId) return;
       sharkyLoading.style.display = 'flex';
-      const url = `${SHARKY_API}/embed/tv/${tvId}/${selectedSeason}/${selectedEpisode}`;
+      const url = `${SHARKY_API}/embed/tv/${tvId}/${selectedSeason}/${selectedEpisode}` + (window.SharkyTV && window.SharkyTV.active ? '?tv=1' : '');
       sharkyFrame.src = '';
       setTimeout(() => {
         sharkyFrame.src = url;
@@ -223,6 +226,18 @@
         saveTvProgress();
         saveContinueWatching();
         updateUrl();
+      }
+
+      if (d.type === 'sharky:back') {
+        /* Back on the remote inside the player means "let me out of the
+           video", not "leave the show" - so put the highlight on the episode
+           list rather than navigating away from the page. */
+        const row = episodeList.querySelector('.episode-item.playing')
+                 || episodeList.querySelector('.episode-item');
+        if (row) {
+          row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          if (window.SharkyTV && window.SharkyTV.focus) window.SharkyTV.focus(row);
+        }
       }
     });
 
