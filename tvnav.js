@@ -25,6 +25,7 @@
     '.clear-search',
     '.hero-pager button',
     '.logo',
+    'iframe',
     'input[type="text"]',
     'input[type="search"]',
     'a[href]',
@@ -69,7 +70,15 @@
     get active() { return tvMode; },
     /* Let a page hand the highlight somewhere - used when the player
        reports Back, so the remote lands on the episode list. */
-    focus: function (el) { if (el) setFocus(el); }
+    focus: function (el) { if (el) setFocus(el); },
+    /* Called by the page when the player reports Back. */
+    exitFrame: function () { exitFrame(); },
+    /* Called after picking an episode: the viewer means "play this", so put
+       the remote straight into the player rather than making them find it. */
+    enterFrame: function (el) {
+      var f = el || document.getElementById('sharkyFrame');
+      if (f) { setFocus(f); enterFrame(f); }
+    }
   };
 
   /* ------------------------------------------------------------ geometry */
@@ -106,6 +115,11 @@
   }
 
   function centre(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+
+  /* Distance between two 1-D spans; 0 when they overlap at all. */
+  function gap(a1, a2, b1, b2) {
+    return Math.max(0, Math.max(a1 - b2, b1 - a2));
+  }
 
   /* The focus highlight scales the card up, and a scaled card's bounding box
      overlaps its neighbour - which makes the neighbour look like it isn't
@@ -155,10 +169,16 @@
       var r = rectOf(el), c = centre(r);
       var along, across, ok;
 
-      if (dir === 'left')       { ok = r.right  <= fr.left  + 2; along = fc.x - c.x; across = Math.abs(c.y - fc.y); }
-      else if (dir === 'right') { ok = r.left   >= fr.right - 2; along = c.x - fc.x; across = Math.abs(c.y - fc.y); }
-      else if (dir === 'up')    { ok = r.bottom <= fr.top   + 2; along = fc.y - c.y; across = Math.abs(c.x - fc.x); }
-      else                      { ok = r.top    >= fr.bottom- 2; along = c.y - fc.y; across = Math.abs(c.x - fc.x); }
+      /* "across" is the gap between the two elements on the other axis, not
+         the distance between their centres. Centres punish anything large:
+         the player iframe spans the whole width, so its centre sits far from
+         a button off to one side, and a distant but centre-aligned link would
+         beat it. With a gap, an element whose span overlaps yours scores 0
+         and wins, which is what the eye expects. */
+      if (dir === 'left')       { ok = r.right  <= fr.left  + 2; along = fc.x - c.x; across = gap(fr.top, fr.bottom, r.top, r.bottom); }
+      else if (dir === 'right') { ok = r.left   >= fr.right - 2; along = c.x - fc.x; across = gap(fr.top, fr.bottom, r.top, r.bottom); }
+      else if (dir === 'up')    { ok = r.bottom <= fr.top   + 2; along = fc.y - c.y; across = gap(fr.left, fr.right, r.left, r.right); }
+      else                      { ok = r.top    >= fr.bottom- 2; along = c.y - fc.y; across = gap(fr.left, fr.right, r.left, r.right); }
 
       if (!ok || along < 0) continue;
 
@@ -196,7 +216,13 @@
     if (!el.hasAttribute('tabindex') && !/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) {
       el.setAttribute('tabindex', '-1');
     }
-    try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (e2) {} }
+    /* Never call focus() on an iframe just to highlight it: focusing the
+       element hands every subsequent keypress to the document inside, so the
+       remote would be swallowed by the player the moment it passed over it and
+       could never move on. Highlight now, enter only on OK. */
+    if (el.tagName !== 'IFRAME') {
+      try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (e2) {} }
+    }
     reveal(el);
   }
 
@@ -230,8 +256,36 @@
     else reveal(current);          /* nothing that way — nudge so it's clearly the edge */
   }
 
+  /* Key events go to whichever document holds focus. The player lives in an
+     iframe, so until focus is actually inside it the player never sees a
+     single keypress - this page swallows them all. OK on the player hands
+     focus over; the player posts sharky:back when it wants out again. */
+  var inFrame = false;
+
+  function enterFrame(el) {
+    try { el.focus(); } catch (e) {}
+    try { if (el.contentWindow) el.contentWindow.focus(); } catch (e) {}
+    inFrame = true;
+    document.body.classList.add('tv-in-player');
+  }
+
+  function exitFrame() {
+    if (!inFrame) return;
+    inFrame = false;
+    document.body.classList.remove('tv-in-player');
+    try { window.focus(); } catch (e) {}
+  }
+
+  /* If focus comes back to this page by any other route, stop pretending
+     we're still inside the player. */
+  window.addEventListener('focus', function () {
+    if (inFrame && document.activeElement &&
+        document.activeElement.tagName !== 'IFRAME') exitFrame();
+  });
+
   function activate(el) {
     if (!el) return;
+    if (el.tagName === 'IFRAME') { enterFrame(el); return; }
     if (el.tagName === 'INPUT') { try { el.focus(); } catch (e) {} return; }
     el.click();
   }
