@@ -1733,3 +1733,57 @@ body.tv-mode .row-arrow { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .movie-card.tv-focus { transform: none; }
 }
+
+/* ==========================================================================
+   Fullscreen player overlay  (player.js)
+   Playing is a mode, not a panel on a page: the video gets the whole screen
+   and Back returns you to exactly where you were.
+   ========================================================================== */
+
+.player-overlay { position: fixed; inset: 0; z-index: 500; background: #000; display: none; }
+.player-overlay.open { display: block; }
+
+.player-overlay .po-frame {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: 0; background: #000;
+  opacity: 0; transition: opacity .35s ease;
+}
+.player-overlay.loaded .po-frame { opacity: 1; }
+
+.po-loading {
+  position: absolute; inset: 0; display: flex;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; color: #fff;
+}
+.player-overlay.loaded .po-loading { display: none; }
+
+.po-spinner {
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, .16);
+  border-top-color: var(--red);
+  animation: po-spin .8s linear infinite;
+}
+@keyframes po-spin { to { transform: rotate(360deg); } }
+
+.po-loading-text {
+  font-size: .78rem; letter-spacing: .16em; text-transform: uppercase;
+  color: rgba(255, 255, 255, .55);
+}
+
+.po-close {
+  position: absolute; top: 18px; right: 22px; z-index: 2;
+  width: 46px; height: 46px; border: 0; border-radius: 50%;
+  background: rgba(0, 0, 0, .55); color: #fff;
+  font-size: 1.05rem; cursor: pointer; transition: background .2s, transform .2s;
+}
+.po-close:hover { background: var(--red); transform: scale(1.08); }
+
+body.player-open { overflow: hidden; }
+
+/* A remote has no pointer, and Back already closes the player. */
+body.tv-mode .po-close { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .player-overlay .po-frame { transition: none; }
+  .po-spinner { animation-duration: 1.6s; }
+}

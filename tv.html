@@ -13,6 +13,7 @@
   <!-- TV remote / D-pad navigation. Loaded early so page
        scripts can read window.SharkyTV when building URLs. -->
   <script src="tvnav.js"></script>
+  <script src="player.js" defer></script>
 </head>
 <body class="player-page">
 
@@ -53,6 +54,7 @@
         </div>
 
         <div class="watch-actions">
+          <button class="watch-action-btn primary" id="playBtn"><span class="ic">&#9654;</span> Play</button>
           <button class="watch-action-btn" id="downloadBtn"><span class="ic">&#x2913;</span> <span id="downloadLabel">Download Episode</span></button>
           <button class="watch-action-btn" id="gwBtn"><span class="ic">&#9749;</span> Group Watch</button>
           <span class="download-status" id="downloadStatus">
@@ -139,16 +141,22 @@
 
     function esc(v){ return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
 
+    /* Set when the viewer actively chose an episode, so an ordinary page
+       load doesn't start a stream nobody asked for. */
+    let userPickedEpisode = false;
+    let currentPlayUrl = '';
+
     function loadSharkyPlayer() {
       if (!tvId) return;
-      sharkyLoading.style.display = 'flex';
-      const url = `${SHARKY_API}/embed/tv/${tvId}/${selectedSeason}/${selectedEpisode}` + (window.SharkyTV && window.SharkyTV.active ? '?tv=1' : '');
-      sharkyFrame.src = '';
-      setTimeout(() => {
-        sharkyFrame.src = url;
-        sharkyFrame.addEventListener('load',
-          () => { sharkyLoading.style.display = 'none'; }, { once: true });
-      }, 80);
+      currentPlayUrl = `${SHARKY_API}/embed/tv/${tvId}/${selectedSeason}/${selectedEpisode}`
+                      + (window.SharkyTV && window.SharkyTV.active ? '?tv=1' : '');
+      /* Opening the page no longer starts the video. Playing is an explicit
+         choice that takes over the whole screen, so a deep link lands on the
+         episode list rather than ambushing you with a stream. */
+      if (userPickedEpisode) {
+        userPickedEpisode = false;
+        if (window.SharkyPlayer) window.SharkyPlayer.open(currentPlayUrl);
+      }
       saveContinueWatching();
       saveTvProgress();
       updateUrl();
@@ -228,17 +236,21 @@
         updateUrl();
       }
 
-      if (d.type === 'sharky:back') {
-        /* Back on the remote inside the player means "let me out of the
-           video", not "leave the show" - so put the highlight on the episode
-           list rather than navigating away from the page. */
-        const row = episodeList.querySelector('.episode-item.playing')
-                 || episodeList.querySelector('.episode-item');
-        if (row) {
-          row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-          if (window.SharkyTV && window.SharkyTV.focus) window.SharkyTV.focus(row);
-        }
-      }
+    });
+
+    /* Closing the player means "let me out of the video", not "leave the
+       show" - so the highlight goes back to the episode you were watching. */
+    document.addEventListener('sharky:player-closed', () => {
+      const row = episodeList.querySelector('.episode-item.playing')
+               || episodeList.querySelector('.episode-item');
+      if (!row) return;
+      row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (window.SharkyTV && window.SharkyTV.focus) window.SharkyTV.focus(row);
+    });
+
+    const playBtn = document.getElementById('playBtn');
+    if (playBtn) playBtn.addEventListener('click', () => {
+      if (currentPlayUrl && window.SharkyPlayer) window.SharkyPlayer.open(currentPlayUrl);
     });
 
     function getStoredProgress() {
@@ -332,6 +344,7 @@
             <div class="ep-chevron">&#10095;</div>
           `;
           li.addEventListener('click', () => {
+            userPickedEpisode = true;
             selectedEpisode = Number(ep.episode_number);
             document.querySelectorAll('.episode-item').forEach(x => x.classList.remove('playing'));
             li.classList.add('playing');

@@ -13,6 +13,7 @@
   <!-- TV remote / D-pad navigation. Loaded early so page
        scripts can read window.SharkyTV when building URLs. -->
   <script src="tvnav.js"></script>
+  <script src="player.js" defer></script>
 </head>
 <body class="player-page">
 
@@ -53,6 +54,7 @@
         </div>
 
         <div class="watch-actions">
+          <button class="watch-action-btn primary" id="playBtn"><span class="ic">&#9654;</span> Play</button>
           <button class="watch-action-btn" id="downloadBtn"><span class="ic">&#x2913;</span> <span id="downloadLabel">Download</span></button>
           <button class="watch-action-btn" id="gwBtn"><span class="ic">&#9749;</span> Group Watch</button>
           <span class="download-status" id="downloadStatus">
@@ -127,11 +129,16 @@
     const relatedRow    = document.getElementById('relatedRow');
 
     // ── Player ────────────────────────────────────────────
-    if (movieId) {
-      sharkyFrame.src = `${SHARKY_API}/embed/movie/${movieId}` + (window.SharkyTV && window.SharkyTV.active ? '?tv=1' : '');
-      sharkyFrame.addEventListener('load',
-        () => { sharkyLoading.style.display = 'none'; }, { once: true });
-    } else {
+    /* Playing takes over the whole screen rather than sitting in a panel, so
+       the page loads as a title page and waits to be asked. */
+    const currentPlayUrl = movieId
+      ? `${SHARKY_API}/embed/movie/${movieId}` + (window.SharkyTV && window.SharkyTV.active ? '?tv=1' : '')
+      : '';
+    const playBtn = document.getElementById('playBtn');
+    if (playBtn) playBtn.addEventListener('click', () => {
+      if (currentPlayUrl && window.SharkyPlayer) window.SharkyPlayer.open(currentPlayUrl);
+    });
+    if (!movieId && sharkyLoading) {
       sharkyLoading.innerHTML = '<p style="color:#888;padding:20px">No movie selected.</p>';
     }
 
