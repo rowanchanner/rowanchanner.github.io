@@ -33,6 +33,9 @@
   ].join(',');
 
   var FOCUS_CLASS = 'tv-focus';
+  /* Where the focused row sits once scrolled: below the fixed navbar,
+     with its title visible above the artwork. */
+  var ROW_TOP = 96;
 
   /* Key names, then raw keyCodes as a fallback — TV browsers are inconsistent
      about which they send, and some send only the numeric code. */
@@ -185,6 +188,13 @@
       /* Weight drift across the axis heavily, so moving down a page of rows
          keeps roughly the same column instead of darting sideways. */
       var score = along + across * 3;
+
+      /* The navbar is pinned to the top of the window, so it is always just
+         above whatever you are on and always closer than the row above once
+         that row has scrolled off. Left alone it swallows every press of Up
+         from anywhere on the page. Push it right to the back so it is only
+         chosen when there is genuinely nothing else above. */
+      if (dir === 'up' && el.closest('.navbar')) score += 1e6;
       if (score < bestScore) { bestScore = score; best = el; }
     }
     return best;
@@ -233,7 +243,22 @@
       var er = rectOf(el), rr = row.getBoundingClientRect();
       row.scrollLeft += (er.left + er.width / 2) - (rr.left + rr.width / 2);
     }
-    /* Vertical: keep it clear of the fixed navbar and the bottom edge. */
+    /* Vertical: put the row you are on in the SAME place every time, whichever
+       direction you arrived from. The two directions used to do different
+       things - moving down scrolled the card until its bottom cleared the
+       bottom edge, moving up scrolled until its top cleared the navbar - so
+       going down snapped row to row while going up often didn't scroll at all
+       until the row had already left the screen, and then lurched. Aligning
+       the row's block to a fixed offset makes both directions identical. */
+    var block = el.closest('.movie-row-block');
+    if (block) {
+      var delta = block.getBoundingClientRect().top - ROW_TOP;
+      if (Math.abs(delta) > 2) scrollPage(delta);
+      return;
+    }
+
+    /* Anything not in a row - navbar, hero, modal buttons, episode rows -
+       just has to stay on screen. */
     var r = rectOf(el);
     var top = 130, bottom = window.innerHeight - 80;
     if (r.top < top) scrollPage(r.top - top);
