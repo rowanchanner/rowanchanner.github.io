@@ -135,13 +135,18 @@
          something merely closer. */
       var score = across * 8 + along;
 
-      /* The menu is only enterable by going up (or by opening the sidebar).
-         Moving ALONG it, though, has to work normally — penalising left and
-         right too was why Films and Series could not be reached at all: every
-         card on the page scored better than the link right next to it. */
+      /* The bar across the top is a last resort in every direction, including
+         up. It is fixed to the viewport, so once the page has scrolled it is
+         nearer to a card than the row above is — which is why Up from the
+         middle of the page shot straight to Settings instead of moving one
+         row. The penalty is additive rather than a ban, so when there really
+         is nothing else above (the billboard) the menu still wins.
+
+         Moving ALONG the bar has to work normally, though: penalising that
+         too was why Films and Series could not be reached at all. */
       var elNav = el.classList.contains('nav-link');
       var fromNav = from.classList.contains('nav-link');
-      if (elNav && !fromNav && dir !== 'up') score += 1e6;
+      if (elNav && !fromNav) score += 1e6;
       if (!elNav && fromNav && (dir === 'left' || dir === 'right')) score += 1e6;
       if (score < bestScore) { bestScore = score; best = el; }
     });
@@ -215,7 +220,11 @@
     var page = el.closest('.scroller');
     if (page) {
       var ps = scrollState(page);
-      var block = el.closest('.row-block') || el;
+      /* On the billboard's own buttons, bring the whole billboard into view
+         rather than just the button — otherwise the first thing you see on
+         opening the app is a strip of buttons with the title cut off above
+         them, and no amount of pressing Up ever reveals it. */
+      var block = el.closest('.row-block') || el.closest('#billboard') || el;
       var br = rectOf(block);
       var er = rectOf(el);
       var pr = page.getBoundingClientRect();
