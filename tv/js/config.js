@@ -57,7 +57,17 @@
        the transcoding, so this stays deliberately small. */
     LIB_PARALLEL: 3,
 
-    VERSION: '1.0.0',
+    /* Which country's charts the Top 10 rows show. Worked out from the
+       device unless Settings overrides it. */
+    get REGION() {
+      if (stored.region) return stored.region;
+      try { return w.Region ? w.Region.detect() : 'GB'; } catch (e) { return 'GB'; }
+    },
+    set REGION(v) { stored.region = String(v || '').toUpperCase() || null; save(); },
+    get REGION_IS_SET() { return !!stored.region; },
+    clearRegion: function () { delete stored.region; save(); },
+
+    VERSION: '1.1.0',
 
     reset: function () { stored = {}; save(); }
   };

@@ -65,6 +65,9 @@
         <div class="bb-fade"></div>
         <div class="bb-text">
           <div id="bbKind" class="bb-kind"></div>
+          <!-- The show's own lettering when TMDB has it, the plain title when
+               it does not. One is always hidden. -->
+          <img id="bbLogo" class="bb-logo off" alt="">
           <h1 id="bbTitle" class="bb-title"></h1>
           <div id="bbMeta" class="bb-meta"></div>
           <p id="bbDesc" class="bb-desc"></p>
@@ -135,6 +138,15 @@
   </div>
 </div>
 
+<!-- COUNTRY PICKER -->
+<div id="regionPicker" class="modal off">
+  <div class="modal-box">
+    <h2>Top 10 for which country?</h2>
+    <p class="modal-text">The charts show what is most watched — and actually streamable — where you are.</p>
+    <div id="regionGrid" class="region-grid"></div>
+  </div>
+</div>
+
 <!-- EXIT -->
 <div id="exitBox" class="modal off">
   <div class="modal-box small">
@@ -161,7 +173,7 @@
   var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
   var q = bust ? '?v=' + encodeURIComponent(bust) : '';
   var files = ['compat', 'config', 'store', 'api', 'nav', 'ui',
-               'keyboard', 'intro', 'player', 'screens', 'sidebar', 'app'];
+               'keyboard', 'region', 'intro', 'player', 'screens', 'sidebar', 'app'];
   window.SHARKY_BUILD = bust || 'bundled';
   for (var i = 0; i < files.length; i++) {
     document.write('<script src="js/' + files[i] + '.js' + q + '"><\/script>');
