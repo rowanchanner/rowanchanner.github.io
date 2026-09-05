@@ -41,10 +41,31 @@
 
     /* ── Continue watching ────────────────────────────────────────────── */
 
-    continueList: function () {
+    /* Every row, episodes included. Used by resumePoint and by the progress
+       ticks — not by the Continue Watching row. */
+    continueRaw: function () {
       var rows = read(K_CONTINUE, []);
       if (!Array.isArray(rows)) return [];
       return rows.slice().sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    },
+
+    /* What the Continue Watching row shows: ONE card per title.
+     *
+     * Watching a bit of episode one, skipping to two, then dipping into three
+     * used to put three cards on the row for the same programme. No streaming
+     * service does that — a series gets one card, and it takes you to wherever
+     * you got to. Rows are already newest-first, so the first entry seen for a
+     * given show is the one to keep. */
+    continueList: function () {
+      var rows = Store.continueRaw();
+      var seen = {}, out = [];
+      rows.forEach(function (r) {
+        var id = (r.kind || 'movie') + ':' + r.id;
+        if (seen[id]) return;
+        seen[id] = 1;
+        out.push(r);
+      });
+      return out;
     },
 
     /* Called every few seconds while something plays. Finished titles drop
@@ -91,7 +112,7 @@
        for, so "Play" on a series picks up where the viewer left off. */
     resumePoint: function (tvId) {
       var best = null;
-      Store.continueList().forEach(function (r) {
+      Store.continueRaw().forEach(function (r) {
         if (r.kind !== 'tv' || String(r.id) !== String(tvId)) return;
         if (!best || (r.at || 0) > (best.at || 0)) best = r;
       });

@@ -1868,3 +1868,65 @@ body.tv-mode .po-close { display: none; }
 @media (max-width: 900px) {
   .nav-cta-app { display: none; }
 }
+
+
+/* ==============================================================
+   CARD TITLES WITHOUT A MOUSE
+   The overlay that carries the title only appeared on :hover, so on
+   a phone — where there is no hover — the rows were wall-to-wall
+   artwork with nothing naming any of it.
+
+   Where the pointer cannot hover, the title and its gradient are
+   simply always there. The little action buttons are dropped: they
+   are a hover affordance, and tapping the card opens the title page
+   which has Play and My List on it anyway.
+   ============================================================== */
+
+@media (hover: none), (pointer: coarse) {
+  .card-overlay {
+    opacity: 1;
+    justify-content: flex-end;
+    padding: 10px 10px 9px;
+    /* Lighter than the hover version: this one is permanent, so it has
+       to sit under the artwork rather than bury it. */
+    background: linear-gradient(to top,
+                rgba(0,0,0,.94) 0%, rgba(0,0,0,.55) 42%, rgba(0,0,0,0) 76%);
+    transition: none;
+  }
+  .card-overlay .card-actions { display: none; }
+
+  .card-title {
+    font-size: .82rem;
+    margin-bottom: 2px;
+    /* Two lines maximum, so a long title cannot swallow the poster. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-meta { font-size: .64rem; opacity: .85; }
+  .card-meta .card-badge { padding: 1px 5px; }
+
+  /* The remove button on Continue / My List has no hover to appear on. */
+  .movie-card .card-remove { opacity: 1; transform: none; }
+}
+
+/* Same treatment on a narrow window, whatever the pointer says — a phone
+   held in landscape still reports a coarse pointer, but a small desktop
+   window does not, and the rows are just as unreadable there. */
+@media (max-width: 760px) {
+  .card-overlay {
+    opacity: 1;
+    padding: 10px 10px 9px;
+    background: linear-gradient(to top,
+                rgba(0,0,0,.94) 0%, rgba(0,0,0,.55) 42%, rgba(0,0,0,0) 76%);
+  }
+  .card-overlay .card-actions { display: none; }
+  .card-title {
+    font-size: .8rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
