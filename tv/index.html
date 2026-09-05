@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#05070c">
-<title>Sharky TV</title>
-<link rel="icon" href="img/icon.svg">
+<meta name="theme-color" content="#141414">
+<title>Sharky Movies</title>
+<link rel="icon" href="img/logo-128.png">
 <script>
 (function () {
   var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
@@ -17,49 +17,62 @@
 </head>
 <body data-screen="home">
 
-<!-- Splash: stays up until the server has answered once. -->
-<div id="splash">
-  <div class="splash-mark">SHARKY</div>
-  <div class="splash-sub">TV</div>
+<!-- COLD OPEN
+     The wordmark from the website with a sting under it. Netflix earns its
+     ident by playing it every launch, so this does too - but any key gets you
+     past it, because theatre you cannot skip is a toll booth. -->
+<div id="intro" class="intro">
+  <div class="intro-inner">
+    <img id="introMark" class="intro-shark" src="img/logo.png" alt="">
+    <div class="intro-word">
+      <span>S</span><span>H</span><span>A</span><span>R</span><span>K</span><span>Y</span>
+    </div>
+    <div class="intro-sub">M O V I E S</div>
+  </div>
+</div>
+
+<!-- Loading state, once the ident has cleared. -->
+<div id="splash" class="off">
+  <img class="splash-shark" src="img/logo.png" alt="">
+  <div class="splash-word">SHARKY</div>
   <div class="spinner"></div>
   <div id="splashStatus" class="splash-status">Starting</div>
 </div>
 
 <div id="app">
 
-  <nav id="sidebar">
-    <div class="side-logo" aria-hidden="true">S</div>
-    <button type="button" class="f side-item on" data-screen="home" data-key="side-home">
-      <span class="side-ico">&#9632;</span><span class="side-text">Home</span>
-    </button>
-    <button type="button" class="f side-item" data-screen="search" data-key="side-search">
-      <span class="side-ico">&#9906;</span><span class="side-text">Search</span>
-    </button>
-    <button type="button" class="f side-item" data-screen="movies" data-key="side-movies">
-      <span class="side-ico">&#9654;</span><span class="side-text">Films</span>
-    </button>
-    <button type="button" class="f side-item" data-screen="tv" data-key="side-tv">
-      <span class="side-ico">&#9635;</span><span class="side-text">Series</span>
-    </button>
-    <button type="button" class="f side-item" data-screen="mylist" data-key="side-list">
-      <span class="side-ico">&#10010;</span><span class="side-text">My List</span>
-    </button>
-    <button type="button" class="f side-item" data-screen="settings" data-key="side-settings">
-      <span class="side-ico">&#9881;</span><span class="side-text">Settings</span>
-    </button>
-  </nav>
+  <header id="topnav">
+    <div class="nav-brand">
+      <img class="nav-shark" src="img/logo-128.png" alt="">
+      <span class="nav-word">SHARKY</span>
+    </div>
+    <nav class="nav-links">
+      <button type="button" class="f nav-link on" data-screen="home" data-key="nav-home">Home</button>
+      <button type="button" class="f nav-link" data-screen="movies" data-key="nav-movies">Films</button>
+      <button type="button" class="f nav-link" data-screen="tv" data-key="nav-tv">Series</button>
+      <button type="button" class="f nav-link" data-screen="mylist" data-key="nav-list">My List</button>
+      <button type="button" class="f nav-link" data-screen="search" data-key="nav-search">Search</button>
+      <button type="button" class="f nav-link" data-screen="settings" data-key="nav-settings">Settings</button>
+    </nav>
+  </header>
 
   <main id="main">
 
     <!-- HOME -->
     <section id="screen-home" class="screen scroller">
-      <div id="hero">
-        <div id="heroImg"></div>
-        <div class="hero-fade"></div>
-        <div class="hero-text">
-          <h1 id="heroTitle"></h1>
-          <div id="heroMeta" class="hero-meta"></div>
-          <p id="heroDesc" class="hero-desc"></p>
+      <div id="billboard">
+        <div id="billboardArt"></div>
+        <div class="bb-fade"></div>
+        <div class="bb-text">
+          <div id="bbKind" class="bb-kind"></div>
+          <h1 id="bbTitle" class="bb-title"></h1>
+          <div id="bbMeta" class="bb-meta"></div>
+          <p id="bbDesc" class="bb-desc"></p>
+          <div class="bb-actions">
+            <button type="button" class="f btn btn-primary autofocus" id="bbPlay" data-key="bb-play"><span class="btn-ico">&#9654;</span>Play</button>
+            <button type="button" class="f btn" id="bbInfo" data-key="bb-info">More Info</button>
+            <button type="button" class="f btn btn-icon" id="bbList" data-key="bb-list" aria-label="Add to My List">+</button>
+          </div>
         </div>
       </div>
       <div id="homeRows" class="rows"></div>
@@ -69,7 +82,7 @@
     <section id="screen-search" class="screen off">
       <div class="search-wrap">
         <div class="search-left">
-          <div id="searchTerm" class="search-term placeholder">Type a title</div>
+          <div id="searchTerm" class="search-term placeholder">Search</div>
           <div id="kbHost" class="kb"></div>
         </div>
         <div class="search-right scroller">
@@ -78,7 +91,7 @@
       </div>
     </section>
 
-    <!-- BROWSE (Films / Series / My List) -->
+    <!-- BROWSE -->
     <section id="screen-browse" class="screen off scroller">
       <h1 id="browseTitle" class="page-title">Films</h1>
       <div id="browseBody"></div>
@@ -102,6 +115,7 @@
 <!-- PLAYER -->
 <div id="playerOverlay" class="off">
   <div id="playerLoading" class="po-loading">
+    <img class="po-shark" src="img/logo-128.png" alt="">
     <div class="spinner"></div>
     <div id="playerStatus" class="po-status">Loading stream</div>
   </div>
@@ -133,6 +147,11 @@
   </div>
 </div>
 
+<audio id="identAudio" preload="auto">
+  <source src="audio/ident.mp3" type="audio/mpeg">
+  <source src="audio/ident.ogg" type="audio/ogg">
+</audio>
+
 <!-- The scripts are injected rather than written as plain tags so that the
      cache-buster the shell puts on this page's URL is carried onto every one
      of them. Without that a WebView happily serves yesterday's app.js from
@@ -142,7 +161,7 @@
   var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
   var q = bust ? '?v=' + encodeURIComponent(bust) : '';
   var files = ['compat', 'config', 'store', 'api', 'nav', 'ui',
-               'keyboard', 'player', 'screens', 'app'];
+               'keyboard', 'intro', 'player', 'screens', 'app'];
   window.SHARKY_BUILD = bust || 'bundled';
   for (var i = 0; i < files.length; i++) {
     document.write('<script src="js/' + files[i] + '.js' + q + '"><\/script>');

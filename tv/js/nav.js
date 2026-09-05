@@ -92,11 +92,10 @@
          something merely closer. */
       var score = across * 8 + along;
 
-      /* Coming down out of the sidebar, prefer the row you can see rather
-         than whatever happens to be nearest the top edge. */
-      if (el.classList.contains('side-item') && dir !== 'up' && !from.classList.contains('side-item')) {
-        score += 4000;
-      }
+      /* The nav sits across the top, so anything below it is nearer to a
+         card than the card next door is. Only Up should reach it, and only
+         from the topmost thing on the page. */
+      if (el.classList.contains('nav-link') && dir !== 'up') score += 1e6;
       if (score < bestScore) { bestScore = score; best = el; }
     });
     return best;

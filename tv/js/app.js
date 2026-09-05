@@ -1,4 +1,4 @@
-/* app.js — boot, the sidebar, and what Back means from anywhere.
+/* app.js — boot, the top nav, and what Back means from anywhere.
  *
  * The splash stays up until the server has answered once, because a Render
  * box that has gone to sleep takes the best part of a minute to wake and an
@@ -74,12 +74,20 @@
   })();
   w.TextEntry = TextEntry;
 
-  /* ── Sidebar ───────────────────────────────────────────────────────────── */
+  /* ── Top nav ───────────────────────────────────────────────────────────── */
 
-  function wireSidebar() {
-    [].forEach.call(document.querySelectorAll('.side-item'), function (b) {
+  function wireNav() {
+    [].forEach.call(document.querySelectorAll('.nav-link'), function (b) {
       b.addEventListener('click', function () {
         Screens.go(b.getAttribute('data-screen'), null, true);
+      });
+    });
+
+    /* Transparent over the billboard, solid once you have scrolled past it —
+       the same behaviour as the website's navbar. */
+    [].forEach.call(document.querySelectorAll('.scroller'), function (sc) {
+      sc.addEventListener('scroll', function () {
+        document.body.classList.toggle('scrolled', sc.scrollTop > 40);
       });
     });
   }
@@ -177,7 +185,7 @@
   /* ── Boot ───────────────────────────────────────────────────────────────── */
 
   function boot() {
-    wireSidebar();
+    wireNav();
     wireCards();
     wireBack();
     wirePlayer();
@@ -186,6 +194,14 @@
     var status = document.getElementById('splashStatus');
     status.textContent = 'Waking the server';
 
+    /* The ident is theatre, not a gate: the rows are already being fetched
+       underneath it, so skipping it lands you somewhere useful. */
+    var introDone = new Promise(function (resolve) {
+      if (!w.Intro || w.Intro.finished) return resolve();
+      document.addEventListener('intro:done', function () { resolve(); });
+      setTimeout(resolve, 6000);           // never wait on a stuck animation
+    });
+
     /* Don't hold the app hostage to the ping: start loading the rows in
        parallel and drop the splash when the first of them is ready. */
     var pinged = API.ping().then(function (ok) {
@@ -193,14 +209,16 @@
       return ok;
     });
 
-    Promise.all([pinged, new Promise(function (r) { setTimeout(r, 400); })])
-      .then(function () {
-        Screens.go('home', null, true);
-        return waitForRows(45000);
-      })
+    Screens.go('home', null, true);
+
+    Promise.all([pinged, introDone, waitForRows(45000)])
       .then(function () {
         splash.classList.add('off');
-        Nav.focusFirst(document.getElementById('screen-home'));
+        document.body.classList.add('intro-done');
+        var home = document.getElementById('screen-home');
+        var play = document.getElementById('bbPlay');
+        if (play) Nav.focus(play);
+        else Nav.focusFirst(home);
       });
   }
 
