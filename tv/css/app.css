@@ -246,7 +246,10 @@ body.scrolled #topnav { background: #0a0a0a; }
 .scroller {
   overflow-y: auto;
   overflow-x: hidden;
-  scroll-behavior: smooth;
+  /* No scroll-behavior: smooth — nav.js animates towards a tracked target
+     instead. Letting the browser animate as well made held arrows compound a
+     position that was still moving, which is what "spazzing out and then
+     jumping" was. */
   -webkit-overflow-scrolling: touch;
 }
 .scroller::-webkit-scrollbar { width: 0; height: 0; }
@@ -367,7 +370,6 @@ body.scrolled #topnav { background: #0a0a0a; }
 .row-viewport {
   overflow-x: auto;
   overflow-y: hidden;
-  scroll-behavior: smooth;
   padding: 1.4vh 0 1.8vh 0;
 }
 .row-viewport::-webkit-scrollbar { width: 0; height: 0; }
@@ -705,3 +707,93 @@ body.playing #app { visibility: hidden; }
   .intro-word span, .intro-sub, .intro-shark { animation: none !important; opacity: 1 !important; transform: none !important; }
   .card, .btn, .ep { transition: none; }
 }
+
+
+/* ── Sidebar ────────────────────────────────────────────────────────────────
+   Push Left at the edge of the screen and the menu comes out over the top of
+   everything, the way a television menu should: nowhere to be seen until it
+   is wanted, one press away when it is. */
+
+/* A scrim across the whole screen, so the menu reads as being on top of the
+   page rather than printed over it. */
+.sb-scrim {
+  position: fixed;
+  z-index: 110;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.72);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s ease-out;
+}
+body.sidebar-open .sb-scrim { opacity: 1; }
+
+.sidebar {
+  position: fixed;
+  z-index: 120;
+  top: 0; left: 0; bottom: 0;
+  width: 26vw;
+  padding: 4vh 0 4vh 0;
+  /* Solid under the words, fading out at the right-hand edge so it sits over
+     the page rather than cutting a hard rectangle out of it. */
+  background: linear-gradient(90deg,
+              #050505 0%, #050505 62%, rgba(5,5,5,.92) 78%, rgba(5,5,5,0) 100%);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-101%);
+  transition: transform .22s ease-out;
+}
+body.sidebar-open .sidebar { transform: translateX(0); }
+
+/* Everything behind it steps back and dims. */
+#main, #topnav {
+  transition: transform .22s ease-out, filter .22s ease-out;
+}
+body.sidebar-open #main,
+body.sidebar-open #topnav {
+  transform: translateX(5vw);
+  filter: brightness(.35) saturate(.6);
+}
+
+.sb-brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 0 4vh 2vw;
+}
+.sb-shark { width: 2.6vw; height: auto; margin-right: 0.5vw; }
+.sb-word {
+  font-size: 1.7vw;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  color: var(--red);
+}
+
+.sb-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 74%;
+  text-align: left;
+  padding: 1.5vh 0 1.5vh 2vw;
+  font-size: 1.35vw;
+  font-weight: 600;
+  color: #8c8c8c;
+  border-left: 0.3vw solid transparent;
+}
+.sb-ico {
+  display: inline-block;
+  width: 2.2vw;
+  font-size: 1.2vw;
+  color: inherit;
+}
+.sb-item.on { color: #fff; }
+.sb-item.focused {
+  color: #fff;
+  background: rgba(229,9,20,.22);
+  border-left-color: var(--red);
+}
+
+/* With the menu doing the navigating, the bar across the top is just the
+   mark and the section you are in. */
+body.sidebar-open .nav-links { opacity: .35; }
+.nav-links { transition: opacity .2s; }

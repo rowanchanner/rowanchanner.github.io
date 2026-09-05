@@ -217,6 +217,11 @@
         document.body.classList.add('intro-done');
         var home = document.getElementById('screen-home');
         var play = document.getElementById('bbPlay');
+
+        /* Only take the highlight if nobody has moved it. Skipping the ident
+           and starting to browse straight away used to end with the app
+           snatching focus back to Play a second later. */
+        if (Nav.current && document.contains(Nav.current)) return;
         if (play) Nav.focus(play);
         else Nav.focusFirst(home);
       });
