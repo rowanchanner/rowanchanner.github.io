@@ -40,11 +40,33 @@
     return true;
   }
 
-  /* The element's box as it would be with no focus zoom applied. */
+  /* The element's box as it WILL be: with the focus zoom undone, and with any
+     scrolling that is still gliding already applied.
+     
+     Both corrections were bugs first. The zoom inflates the highlighted card
+     so it overlaps its neighbours, which made right-arrow skip every other
+     one. And measuring during a glide gave transient geometry in which a
+     billboard button could line up with a card two rows down, so walking
+     along a row occasionally leapt somewhere absurd. Rebuilding the box from
+     the (zoom-invariant) centre and adding the outstanding scroll distance
+     fixes both. */
   function rectOf(el) {
     var r = el.getBoundingClientRect();
     var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     var wid = el.offsetWidth || r.width, hei = el.offsetHeight || r.height;
+
+    /* However far each scrolling ancestor still has to travel, the content
+       inside it has already been promised that movement. */
+    var node = el.parentNode;
+    while (node && node.nodeType === 1) {
+      var st = node.__scroll;
+      if (st) {
+        cx += node.scrollLeft - st.targetX;
+        cy += node.scrollTop - st.target;
+      }
+      node = node.parentNode;
+    }
+
     return {
       left: cx - wid / 2, right: cx + wid / 2,
       top: cy - hei / 2, bottom: cy + hei / 2,
@@ -52,8 +74,22 @@
     };
   }
 
+  /* When something is laid over the page — the menu, a dialog — the highlight
+     must stay inside it. Without this, Down inside the open menu walked out
+     into the row behind it, because a card underneath scored perfectly well
+     on pure geometry. */
+  function scope() {
+    if (document.body.classList.contains('sidebar-open')) {
+      var sb = document.getElementById('sidebar');
+      if (sb) return sb;
+    }
+    var modals = document.querySelectorAll('.modal:not(.off)');
+    if (modals.length) return modals[modals.length - 1];
+    return document;
+  }
+
   function candidates() {
-    var all = [].slice.call(document.querySelectorAll(FOCUSABLE));
+    var all = [].slice.call(scope().querySelectorAll(FOCUSABLE));
     return all.filter(visible);
   }
 
@@ -79,6 +115,13 @@
         if (dir === 'right' && b.cx <= a.cx + 1) return;
         if (dir === 'left' && b.cx >= a.cx - 1) return;
         across = gap(a.top, a.bottom, b.top, b.bottom);
+        /* Left and right stay on the line you are on: the two must genuinely
+           share horizontal band, not merely sit near each other. Without this,
+           Left from the first card in a row slid diagonally up into the
+           billboard — so the edge of the row was never reached and the menu
+           never opened. */
+        var overlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (overlap < Math.min(a.height, b.height) * 0.5) return;
       } else {
         along = dir === 'down' ? b.top - a.bottom : a.top - b.bottom;
         if (dir === 'down' && b.cy <= a.cy + 1) return;
@@ -92,40 +135,100 @@
          something merely closer. */
       var score = across * 8 + along;
 
-      /* The nav sits across the top, so anything below it is nearer to a
-         card than the card next door is. Only Up should reach it, and only
-         from the topmost thing on the page. */
-      if (el.classList.contains('nav-link') && dir !== 'up') score += 1e6;
+      /* The menu is only enterable by going up (or by opening the sidebar).
+         Moving ALONG it, though, has to work normally — penalising left and
+         right too was why Films and Series could not be reached at all: every
+         card on the page scored better than the link right next to it. */
+      var elNav = el.classList.contains('nav-link');
+      var fromNav = from.classList.contains('nav-link');
+      if (elNav && !fromNav && dir !== 'up') score += 1e6;
+      if (!elNav && fromNav && (dir === 'left' || dir === 'right')) score += 1e6;
       if (score < bestScore) { bestScore = score; best = el; }
     });
     return best;
   }
 
+  /* ── Scrolling ────────────────────────────────────────────────────────────
+     Held-down arrows used to make the page lurch and then jump. The cause was
+     asking the browser for a smooth scroll and then, before it had finished,
+     reading the half-way scrollTop and adding another delta to it — so every
+     press compounded a position that was still moving.
+
+     Now each scroller carries its own target. Deltas are measured against
+     that target rather than against wherever the animation currently is, and
+     one rAF loop walks the real position towards it. Holding a direction
+     glides; letting go stops exactly where the highlight is. */
+
+  function scrollState(el) {
+    if (!el.__scroll) {
+      el.__scroll = { target: el.scrollTop, targetX: el.scrollLeft, raf: 0 };
+    }
+    var st = el.__scroll;
+    /* If something else moved this element (a screen change, a re-render),
+       adopt the real position rather than fighting it. */
+    if (!st.raf) { st.target = el.scrollTop; st.targetX = el.scrollLeft; }
+    return st;
+  }
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  function glide(el) {
+    var st = el.__scroll;
+    if (st.raf) return;
+    st.raf = requestAnimationFrame(function step() {
+      var dy = st.target - el.scrollTop;
+      var dx = st.targetX - el.scrollLeft;
+      if (Math.abs(dy) < 1 && Math.abs(dx) < 1) {
+        el.scrollTop = st.target;
+        el.scrollLeft = st.targetX;
+        st.raf = 0;
+        return;
+      }
+      /* A fifth of the remaining distance per frame: quick to start, settles
+         without overshoot, and never has to be cancelled. */
+      el.scrollTop += dy * 0.22;
+      el.scrollLeft += dx * 0.22;
+      st.raf = requestAnimationFrame(step);
+    });
+  }
+
   function scrollIntoView(el) {
     if (!el) return;
-    var row = el.closest('.row-track');
-    if (row) {
-      var r = el.getBoundingClientRect();
-      var rr = row.parentNode.getBoundingClientRect();
-      var pad = 80;
-      if (r.left < rr.left + pad) {
-        row.parentNode.scrollLeft += (r.left - rr.left - pad);
-      } else if (r.right > rr.right - pad) {
-        row.parentNode.scrollLeft += (r.right - rr.right + pad);
+
+    var track = el.closest('.row-track');
+    if (track) {
+      var vp = track.parentNode;
+      var st = scrollState(vp);
+      var pad = vp.clientWidth * 0.06;
+      var r = rectOf(el);                    // already settled-position
+      var vr = vp.getBoundingClientRect();
+      var left = r.left - vr.left;
+      var right = r.right - vr.left;
+      var maxX = Math.max(0, vp.scrollWidth - vp.clientWidth);
+      if (left < pad) st.targetX = clamp(st.targetX + (left - pad), 0, maxX);
+      else if (right > vp.clientWidth - pad) {
+        st.targetX = clamp(st.targetX + (right - vp.clientWidth + pad), 0, maxX);
       }
+      glide(vp);
     }
+
     var page = el.closest('.scroller');
     if (page) {
-      var er = el.getBoundingClientRect();
-      var pr = page.getBoundingClientRect();
+      var ps = scrollState(page);
       var block = el.closest('.row-block') || el;
-      var br = block.getBoundingClientRect();
-      var topPad = 110, botPad = 90;
-      if (br.top < pr.top + topPad) {
-        page.scrollTop += (br.top - pr.top - topPad);
-      } else if (er.bottom > pr.bottom - botPad) {
-        page.scrollTop += (er.bottom - pr.bottom + botPad);
+      var br = rectOf(block);
+      var er = rectOf(el);
+      var pr = page.getBoundingClientRect();
+      var topPad = page.clientHeight * 0.13;
+      var botPad = page.clientHeight * 0.10;
+      var top = br.top - pr.top;
+      var bottom = er.bottom - pr.top;
+      var maxY = Math.max(0, page.scrollHeight - page.clientHeight);
+      if (top < topPad) ps.target = clamp(ps.target + (top - topPad), 0, maxY);
+      else if (bottom > page.clientHeight - botPad) {
+        ps.target = clamp(ps.target + (bottom - page.clientHeight + botPad), 0, maxY);
       }
+      glide(page);
     }
   }
 
@@ -210,6 +313,13 @@
       }
     }
 
+    /* Last refusal before the default behaviour: opening the menu when Left
+       has nowhere left to go. */
+    if (w.Sidebar && w.Sidebar.edgeHandler(action, e) === true) {
+      e.preventDefault();
+      return;
+    }
+
     if (action === 'ok') {
       e.preventDefault();
       if (current) activate(current);
@@ -245,6 +355,9 @@
   w.Nav = {
     focus: setFocus,
     move: move,
+    /* Would this direction land anywhere? The sidebar asks before claiming a
+       Left press, so it only opens at the true edge of the screen. */
+    wouldMove: function (dir) { return !!pick(dir, current); },
     get current() { return current; },
     clear: function () {
       if (current) current.classList.remove('focused');
