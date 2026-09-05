@@ -32,39 +32,79 @@
   var homeLoaded = false;
   var pools = { movie: [], tv: [] };
 
-  /* ── Hero ──────────────────────────────────────────────────────────────
-     The backdrop behind the rows follows the highlight. It is a still, not a
-     trailer: a Fire Stick has one video decoder and it belongs to playback. */
+  /* ── Billboard ─────────────────────────────────────────────────────────
+     The big panel across the top of Home. It follows the highlight, which is
+     what a television does instead of a hover, and its Play button always
+     belongs to whatever is highlighted. It is a still, not a trailer: a Fire
+     Stick has one video decoder and it belongs to playback. */
+  var billboardItem = null;
+
   function setHero(item) {
-    var hero = document.getElementById('hero');
-    if (!hero || !item) return;
+    if (!item) return;
+    billboardItem = item;
     clearTimeout(heroTimer);
     heroTimer = setTimeout(function () {
-      var img = document.getElementById('heroImg');
-      hero.classList.add('shown');
+      if (billboardItem !== item) return;
+      var art = document.getElementById('billboardArt');
       var url = item.backdrop || item.card || '';
-      if (url && img.getAttribute('data-src') !== url) {
-        img.setAttribute('data-src', url);
+      if (url && art.getAttribute('data-src') !== url) {
+        art.setAttribute('data-src', url);
         var pre = new Image();
         pre.onload = function () {
-          if (img.getAttribute('data-src') !== url) return;
-          img.style.backgroundImage = 'url("' + url + '")';
+          if (art.getAttribute('data-src') !== url) return;
+          art.style.backgroundImage = 'url("' + url + '")';
+          art.classList.add('shown');
         };
         pre.src = url;
       }
-      document.getElementById('heroTitle').textContent = item.title || '';
+      document.getElementById('bbKind').textContent =
+        item.kind === 'tv' ? 'SERIES' : 'FILM';
+      document.getElementById('bbTitle').textContent = item.title || '';
+
       var bits = [];
       if (item.year) bits.push(item.year);
-      bits.push(item.kind === 'tv' ? 'Series' : 'Film');
-      if (item.rating && item.rating !== '0.0') bits.push('★ ' + item.rating);
-      document.getElementById('heroMeta').textContent = bits.join('  ·  ');
-      document.getElementById('heroDesc').textContent = (item.overview || '').slice(0, 260);
+      if (item.rating && item.rating !== '0.0') bits.push('\u2605 ' + item.rating);
+      var p = item.kind === 'tv' ? Store.resumePoint(item.id)
+                                 : Store.progress({ id: item.id, kind: 'movie' });
+      if (p && p.season) bits.push('You are on S' + p.season + ' E' + p.episode);
+      else if (p && p.pct > 2 && p.pct < 92) bits.push(p.pct + '% watched');
+      document.getElementById('bbMeta').textContent = bits.join('   \u00b7   ');
+
+      document.getElementById('bbDesc').textContent = (item.overview || '').slice(0, 280);
+      document.getElementById('bbList').textContent = Store.inList(item) ? '\u2713' : '+';
     }, 180);
+  }
+
+  /* The billboard's buttons act on whatever is highlighted right now. */
+  function wireBillboard() {
+    var play = document.getElementById('bbPlay');
+    var info = document.getElementById('bbInfo');
+    var list = document.getElementById('bbList');
+    if (!play || play.__wired) return;
+    play.__wired = true;
+
+    play.addEventListener('click', function () {
+      if (!billboardItem) return;
+      if (billboardItem.kind === 'tv') {
+        var r = Store.resumePoint(billboardItem.id);
+        Player.play(billboardItem, r ? r.season : 1, r ? r.episode : 1, '');
+      } else {
+        Player.play(billboardItem, 0, 0, '');
+      }
+    });
+    info.addEventListener('click', function () {
+      if (billboardItem) go('details', { item: billboardItem });
+    });
+    list.addEventListener('click', function () {
+      if (!billboardItem) return;
+      list.textContent = Store.toggleList(billboardItem) ? '\u2713' : '+';
+    });
   }
 
   /* ── Home ─────────────────────────────────────────────────────────────── */
 
   function renderHome(force) {
+    wireBillboard();
     var host = document.getElementById('homeRows');
     if (homeLoaded && !force) { refreshPersonalRows(); return Promise.resolve(); }
 
@@ -626,7 +666,7 @@
     target.classList.remove('off');
     target.scrollTop = 0;
 
-    [].forEach.call(document.querySelectorAll('.side-item'), function (b) {
+    [].forEach.call(document.querySelectorAll('.nav-link'), function (b) {
       b.classList.toggle('on', b.getAttribute('data-screen') === name);
     });
     document.body.setAttribute('data-screen', name);
@@ -637,6 +677,7 @@
     (res && res.then ? res : Promise.resolve()).then(function () {
       Nav.focusFirst(target);
       if (name === 'home') {
+        /* Give the billboard something to be about before anyone moves. */
         var first = target.querySelector('.card');
         if (first && first.__item) setHero(first.__item);
       }
