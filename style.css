@@ -1818,3 +1818,53 @@ body.tv-mode .po-close { display: none; }
   .player-overlay .po-frame { transition: none; }
   .po-spinner { animation-duration: 1.6s; }
 }
+
+
+/* ==============================================================
+   TV / APP CALL-TO-ACTIONS
+   Two ways onto the television, sitting in the navbar next to the
+   search box. Deliberately quiet: an outline until you hover, so
+   they do not compete with the artwork underneath.
+   ============================================================== */
+
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-right: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.05);
+  color: #e8e8e8;
+  font-size: .82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background .18s var(--ease), border-color .18s var(--ease),
+              color .18s var(--ease), transform .18s var(--ease);
+}
+.nav-cta:hover,
+.nav-cta:focus-visible {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.nav-cta b { font-weight: 800; }
+.nav-cta-ico { font-size: 1rem; line-height: 1; }
+
+/* The app one is the longer sentence, so it is the first to go when the
+   window narrows: the TV link still gets people where they are going. */
+@media (max-width: 1500px) {
+  .nav-cta-app .nav-cta-text { display: none; }
+  .nav-cta-app { padding: 8px 12px; }
+  .nav-cta-app:after { content: "Get the app"; font-weight: 800; }
+}
+@media (max-width: 1180px) {
+  .nav-cta-tv .nav-cta-text { display: none; }
+  .nav-cta-tv { padding: 8px 12px; }
+  .nav-cta-tv:after { content: "TV"; font-weight: 800; }
+}
+@media (max-width: 900px) {
+  .nav-cta-app { display: none; }
+}
