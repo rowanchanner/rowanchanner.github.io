@@ -53,6 +53,20 @@ button {
   cursor: pointer;
   padding: 0;
 }
+
+/* The app draws its own highlight — a white edge on the artwork, a red fill on
+   a button. The browser's default focus ring is drawn around the whole
+   element on top of that, which on a Top 10 card meant a rectangle boxing in
+   the numeral and the caption as well. */
+.f:focus,
+.f:focus-visible,
+button:focus,
+button:focus-visible,
+a:focus,
+a:focus-visible {
+  outline: none;
+}
+.f { -webkit-tap-highlight-color: transparent; }
 img { display: block; }
 
 .off { display: none !important; }
