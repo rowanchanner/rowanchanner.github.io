@@ -31,6 +31,8 @@
 
   var homeLoaded = false;
   var pools = { movie: [], tv: [] };
+  var lastRegion = '';
+  var pendingCharts = [[], []];
 
   /* ── Billboard ─────────────────────────────────────────────────────────
      The big panel across the top of Home. It follows the highlight, which is
@@ -45,6 +47,7 @@
     clearTimeout(heroTimer);
     heroTimer = setTimeout(function () {
       if (billboardItem !== item) return;
+
       var art = document.getElementById('billboardArt');
       var url = item.backdrop || item.card || '';
       if (url && art.getAttribute('data-src') !== url) {
@@ -57,22 +60,78 @@
         };
         pre.src = url;
       }
+
+      /* The title, set in the show's own lettering where there is any. Text
+         goes up immediately so nothing is ever blank, and the logo replaces
+         it when (and only when) it actually loads. */
+      var titleEl = document.getElementById('bbTitle');
+      var logoEl = document.getElementById('bbLogo');
+      titleEl.textContent = item.title || '';
+      titleEl.classList.remove('hidden');
+      logoEl.classList.add('off');
+      logoEl.removeAttribute('src');
+
+      API.logo(item.kind, item.id).then(function (src) {
+        if (billboardItem !== item || !src) return;
+        var img = new Image();
+        img.onload = function () {
+          if (billboardItem !== item) return;
+          logoEl.src = src;
+          logoEl.classList.remove('off');
+          titleEl.classList.add('hidden');
+        };
+        img.src = src;
+      });
+
       document.getElementById('bbKind').textContent =
         item.kind === 'tv' ? 'SERIES' : 'FILM';
-      document.getElementById('bbTitle').textContent = item.title || '';
-
-      var bits = [];
-      if (item.year) bits.push(item.year);
-      if (item.rating && item.rating !== '0.0') bits.push('\u2605 ' + item.rating);
-      var p = item.kind === 'tv' ? Store.resumePoint(item.id)
-                                 : Store.progress({ id: item.id, kind: 'movie' });
-      if (p && p.season) bits.push('You are on S' + p.season + ' E' + p.episode);
-      else if (p && p.pct > 2 && p.pct < 92) bits.push(p.pct + '% watched');
-      document.getElementById('bbMeta').textContent = bits.join('   \u00b7   ');
-
       document.getElementById('bbDesc').textContent = (item.overview || '').slice(0, 280);
       document.getElementById('bbList').textContent = Store.inList(item) ? '\u2713' : '+';
+
+      /* A first pass with what we already know, then the fuller line once
+         TMDB answers — the meta must never sit empty waiting. */
+      paintMeta(item, null);
+      API.extra(item.kind, item.id).then(function (ex) {
+        if (billboardItem !== item) return;
+        paintMeta(item, ex);
+      });
     }, 180);
+  }
+
+  /* "Series · Comedy · 2024 · 8 Episodes · 15" — the line Netflix runs under
+     the logo. Everything in it is optional, so it degrades to just the year
+     rather than showing empty separators. */
+  function paintMeta(item, ex) {
+    var bits = [];
+    bits.push(item.kind === 'tv' ? 'Series' : 'Film');
+    if (ex && ex.genres.length) bits = bits.concat(ex.genres);
+    if (item.year) bits.push(item.year);
+    if (ex) {
+      if (item.kind === 'tv' && ex.episodes) {
+        bits.push(ex.episodes + ' Episode' + (ex.episodes === 1 ? '' : 's'));
+      } else if (item.kind === 'movie' && ex.runtime) {
+        bits.push(UI.runtimeText(ex.runtime));
+      }
+    }
+
+    var host = document.getElementById('bbMeta');
+    host.innerHTML = '';
+    bits.forEach(function (b, i) {
+      if (i) host.appendChild(UI.el('span', 'bb-dot', '\u00b7'));
+      host.appendChild(UI.el('span', 'bb-bit', b));
+    });
+    if (ex && ex.cert) {
+      host.appendChild(UI.el('span', 'bb-cert', ex.cert));
+    }
+
+    /* Where you got to, if anywhere. */
+    var p = item.kind === 'tv' ? Store.resumePoint(item.id)
+                               : Store.progress({ id: item.id, kind: 'movie' });
+    if (p && p.season) {
+      host.appendChild(UI.el('span', 'bb-resume', 'S' + p.season + ' E' + p.episode));
+    } else if (p && p.pct > 2 && p.pct < 92) {
+      host.appendChild(UI.el('span', 'bb-resume', p.pct + '% watched'));
+    }
   }
 
   /* The billboard's buttons act on whatever is highlighted right now. */
@@ -106,18 +165,33 @@
   function renderHome(force) {
     wireBillboard();
     var host = document.getElementById('homeRows');
+    /* Changing country in Settings has to rebuild the charts. */
+    if (lastRegion && lastRegion !== CFG.REGION) homeLoaded = false;
+    lastRegion = CFG.REGION;
     if (homeLoaded && !force) { refreshPersonalRows(); return Promise.resolve(); }
 
     host.innerHTML = '';
     host.appendChild(UI.spinner('Loading your library'));
 
+    var region = CFG.REGION;
     var jobs = HOME_ROWS.map(function (r) {
       return API.list(r.ep, r.kind).catch(function () { return []; });
     });
 
-    return Promise.all(jobs).then(function (lists) {
+    /* The two charts. Kept out of the pool-and-fill machinery on purpose:
+       a Top 10 is an ordered list of exactly ten, not a row to be padded. */
+    var charts = Promise.all([
+      API.topTen('movie', region).catch(function () { return []; }),
+      API.topTen('tv', region).catch(function () { return []; })
+    ]);
+
+    return Promise.all([Promise.all(jobs), charts]).then(function (both) {
+      var lists = both[0];
+      var chartRows = both[1];
       var all = [];
       lists.forEach(function (l) { all = all.concat(l); });
+      chartRows.forEach(function (l) { all = all.concat(l); });
+      pendingCharts = chartRows;
 
       var status = document.getElementById('splashStatus');
       return API.libraryAvailable(all, function (done, total) {
@@ -141,6 +215,20 @@
 
       host.innerHTML = '';
       renderPersonalRows(host);
+
+      /* The charts go straight under Continue Watching, where Netflix puts
+         them: they are the most "today" thing on the screen. */
+      var where = Region.name(region);
+      [['topMoviesRegion', 'Top 10 Films in ' + where + ' Today', pendingCharts[0]],
+       ['topTvRegion', 'Top 10 Series in ' + where + ' Today', pendingCharts[1]]
+      ].forEach(function (def) {
+        var items = (def[2] || []).filter(function (i) { return !keep || keep[i.key]; });
+        /* A chart that has been filtered down to three is not a Top 10, so
+           fall back to showing it unfiltered rather than a stub. */
+        if (items.length < 8) items = (def[2] || []).slice(0, 10);
+        if (items.length < 5) return;
+        host.appendChild(UI.row(def[0], def[1], items.slice(0, 10), { ranked: true }));
+      });
 
       var usedRecently = {};
       HOME_ROWS.forEach(function (def, i) {
@@ -559,6 +647,17 @@
       'set-api'
     ));
 
+    /* Which country the Top 10 rows are for. Detected from the device, but a
+       Fire Stick bought abroad or set to the wrong language needs a way out. */
+    host.appendChild(settingRow(
+      'Country for the Top 10 rows',
+      Region.name(CFG.REGION) + '  (' + CFG.REGION + ')  \u00b7  ' +
+        (CFG.REGION_IS_SET ? 'chosen here' : Region.how()),
+      'Change',
+      function () { pickRegion(); },
+      'set-region'
+    ));
+
     host.appendChild(settingRow(
       'Only show what is cached',
       CFG.LIBRARY_ONLY ? 'On — the home screen lists what plays instantly' :
@@ -622,6 +721,54 @@
     about.appendChild(UI.el('div', 'about-line', 'Server  ' + CFG.API));
     about.appendChild(UI.el('div', 'about-line', navigator.userAgent));
     host.appendChild(about);
+  }
+
+  /* A grid of countries rather than a text field: nobody wants to spell
+     "Netherlands" on an on-screen keyboard. */
+  function pickRegion() {
+    var box = document.getElementById('regionPicker');
+    var grid = document.getElementById('regionGrid');
+    grid.innerHTML = '';
+
+    var opener = Nav.current;
+    var handler = Nav.push(function (action) {
+      if (action === 'back') { close(); return true; }
+      return false;
+    });
+
+    function close() {
+      box.classList.add('off');
+      Nav.pop(handler);
+      if (opener && document.contains(opener)) Nav.focus(opener);
+    }
+
+    var auto = UI.el('button', 'f btn region-auto', 'Detect automatically');
+    auto.type = 'button';
+    auto.setAttribute('data-key', 'region-auto');
+    auto.addEventListener('click', function () {
+      CFG.clearRegion();
+      close();
+      renderSettings();
+      homeLoaded = false;
+    });
+    grid.appendChild(auto);
+
+    Region.list().forEach(function (r) {
+      var b = UI.el('button', 'f region-btn' + (r.code === CFG.REGION ? ' on' : ''),
+                    r.name.replace(/^the /, ''));
+      b.type = 'button';
+      b.setAttribute('data-key', 'region-' + r.code);
+      b.addEventListener('click', function () {
+        CFG.REGION = r.code;
+        close();
+        renderSettings();
+        homeLoaded = false;
+      });
+      grid.appendChild(b);
+    });
+
+    box.classList.remove('off');
+    Nav.focusFirst(box);
   }
 
   function settingRow(title, value, action, fn, key) {

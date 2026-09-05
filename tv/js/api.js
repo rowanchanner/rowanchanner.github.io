@@ -13,6 +13,8 @@
 
   var libCache = {};        // "movie:123" -> true/false, for this run
   var tmdbCache = {};       // endpoint -> normalised results
+  var artCache = {};        // "tv:1396" -> logo url ('' when there isn't one)
+  var extraCache = {};      // "tv:1396" -> {genres, episodes, cert, ...}
 
   function timeout(ms, promise) {
     return new Promise(function (resolve, reject) {
@@ -109,6 +111,76 @@
           return out;
         })
         .catch(function () { return []; });
+    },
+
+    /* ── The title's own logo ─────────────────────────────────────────────
+       The single thing that makes a billboard look like a streaming service
+       rather than a web page: the show's wordmark, as its designers drew it,
+       instead of the title set in whatever font the page uses. TMDB carries
+       these; most big titles have one. */
+    logo: function (kind, id) {
+      var k = kind + ':' + id;
+      if (k in artCache) return Promise.resolve(artCache[k]);
+      return tmdb('/' + (kind === 'tv' ? 'tv' : 'movie') + '/' + id +
+                  '/images?include_image_language=en,null')
+        .then(function (d) {
+          var logos = (d && d.logos) || [];
+          /* Prefer English, prefer PNG (an old WebView can be odd with SVG),
+             then the widest one — the billboard is a big space. */
+          var best = null, bestScore = -1;
+          logos.forEach(function (l) {
+            if (!l.file_path) return;
+            var png = l.file_path.slice(-4).toLowerCase() === '.png';
+            var score = (l.iso_639_1 === 'en' ? 4000 : 0) + (png ? 2000 : 0) +
+                        Math.min(1500, l.width || 0) / 10;
+            /* Very wide, short logos are usually a title card rather than a
+               wordmark; they look wrong scaled into the billboard. */
+            if ((l.aspect_ratio || 0) > 6) score -= 2500;
+            if (score > bestScore) { bestScore = score; best = l; }
+          });
+          artCache[k] = best ? ('https://image.tmdb.org/t/p/w500' + best.file_path) : '';
+          return artCache[k];
+        })
+        .catch(function () { artCache[k] = ''; return ''; });
+    },
+
+    /* Genres, episode count and the age rating for this country — the line
+       under the logo on the billboard. */
+    extra: function (kind, id) {
+      var k = kind + ':' + id;
+      if (extraCache[k]) return Promise.resolve(extraCache[k]);
+      var path = kind === 'tv'
+        ? '/tv/' + id + '?append_to_response=content_ratings'
+        : '/movie/' + id + '?append_to_response=release_dates';
+      return tmdb(path).then(function (d) {
+        var out = {
+          genres: (d.genres || []).slice(0, 2).map(function (g) { return g.name; }),
+          episodes: d.number_of_episodes || 0,
+          seasons: d.number_of_seasons || 0,
+          runtime: d.runtime || 0,
+          cert: certFor(kind, d, CFG.REGION)
+        };
+        extraCache[k] = out;
+        return out;
+      }).catch(function () {
+        extraCache[k] = { genres: [], episodes: 0, seasons: 0, runtime: 0, cert: '' };
+        return extraCache[k];
+      });
+    },
+
+    /* ── Top 10 in a country ──────────────────────────────────────────────
+       TMDB has no per-country chart, and its `region` parameter turns out not
+       to change `popular` at all — GB, US and JP come back identical. What
+       DOES vary by country is what is streamable there, so these rows are
+       "most popular of what people in <country> can actually watch", which is
+       both honest and genuinely different per country. */
+    topTen: function (kind, region) {
+      var path = '/discover/' + (kind === 'tv' ? 'tv' : 'movie') +
+                 '?sort_by=popularity.desc&watch_region=' + encodeURIComponent(region) +
+                 '&with_watch_monetization_types=flatrate';
+      return API.list(path, kind, 1).then(function (items) {
+        return items.slice(0, 10);
+      });
     },
 
     details: function (kind, id) {
@@ -215,6 +287,32 @@
       return base + 'movie/' + item.id + '?tv=1';
     }
   };
+
+  /* The age rating as it is written in this country, falling back to the US
+     one so a card is not left bare. */
+  function certFor(kind, d, region) {
+    try {
+      if (kind === 'tv') {
+        var rows = (d.content_ratings && d.content_ratings.results) || [];
+        var here = pick(rows, region), us = pick(rows, 'US');
+        return (here && here.rating) || (us && us.rating) || '';
+      }
+      var rel = (d.release_dates && d.release_dates.results) || [];
+      var r = pick(rel, region) || pick(rel, 'US');
+      if (!r) return '';
+      for (var i = 0; i < (r.release_dates || []).length; i++) {
+        if (r.release_dates[i].certification) return r.release_dates[i].certification;
+      }
+    } catch (e) {}
+    return '';
+  }
+
+  function pick(rows, cc) {
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].iso_3166_1 === cc) return rows[i];
+    }
+    return null;
+  }
 
   function snapshot(uniq) {
     var out = {};

@@ -47,6 +47,16 @@
       art.appendChild(bar);
     }
 
+    /* Top 10 rows put the position beside the artwork, as a big outlined
+       numeral. It is the one bit of chrome that says "chart" without a word
+       of explanation. */
+    if (opts.rank) {
+      b.classList.add('card-ranked');
+      var rank = el('div', 'card-rank');
+      rank.appendChild(el('span', 'card-rank-n', String(opts.rank)));
+      b.appendChild(rank);
+    }
+
     b.appendChild(art);
 
     var label = el('div', 'card-label');
@@ -66,16 +76,18 @@
     opts = opts || {};
     var block = el('section', 'row-block');
     block.id = 'block-' + id;
+    if (opts.ranked) block.classList.add('row-ranked');
     block.appendChild(el('h2', 'row-title', title));
 
     var vp = el('div', 'row-viewport');
     var track = el('div', 'row-track');
     track.id = 'track-' + id;
 
-    items.forEach(function (item) {
+    items.forEach(function (item, i) {
       var co = typeof opts.cardOpts === 'function' ? opts.cardOpts(item) : (opts.cardOpts || {});
       co = shallow(co);
       co.scope = id;
+      if (opts.ranked) co.rank = i + 1;
       track.appendChild(card(item, co));
     });
 
