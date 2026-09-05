@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05070c">
+<title>Sharky TV</title>
+<link rel="icon" href="img/icon.svg">
+<script>
+(function () {
+  var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
+  document.write('<link rel="stylesheet" href="css/app.css' +
+                 (bust ? '?v=' + encodeURIComponent(bust) : '') + '">');
+})();
+</script>
+<noscript><link rel="stylesheet" href="css/app.css"></noscript>
+</head>
+<body data-screen="home">
+
+<!-- Splash: stays up until the server has answered once. -->
+<div id="splash">
+  <div class="splash-mark">SHARKY</div>
+  <div class="splash-sub">TV</div>
+  <div class="spinner"></div>
+  <div id="splashStatus" class="splash-status">Starting</div>
+</div>
+
+<div id="app">
+
+  <nav id="sidebar">
+    <div class="side-logo" aria-hidden="true">S</div>
+    <button type="button" class="f side-item on" data-screen="home" data-key="side-home">
+      <span class="side-ico">&#9632;</span><span class="side-text">Home</span>
+    </button>
+    <button type="button" class="f side-item" data-screen="search" data-key="side-search">
+      <span class="side-ico">&#9906;</span><span class="side-text">Search</span>
+    </button>
+    <button type="button" class="f side-item" data-screen="movies" data-key="side-movies">
+      <span class="side-ico">&#9654;</span><span class="side-text">Films</span>
+    </button>
+    <button type="button" class="f side-item" data-screen="tv" data-key="side-tv">
+      <span class="side-ico">&#9635;</span><span class="side-text">Series</span>
+    </button>
+    <button type="button" class="f side-item" data-screen="mylist" data-key="side-list">
+      <span class="side-ico">&#10010;</span><span class="side-text">My List</span>
+    </button>
+    <button type="button" class="f side-item" data-screen="settings" data-key="side-settings">
+      <span class="side-ico">&#9881;</span><span class="side-text">Settings</span>
+    </button>
+  </nav>
+
+  <main id="main">
+
+    <!-- HOME -->
+    <section id="screen-home" class="screen scroller">
+      <div id="hero">
+        <div id="heroImg"></div>
+        <div class="hero-fade"></div>
+        <div class="hero-text">
+          <h1 id="heroTitle"></h1>
+          <div id="heroMeta" class="hero-meta"></div>
+          <p id="heroDesc" class="hero-desc"></p>
+        </div>
+      </div>
+      <div id="homeRows" class="rows"></div>
+    </section>
+
+    <!-- SEARCH -->
+    <section id="screen-search" class="screen off">
+      <div class="search-wrap">
+        <div class="search-left">
+          <div id="searchTerm" class="search-term placeholder">Type a title</div>
+          <div id="kbHost" class="kb"></div>
+        </div>
+        <div class="search-right scroller">
+          <div id="searchResults" class="search-results"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BROWSE (Films / Series / My List) -->
+    <section id="screen-browse" class="screen off scroller">
+      <h1 id="browseTitle" class="page-title">Films</h1>
+      <div id="browseBody"></div>
+    </section>
+
+    <!-- DETAILS -->
+    <section id="screen-details" class="screen off scroller">
+      <div id="detailsBackdrop" class="det-backdrop"></div>
+      <div id="detailsBody" class="det-body"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="screen-settings" class="screen off scroller">
+      <h1 class="page-title">Settings</h1>
+      <div id="settingsBody"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- PLAYER -->
+<div id="playerOverlay" class="off">
+  <div id="playerLoading" class="po-loading">
+    <div class="spinner"></div>
+    <div id="playerStatus" class="po-status">Loading stream</div>
+  </div>
+  <iframe id="playerFrame"
+          src="about:blank"
+          allow="autoplay *; fullscreen *; encrypted-media *; picture-in-picture *"
+          allowfullscreen
+          frameborder="0"></iframe>
+</div>
+
+<!-- TEXT ENTRY -->
+<div id="textEntry" class="modal off">
+  <div class="modal-box">
+    <h2 id="textEntryTitle">Enter</h2>
+    <div id="textEntryValue" class="te-value"></div>
+    <div id="textEntryKb" class="kb"></div>
+  </div>
+</div>
+
+<!-- EXIT -->
+<div id="exitBox" class="modal off">
+  <div class="modal-box small">
+    <h2>Close Sharky?</h2>
+    <p class="modal-text">You can carry on where you left off next time.</p>
+    <div class="modal-actions">
+      <button type="button" id="exitNo" class="f btn btn-primary autofocus" data-key="exit-no">Keep watching</button>
+      <button type="button" id="exitYes" class="f btn" data-key="exit-yes">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- The scripts are injected rather than written as plain tags so that the
+     cache-buster the shell puts on this page's URL is carried onto every one
+     of them. Without that a WebView happily serves yesterday's app.js from
+     cache and an update looks like it never happened. -->
+<script>
+(function () {
+  var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
+  var q = bust ? '?v=' + encodeURIComponent(bust) : '';
+  var files = ['compat', 'config', 'store', 'api', 'nav', 'ui',
+               'keyboard', 'player', 'screens', 'app'];
+  window.SHARKY_BUILD = bust || 'bundled';
+  for (var i = 0; i < files.length; i++) {
+    document.write('<script src="js/' + files[i] + '.js' + q + '"><\/script>');
+  }
+})();
+</script>
+</body>
+</html>
