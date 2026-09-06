@@ -14,6 +14,8 @@
   var libCache = {};        // "movie:123" -> true/false, for this run
   var tmdbCache = {};       // endpoint -> normalised results
   var artCache = {};        // "tv:1396" -> logo url ('' when there isn't one)
+  var recentCache = null;   // the Recently Added row, resolved once per run
+  var trailerCache = {};    // "movie:603" -> youtube key ('' when there is none)
   var extraCache = {};      // "tv:1396" -> {genres, episodes, cert, ...}
 
   function timeout(ms, promise) {
@@ -183,6 +185,85 @@
       });
     },
 
+    /* ── Recently added to the library ────────────────────────────────────
+       The API hands back parsed release titles; turning those into cards
+       means a TMDB search each, which is why this is capped, run a few at a
+       time and cached for the session. */
+    recentlyAdded: function (limit) {
+      if (recentCache) return Promise.resolve(recentCache);
+      return timeout(60000, fetch(CFG.API + '/library/recent?limit=' + (limit || 24)))
+        .then(function (r) {
+          if (!r.ok) throw new Error('recent ' + r.status);
+          return r.json();
+        })
+        .then(function (d) {
+          var rows = (d && d.items) || [];
+          var out = [];
+          var next = 0;
+
+          function one() {
+            if (next >= rows.length) return Promise.resolve();
+            var row = rows[next++];
+            return API.search(row.title).then(function (hits) {
+              var best = bestMatch(hits, row);
+              if (best) out.push(best);
+            }).catch(function () {}).then(one);
+          }
+
+          var lanes = [];
+          for (var i = 0; i < Math.min(4, rows.length); i++) lanes.push(one());
+          return Promise.all(lanes).then(function () {
+            /* The API returned them newest-first; the searches finish out of
+               order, so put them back the way they arrived. */
+            var order = {};
+            rows.forEach(function (r, i) { order[_norm(r.title) + '|' + r.kind] = i; });
+            out.sort(function (a, b) {
+              var ka = order[_norm(a.title) + '|' + a.kind];
+              var kb = order[_norm(b.title) + '|' + b.kind];
+              return (ka == null ? 999 : ka) - (kb == null ? 999 : kb);
+            });
+            var seen = {}, uniq = [];
+            out.forEach(function (i) {
+              if (seen[i.key]) return;
+              seen[i.key] = 1;
+              uniq.push(i);
+            });
+            recentCache = uniq;
+            return uniq;
+          });
+        })
+        .catch(function (e) {
+          console.warn('[sharky] recently added unavailable', e && e.message);
+          recentCache = [];
+          return [];
+        });
+    },
+
+    /* The trailer's YouTube key, for the billboard preview. */
+    trailerKey: function (kind, id) {
+      var k = kind + ':' + id;
+      if (k in trailerCache) return Promise.resolve(trailerCache[k]);
+      return tmdb('/' + (kind === 'tv' ? 'tv' : 'movie') + '/' + id + '/videos')
+        .then(function (d) {
+          var vids = (d && d.results) || [];
+          var best = null, bestScore = -1;
+          vids.forEach(function (v) {
+            if (v.site !== 'YouTube' || !v.key) return;
+            var score = 0;
+            if (v.type === 'Trailer') score += 100;
+            else if (v.type === 'Teaser') score += 60;
+            else if (v.type === 'Clip') score += 20;
+            else score -= 40;
+            if (v.official) score += 30;
+            if ((v.iso_639_1 || 'en') === 'en') score += 20;
+            if (score > bestScore) { bestScore = score; best = v; }
+          });
+          trailerCache[k] = best && bestScore > 0 ? best.key : '';
+          return trailerCache[k];
+        })
+        .catch(function () { trailerCache[k] = ''; return ''; });
+    },
+
     details: function (kind, id) {
       var path = (kind === 'tv' ? '/tv/' : '/movie/') + id +
                  '?append_to_response=credits,recommendations,videos';
@@ -312,6 +393,34 @@
       if (rows[i].iso_3166_1 === cc) return rows[i];
     }
     return null;
+  }
+
+  /* Which search hit is the release we parsed? The right kind first, then a
+     matching year, then the closest title — a bare popularity ranking picks
+     the wrong "The Office" surprisingly often. */
+  function bestMatch(hits, row) {
+    var want = _norm(row.title);
+    var best = null, bestScore = -1e9;
+    (hits || []).forEach(function (h, i) {
+      var score = -i;                                  // search order as a tiebreak
+      if (h.kind === row.kind) score += 60;
+      var hn = _norm(h.title);
+      if (hn === want) score += 120;
+      else if (hn.indexOf(want) === 0 || want.indexOf(hn) === 0) score += 40;
+      if (row.year && h.year) {
+        var gap = Math.abs(Number(row.year) - Number(h.year));
+        if (gap === 0) score += 80;
+        else if (gap <= 1) score += 30;
+        else score -= gap * 4;
+      }
+      if (score > bestScore) { bestScore = score; best = h; }
+    });
+    /* A weak best match is worse than no card at all. */
+    return bestScore > 40 ? best : null;
+  }
+
+  function _norm(v) {
+    return String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   }
 
   function snapshot(uniq) {

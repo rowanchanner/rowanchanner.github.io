@@ -291,6 +291,23 @@ body.scrolled #topnav { background: #0a0a0a; }
   transition: opacity .45s ease;
 }
 #billboardArt.shown { opacity: 1; }
+
+/* The trailer sits where the still is, and the still fades out under it. Scaled
+   up and centred so YouTube's letterboxing is pushed off the edges — the
+   billboard is wider than 16:9 once the text column is accounted for. */
+#bbPreview {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 100%;
+  height: 130%;
+  transform: translate(-50%, -50%) scale(1.32);
+  border: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .7s ease;
+}
+#billboard.previewing #bbPreview { opacity: 1; }
+#billboard.previewing #billboardArt { opacity: 0; transition: opacity .7s ease; }
 .bb-fade {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -916,3 +933,22 @@ body.sidebar-open .nav-links { opacity: .35; }
 .region-btn.on { color: #fff; background: rgba(229,9,20,.85); }
 .region-btn.focused { border-color: #fff; background: #fff; color: #141414; }
 .region-auto { margin-bottom: 1.4vh; width: 100%; justify-content: center; }
+
+
+/* ── Card options ───────────────────────────────────────────────────────── */
+
+.opt-list { display: flex; flex-direction: column; min-width: 26vw; }
+.opt-item {
+  text-align: left;
+  padding: 1.5vh 1.4vw;
+  margin-bottom: 0.6vh;
+  border-radius: 0.25vw;
+  background: rgba(255,255,255,0.06);
+  color: #d6d6d6;
+  font-size: 1.2vw;
+  font-weight: 600;
+  border: 0.16vw solid transparent;
+}
+.opt-item.focused { background: #fff; color: #141414; border-color: #fff; }
+.opt-danger { color: #ff8a8a; }
+.opt-danger.focused { background: var(--red); color: #fff; border-color: #fff; }

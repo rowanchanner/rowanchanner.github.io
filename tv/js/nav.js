@@ -331,8 +331,14 @@
 
     if (action === 'ok') {
       e.preventDefault();
+      /* A card's OK is claimed by the options module, which distinguishes a
+         press from a hold. Everything else acts immediately. */
+      if (w.CardOptions && w.CardOptions.keyDown(action, e) === true) return;
       if (current) activate(current);
       return;
+    }
+    if (action === 'menu') {
+      if (w.CardOptions && w.CardOptions.menu()) { e.preventDefault(); return; }
     }
     if (action === 'back') {
       e.preventDefault();
@@ -354,6 +360,13 @@
   }
 
   document.addEventListener('keydown', onKey, true);
+
+  /* The other half of press-and-hold. */
+  document.addEventListener('keyup', function (e) {
+    if (!enabled) return;
+    if (actionFor(e) !== 'ok') return;
+    if (w.CardOptions) w.CardOptions.keyUp();
+  }, true);
 
   /* A mouse or a touchscreen still works — handy when testing on a laptop. */
   document.addEventListener('mouseover', function (e) {
