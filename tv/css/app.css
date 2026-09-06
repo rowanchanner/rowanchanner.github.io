@@ -281,6 +281,10 @@ body.scrolled #topnav { background: #0a0a0a; }
 #billboard {
   position: relative;
   height: 62vh;
+  /* The trailer is deliberately scaled past the edges so YouTube's
+     letterboxing falls outside the frame — without this it spills down over
+     the rows underneath instead of being cut off at the billboard. */
+  overflow: hidden;
 }
 #billboardArt {
   position: absolute;
