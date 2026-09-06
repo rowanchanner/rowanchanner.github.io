@@ -62,6 +62,8 @@
     <section id="screen-home" class="screen scroller">
       <div id="billboard">
         <div id="billboardArt"></div>
+        <iframe id="bbPreview" class="off" title="Trailer"
+                allow="autoplay; encrypted-media" frameborder="0"></iframe>
         <div class="bb-fade"></div>
         <div class="bb-text">
           <div id="bbKind" class="bb-kind"></div>
@@ -138,6 +140,14 @@
   </div>
 </div>
 
+<!-- CARD OPTIONS -->
+<div id="cardOptions" class="modal off">
+  <div class="modal-box small">
+    <h2 id="cardOptionsTitle">Options</h2>
+    <div id="cardOptionsList" class="opt-list"></div>
+  </div>
+</div>
+
 <!-- COUNTRY PICKER -->
 <div id="regionPicker" class="modal off">
   <div class="modal-box">
@@ -173,7 +183,8 @@
   var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
   var q = bust ? '?v=' + encodeURIComponent(bust) : '';
   var files = ['compat', 'config', 'store', 'api', 'nav', 'ui',
-               'keyboard', 'region', 'intro', 'player', 'screens', 'sidebar', 'app'];
+               'keyboard', 'region', 'intro', 'player', 'screens', 'options',
+               'sidebar', 'app'];
   window.SHARKY_BUILD = bust || 'bundled';
   for (var i = 0; i < files.length; i++) {
     document.write('<script src="js/' + files[i] + '.js' + q + '"><\/script>');

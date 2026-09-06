@@ -67,7 +67,13 @@
     get REGION_IS_SET() { return !!stored.region; },
     clearRegion: function () { delete stored.region; save(); },
 
-    VERSION: '1.1.0',
+    /* Play the trailer behind the billboard once the highlight settles.
+       OFF by default on purpose: a Fire Stick has one video decoder and it is
+       better spent on playback than on a preview. */
+    get PREVIEWS() { return stored.previews === true; },
+    set PREVIEWS(v) { stored.previews = !!v; save(); },
+
+    VERSION: '1.2.0',
 
     reset: function () { stored = {}; save(); }
   };

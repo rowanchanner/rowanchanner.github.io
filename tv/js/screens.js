@@ -45,6 +45,7 @@
     if (!item) return;
     billboardItem = item;
     clearTimeout(heroTimer);
+    stopPreview();
     heroTimer = setTimeout(function () {
       if (billboardItem !== item) return;
 
@@ -95,7 +96,50 @@
         if (billboardItem !== item) return;
         paintMeta(item, ex);
       });
+
+      queuePreview(item);
     }, 180);
+  }
+
+  /* ── Trailer preview ──────────────────────────────────────────────────────
+     Once the highlight has genuinely settled, the still dissolves into the
+     trailer, muted, the way Netflix does it.
+
+     Off unless asked for. A Fire Stick has one video decoder, and spending it
+     on a preview is a poor trade against the thing you are about to play — so
+     this is a Settings toggle rather than a default, and it stops the moment
+     the highlight moves or anything starts playing. */
+  var previewTimer = null;
+
+  function stopPreview() {
+    clearTimeout(previewTimer);
+    previewTimer = null;
+    var frame = document.getElementById('bbPreview');
+    if (frame && frame.getAttribute('src')) {
+      frame.removeAttribute('src');
+      frame.classList.add('off');
+    }
+    var bb = document.getElementById('billboard');
+    if (bb) bb.classList.remove('previewing');
+  }
+
+  function queuePreview(item) {
+    if (!CFG.PREVIEWS) return;
+    if (Player.isOpen) return;
+    previewTimer = setTimeout(function () {
+      if (billboardItem !== item || Player.isOpen || Screens.name !== 'home') return;
+      API.trailerKey(item.kind, item.id).then(function (key) {
+        if (!key || billboardItem !== item || Player.isOpen) return;
+        if (Screens.name !== 'home') return;
+        var frame = document.getElementById('bbPreview');
+        if (!frame) return;
+        frame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(key) +
+          '?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1' +
+          '&playlist=' + encodeURIComponent(key) + '&iv_load_policy=3&disablekb=1';
+        frame.classList.remove('off');
+        document.getElementById('billboard').classList.add('previewing');
+      });
+    }, 2200);
   }
 
   /* "Series · Comedy · 2024 · 8 Episodes · 15" — the line Netflix runs under
@@ -216,6 +260,11 @@
       host.innerHTML = '';
       renderPersonalRows(host);
 
+      /* Recently Added comes in on its own schedule — it needs a TMDB search
+         per title — so it is slotted in when it arrives rather than holding
+         up the rest of the page. */
+      renderRecentlyAdded(host);
+
       /* The charts go straight under Continue Watching, where Netflix puts
          them: they are the most "today" thing on the screen. */
       var where = Region.name(region);
@@ -302,6 +351,23 @@
 
   function refreshPersonalRows() {
     renderPersonalRows();
+  }
+
+  /* ── Recently Added ───────────────────────────────────────────────────────
+     What has just landed in the library. Sits under Continue Watching, above
+     the charts: it is the row that answers "did that thing I added finish?" */
+  function renderRecentlyAdded(host) {
+    host = host || document.getElementById('homeRows');
+    API.recentlyAdded(24).then(function (items) {
+      if (!items || items.length < 4) return;
+      if (document.getElementById('block-recent')) return;
+      var block = UI.row('recent', 'Recently Added', items.slice(0, CFG.ROW_MAX));
+      /* Directly after Continue Watching and My List, before the charts. */
+      var after = host.querySelector('#block-mylist') || host.querySelector('#block-continue');
+      if (after && after.nextSibling) host.insertBefore(block, after.nextSibling);
+      else if (after) host.appendChild(block);
+      else host.insertBefore(block, host.firstChild);
+    });
   }
 
   function dedupe(list) {
@@ -659,6 +725,20 @@
     ));
 
     host.appendChild(settingRow(
+      'Trailer previews on the billboard',
+      CFG.PREVIEWS
+        ? 'On \u2014 the trailer plays behind the artwork after a moment'
+        : 'Off \u2014 a still instead. A Fire Stick has one video decoder, and this spends it',
+      CFG.PREVIEWS ? 'Turn off' : 'Turn on',
+      function () {
+        CFG.PREVIEWS = !CFG.PREVIEWS;
+        if (!CFG.PREVIEWS) stopPreview();
+        renderSettings();
+      },
+      'set-preview'
+    ));
+
+    host.appendChild(settingRow(
       'Only show what is cached',
       CFG.LIBRARY_ONLY ? 'On — the home screen lists what plays instantly' :
                          'Off — the home screen lists everything TMDB promotes',
@@ -806,6 +886,7 @@
     }
     currentName = name;
 
+    stopPreview();
     [].forEach.call(document.querySelectorAll('.screen'), function (s) {
       s.classList.add('off');
     });
@@ -846,6 +927,7 @@
 
   w.Screens = {
     go: go,
+    stopPreview: stopPreview,
     back: back,
     get name() { return currentName; },
     setHero: setHero,

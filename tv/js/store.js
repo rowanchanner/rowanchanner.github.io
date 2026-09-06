@@ -108,6 +108,23 @@
 
     clearContinue: function () { write(K_CONTINUE, []); },
 
+    /* Take one title off the Continue Watching row — every episode of it, and
+       the progress that would put it straight back. */
+    forget: function (id, kind) {
+      kind = kind || 'movie';
+      var rows = read(K_CONTINUE, []).filter(function (r) {
+        return !(String(r.id) === String(id) && (r.kind || 'movie') === kind);
+      });
+      write(K_CONTINUE, rows);
+
+      var all = read(K_PROGRESS, {});
+      var prefix = kind + ':' + id;
+      Object.keys(all || {}).forEach(function (k) {
+        if (k === prefix || k.indexOf(prefix + ':') === 0) delete all[k];
+      });
+      write(K_PROGRESS, all);
+    },
+
     /* Where to resume a show: the most recent episode we have a position
        for, so "Play" on a series picks up where the viewer left off. */
     resumePoint: function (tvId) {
