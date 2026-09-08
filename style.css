@@ -1860,13 +1860,19 @@ body.tv-mode .po-close { display: none; }
   .nav-cta-app { padding: 8px 12px; }
   .nav-cta-app:after { content: "Get the app"; font-weight: 800; }
 }
+@media (max-width: 1380px) {
+  .nav-cta-mobile .nav-cta-text { display: none; }
+  .nav-cta-mobile { padding: 8px 12px; }
+  .nav-cta-mobile:after { content: "Phone app"; font-weight: 800; }
+}
 @media (max-width: 1180px) {
   .nav-cta-tv .nav-cta-text { display: none; }
   .nav-cta-tv { padding: 8px 12px; }
   .nav-cta-tv:after { content: "TV"; font-weight: 800; }
 }
 @media (max-width: 900px) {
-  .nav-cta-app { display: none; }
+  .nav-cta-app,
+  .nav-cta-mobile { display: none; }
 }
 
 
