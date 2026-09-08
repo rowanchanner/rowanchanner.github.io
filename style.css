@@ -1871,8 +1871,12 @@ body.tv-mode .po-close { display: none; }
   .nav-cta-tv:after { content: "TV"; font-weight: 800; }
 }
 @media (max-width: 900px) {
-  .nav-cta-app,
-  .nav-cta-mobile { display: none; }
+  .nav-cta-app { display: none; }
+  .nav-cta-mobile {
+    display: inline-flex;
+    flex: 0 0 auto;
+    margin-right: 0;
+  }
 }
 
 
