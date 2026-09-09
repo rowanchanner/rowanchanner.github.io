@@ -248,6 +248,9 @@ function removeContinueItem(item) {
 }
 
 const SHARKY_API = 'https://sharky-movies-api.onrender.com';
+const LIBRARY_FILTER_TIMEOUT_MS = 8000;
+const sharkyTimeoutSignal = ms =>
+  window.AbortSignal && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
 
 /* ── Only show what we can actually play ──────────────────────────────────
    The homepage used to list whatever TMDB was promoting, most of which had to
@@ -274,7 +277,7 @@ async function libraryAvailable(items) {
     byId.get(id).push(mediaKey(x));
   });
   let answered = false;
-  const CHUNK_SIZE = 12;
+  const CHUNK_SIZE = 80;
   for (let i = 0; i < list.length; i += CHUNK_SIZE) {
     const chunk = list.slice(i, i + CHUNK_SIZE).map(x => ({
       id: x.id,
@@ -286,7 +289,8 @@ async function libraryAvailable(items) {
       const r = await fetch(`${SHARKY_API}/library/filter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: chunk })
+        body: JSON.stringify({ items: chunk }),
+        signal: sharkyTimeoutSignal(LIBRARY_FILTER_TIMEOUT_MS)
       });
       if (!r.ok) {
         console.warn('[sharky] library check chunk failed', r.status);
@@ -833,7 +837,7 @@ syncNavHeight();
 async function init() {
   Object.values(rowMap).forEach(r => showSkeletonRow(r, 8));
 
-  const ROW_PAGES = 6;
+  const ROW_PAGES = 3;
   const [
     trendingAll,
     trendingMovies, popularMovies, topMovies,
