@@ -1940,3 +1940,92 @@ body.tv-mode .po-close { display: none; }
     overflow: hidden;
   }
 }
+
+/* ==============================================================
+   Support popup  (support-popup.js)
+   A small card bottom-right asking people to join the Discord.
+   Sits under the details/player modals (z-index 500) so it can
+   never cover something the viewer opened on purpose.
+   ============================================================== */
+.support-popup {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 450;
+  width: min(320px, calc(100vw - 40px));
+  padding: 18px 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(14px) scale(.97);
+  transition: opacity .26s var(--ease), transform .26s var(--ease);
+}
+.support-popup.show { opacity: 1; transform: none; }
+
+.support-popup .support-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .18s var(--ease), color .18s var(--ease);
+}
+.support-popup .support-close:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+.support-title {
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  margin-bottom: 6px;
+  padding-right: 22px;
+}
+.support-text {
+  font-size: .86rem;
+  line-height: 1.45;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.support-text b { color: #fff; font-weight: 700; }
+
+.support-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: #5865f2;
+  color: #fff;
+  font-size: .86rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background .18s var(--ease), transform .18s var(--ease);
+}
+.support-btn:hover { background: #6f7aff; transform: translateY(-1px); }
+.support-btn svg { flex: none; }
+
+/* On a phone it reads better as a bar across the bottom. */
+@media (max-width: 560px) {
+  .support-popup {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-popup { transition: opacity .01s; }
+  .support-popup.show { transform: none; }
+}
