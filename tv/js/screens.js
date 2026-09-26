@@ -31,6 +31,129 @@
 
   var homeLoaded = false;
   var pools = { movie: [], tv: [] };
+
+  /* ── Endless home ─────────────────────────────────────────────────────────
+     Scroll to the bottom and more rows arrive: first every genre the fixed
+     rows above don't cover, then the same list again from deeper TMDB pages,
+     round and round, so it never simply runs out. Each row is filtered to the
+     library like the rest of Home, and never repeats a title already on
+     screen. Capped, because a Fire Stick has to hold every card it draws. */
+  var MORE_ROWS = [
+    { title: 'Thrillers',            ep: '/discover/movie?with_genres=53&sort_by=popularity.desc',    kind: 'movie' },
+    { title: 'Crime Dramas',         ep: '/discover/tv?with_genres=80&sort_by=popularity.desc',       kind: 'tv' },
+    { title: 'Adventure',            ep: '/discover/movie?with_genres=12&sort_by=popularity.desc',    kind: 'movie' },
+    { title: 'Comedy Series',        ep: '/discover/tv?with_genres=35&sort_by=popularity.desc',       kind: 'tv' },
+    { title: 'Crime Films',          ep: '/discover/movie?with_genres=80&sort_by=popularity.desc',    kind: 'movie' },
+    { title: 'Sci-Fi & Fantasy Series', ep: '/discover/tv?with_genres=10765&sort_by=popularity.desc', kind: 'tv' },
+    { title: 'Family Night',         ep: '/discover/movie?with_genres=10751&sort_by=popularity.desc', kind: 'movie' },
+    { title: 'Drama Series',         ep: '/discover/tv?with_genres=18&sort_by=popularity.desc',       kind: 'tv' },
+    { title: 'Fantasy',              ep: '/discover/movie?with_genres=14&sort_by=popularity.desc',    kind: 'movie' },
+    { title: 'Action & Adventure Series', ep: '/discover/tv?with_genres=10759&sort_by=popularity.desc', kind: 'tv' },
+    { title: 'Mystery',              ep: '/discover/movie?with_genres=9648&sort_by=popularity.desc',  kind: 'movie' },
+    { title: 'Animated Series',      ep: '/discover/tv?with_genres=16&sort_by=popularity.desc',       kind: 'tv' },
+    { title: 'Romance',              ep: '/discover/movie?with_genres=10749&sort_by=popularity.desc', kind: 'movie' },
+    { title: 'Mystery Series',       ep: '/discover/tv?with_genres=9648&sort_by=popularity.desc',     kind: 'tv' },
+    { title: 'War',                  ep: '/discover/movie?with_genres=10752&sort_by=popularity.desc', kind: 'movie' },
+    { title: 'Reality TV',           ep: '/discover/tv?with_genres=10764&sort_by=popularity.desc',    kind: 'tv' },
+    { title: 'History',              ep: '/discover/movie?with_genres=36&sort_by=popularity.desc',    kind: 'movie' },
+    { title: 'Docuseries',           ep: '/discover/tv?with_genres=99&sort_by=popularity.desc',       kind: 'tv' },
+    { title: 'Music',                ep: '/discover/movie?with_genres=10402&sort_by=popularity.desc', kind: 'movie' },
+    { title: 'Westerns',             ep: '/discover/movie?with_genres=37&sort_by=popularity.desc',    kind: 'movie' },
+    { title: 'Hidden Gems',          ep: '/discover/movie?sort_by=vote_average.desc&vote_count.gte=300', kind: 'movie' },
+    { title: 'Binge-worthy Series',  ep: '/discover/tv?sort_by=vote_average.desc&vote_count.gte=300',    kind: 'tv' }
+  ];
+  var MORE_MAX_ROWS = 60;      // hard stop for a stick's memory
+  var more = { next: 0, loading: false, added: 0, shown: {}, misses: 0 };
+
+  function resetMore() {
+    more = { next: 0, loading: false, added: 0, shown: {}, misses: 0 };
+  }
+
+  /* Titles on screen right now, so a new row brings new things. */
+  function markShown(host) {
+    [].forEach.call((host || document).querySelectorAll('#homeRows .card'), function (c) {
+      if (c.__item && c.__item.key) more.shown[c.__item.key] = 1;
+    });
+  }
+
+  function loadMoreRows() {
+    if (more.loading || !homeLoaded || more.added >= MORE_MAX_ROWS) return Promise.resolve();
+    if (more.misses > MORE_ROWS.length * 2) return Promise.resolve();   // nothing left to find
+    more.loading = true;
+    var host = document.getElementById('homeRows');
+    markShown(host);
+
+    var idx = more.next++;
+    var def = MORE_ROWS[idx % MORE_ROWS.length];
+    var lap = Math.floor(idx / MORE_ROWS.length);       // 0, 1, 2 ... deeper each time round
+    var startPage = 1 + lap * CFG.ROW_PAGES;
+    var jobs = [];
+    for (var p = 0; p < CFG.ROW_PAGES; p++) {
+      jobs.push(API.tmdb(withPageParam(def.ep, startPage + p)).catch(function () { return null; }));
+    }
+    var spin = UI.spinner('Loading more');
+    spin.classList.add('more-spinner');
+    host.appendChild(spin);
+
+    return Promise.all(jobs).then(function (pages) {
+      var seen = {}, list = [];
+      pages.forEach(function (d) {
+        ((d && d.results) || []).forEach(function (raw) {
+          var it = API.normalise(raw, def.kind);
+          if (!it || seen[it.key] || more.shown[it.key]) return;
+          if (!it.card && !it.poster) return;
+          seen[it.key] = 1; list.push(it);
+        });
+      });
+      return API.libraryAvailable(list).then(function (keep) {
+        return list.filter(function (i) { return !keep || keep[i.key]; });
+      });
+    }).then(function (owned) {
+      if (spin.parentNode) spin.parentNode.removeChild(spin);
+      if (owned.length < CFG.ROW_MIN) { more.misses++; return false; }
+      more.misses = 0;
+      var title = lap ? 'More ' + def.title : def.title;
+      var block = UI.row('more' + idx, title, owned.slice(0, CFG.ROW_MAX));
+      block.classList.add('row-more');
+      host.appendChild(block);
+      more.added++;
+      markShown(host);
+      return true;
+    }).catch(function () {
+      if (spin.parentNode) spin.parentNode.removeChild(spin);
+      more.misses++;
+      return false;
+    }).then(function (added) {
+      more.loading = false;
+      /* A row that came back empty (nothing in the library for it) should not
+         leave the bottom of the page with nothing to scroll to. */
+      if (!added) return loadMoreRows();
+      maybeLoadMore();
+    });
+  }
+
+  function withPageParam(endpoint, page) {
+    var clean = endpoint.replace(/([?&])page=\d+&?/, '$1').replace(/[?&]$/, '');
+    return clean + (clean.indexOf('?') >= 0 ? '&' : '?') + 'page=' + page;
+  }
+
+  /* Near the bottom (within about a screen and a half)? Fetch the next row. */
+  function maybeLoadMore() {
+    var sc = document.getElementById('screen-home');
+    if (!sc || sc.classList.contains('off') || !homeLoaded) return;
+    var left = sc.scrollHeight - (sc.scrollTop + sc.clientHeight);
+    if (left < sc.clientHeight * 1.5) loadMoreRows();
+  }
+
+  function wireEndless() {
+    var sc = document.getElementById('screen-home');
+    if (!sc || sc.__endless) return;
+    sc.__endless = true;
+    sc.addEventListener('scroll', maybeLoadMore, { passive: true });
+    /* The remote moves focus rather than scrolling, so watch that too. */
+    sc.addEventListener('focusin', maybeLoadMore);
+    document.addEventListener('keydown', function () { setTimeout(maybeLoadMore, 250); });
+  }
   var lastRegion = '';
   var pendingCharts = [[], []];
 
@@ -216,6 +339,8 @@
 
     host.innerHTML = '';
     host.appendChild(UI.spinner('Loading your library'));
+    resetMore();
+    wireEndless();
 
     var region = CFG.REGION;
     var jobs = HOME_ROWS.map(function (r) {
@@ -293,6 +418,8 @@
           'Nothing came back from the library. Check the server address in Settings.'));
       }
       homeLoaded = true;
+      /* Fill the first screen's worth straight away if the page is short. */
+      setTimeout(maybeLoadMore, 400);
     }).catch(function (e) {
       host.innerHTML = '';
       host.appendChild(UI.empty('Could not load: ' + (e && e.message ? e.message : 'unknown error')));
@@ -480,15 +607,37 @@
     searchTimer = setTimeout(function () {
       var term = searchTerm;
       API.search(term).then(function (items) {
-        if (term !== searchTerm) return;
+        if (term !== searchTerm) return null;
+        items = items.slice(0, 40);
+        if (!items.length) return { items: items, keep: null };
+        /* Check TorBox / the cache / pins first, so what already plays comes
+           top. Capped at a few seconds: a slow or sleeping server must never
+           hold the results back - they just arrive in TMDB's order instead. */
+        var capped = new Promise(function (res) { setTimeout(function () { res(null); }, 5000); });
+        return Promise.race([
+          API.libraryAvailable(items, null, true).catch(function () { return null; }),
+          capped
+        ]).then(function (keep) { return { items: items, keep: keep }; });
+      }).then(function (res) {
+        if (!res || term !== searchTerm) return;
+        var items = res.items, keep = res.keep;
         host.innerHTML = '';
         if (!items.length) {
           host.appendChild(UI.empty('Nothing found for "' + term + '"'));
           return;
         }
-        /* Search deliberately is NOT filtered to the library: this is how you
-           reach something that has not been cached yet. */
-        host.appendChild(UI.grid(items.slice(0, 40)));
+        /* Search is still NOT filtered to the library - that is how you reach
+           something that has not been cached yet. It is ordered instead:
+           ready to play first, TMDB's order kept inside each group. */
+        if (keep) {
+          var ready = items.filter(function (i) { return keep[i.key]; });
+          var rest = items.filter(function (i) { return !keep[i.key]; });
+          items = ready.concat(rest);
+        }
+        host.appendChild(UI.grid(items, {
+          scope: 'search',
+          cardOpts: function (i) { return { ready: !!(keep && keep[i.key]) }; }
+        }));
       });
     }, 420);
   }

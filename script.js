@@ -926,6 +926,126 @@ async function init() {
     if (owned.length) heroPool = owned;
   }
   startHeroCarousel(heroPool);
+
+  /* Everything already on the page, so endless rows only bring new titles. */
+  [...allPlayable, ...trendingMovies, ...trendingTv].forEach(i => {
+    const k = mediaKey(i);
+    if (k) endless.shown.add(k);
+  });
+  startEndlessRows();
+}
+
+/* ── Endless homepage ────────────────────────────────────────────────────
+   Scroll to the bottom and more rows arrive: every genre the fixed rows above
+   don't cover, then the same list again from deeper TMDB pages, round and
+   round. Each row is filtered to what the library can play (same check as
+   the rest of the page, failing open the same way) and never repeats a title
+   already on screen. */
+const ENDLESS_ROWS = [
+  { title: "Thrillers",               ep: "/discover/movie?with_genres=53&sort_by=popularity.desc",    type: "movie" },
+  { title: "Crime Dramas",            ep: "/discover/tv?with_genres=80&sort_by=popularity.desc",       type: "tv" },
+  { title: "Adventure",               ep: "/discover/movie?with_genres=12&sort_by=popularity.desc",    type: "movie" },
+  { title: "Comedy Series",           ep: "/discover/tv?with_genres=35&sort_by=popularity.desc",       type: "tv" },
+  { title: "Crime Films",             ep: "/discover/movie?with_genres=80&sort_by=popularity.desc",    type: "movie" },
+  { title: "Sci-Fi & Fantasy Series", ep: "/discover/tv?with_genres=10765&sort_by=popularity.desc",    type: "tv" },
+  { title: "Family Night",            ep: "/discover/movie?with_genres=10751&sort_by=popularity.desc", type: "movie" },
+  { title: "Drama Series",            ep: "/discover/tv?with_genres=18&sort_by=popularity.desc",       type: "tv" },
+  { title: "Fantasy",                 ep: "/discover/movie?with_genres=14&sort_by=popularity.desc",    type: "movie" },
+  { title: "Action & Adventure Series", ep: "/discover/tv?with_genres=10759&sort_by=popularity.desc",  type: "tv" },
+  { title: "Mystery",                 ep: "/discover/movie?with_genres=9648&sort_by=popularity.desc",  type: "movie" },
+  { title: "Animated Series",         ep: "/discover/tv?with_genres=16&sort_by=popularity.desc",       type: "tv" },
+  { title: "War",                     ep: "/discover/movie?with_genres=10752&sort_by=popularity.desc", type: "movie" },
+  { title: "Mystery Series",          ep: "/discover/tv?with_genres=9648&sort_by=popularity.desc",     type: "tv" },
+  { title: "History",                 ep: "/discover/movie?with_genres=36&sort_by=popularity.desc",    type: "movie" },
+  { title: "Reality TV",              ep: "/discover/tv?with_genres=10764&sort_by=popularity.desc",    type: "tv" },
+  { title: "Music",                   ep: "/discover/movie?with_genres=10402&sort_by=popularity.desc", type: "movie" },
+  { title: "Docuseries",              ep: "/discover/tv?with_genres=99&sort_by=popularity.desc",       type: "tv" },
+  { title: "Westerns",                ep: "/discover/movie?with_genres=37&sort_by=popularity.desc",    type: "movie" },
+  { title: "Hidden Gems",             ep: "/discover/movie?sort_by=vote_average.desc&vote_count.gte=300", type: "movie" },
+  { title: "Binge-worthy Series",     ep: "/discover/tv?sort_by=vote_average.desc&vote_count.gte=300",    type: "tv" },
+];
+const ENDLESS_MAX_ROWS = 80;
+const ENDLESS_MIN_ITEMS = 6;
+const endless = { next: 0, loading: false, added: 0, misses: 0, shown: new Set(), sentinel: null };
+
+async function loadEndlessRow() {
+  if (endless.loading || endless.added >= ENDLESS_MAX_ROWS) return;
+  if (endless.misses > ENDLESS_ROWS.length * 2) return;            // nothing left to find
+  endless.loading = true;
+  const idx = endless.next++;
+  const def = ENDLESS_ROWS[idx % ENDLESS_ROWS.length];
+  const lap = Math.floor(idx / ENDLESS_ROWS.length);                  // deeper pages each lap
+  let added = false;
+  try {
+    const pages = await Promise.all([1, 2, 3].map(n =>
+      getList(endpointWithPage(def.ep, lap * 3 + n), def.type).catch(() => [])));
+    const seen = new Set();
+    const fresh = pages.flat().filter(i => {
+      const k = mediaKey(i);
+      if (!k || seen.has(k) || endless.shown.has(k)) return false;
+      if (!i.poster_path && !i.backdrop_path) return false;
+      seen.add(k);
+      return true;
+    });
+    const keep = fresh.length ? await libraryAvailable(fresh) : null;
+    const items = playableOnly(fresh, keep).slice(0, 20);
+    if (items.length >= ENDLESS_MIN_ITEMS) {
+      const block = document.createElement("div");
+      block.className = "movie-row-block endless-row";
+      block.dataset.cat = def.type === "tv" ? "tv" : "movies";
+      block.innerHTML =
+        '<div class="section-header"><h2></h2></div>' +
+        '<div class="row-viewport">' +
+          '<button class="row-arrow left">&#10094;</button>' +
+          '<div class="movie-row"></div>' +
+          '<button class="row-arrow right">&#10095;</button>' +
+        '</div>';
+      block.querySelector("h2").textContent = lap ? "More " + def.title : def.title;
+      const row = block.querySelector(".movie-row");
+      block.querySelector(".row-arrow.left").addEventListener("click",
+        () => row.scrollBy({ left: -row.clientWidth * .8, behavior: "smooth" }));
+      block.querySelector(".row-arrow.right").addEventListener("click",
+        () => row.scrollBy({ left:  row.clientWidth * .8, behavior: "smooth" }));
+      rowsSection.insertBefore(block, endless.sentinel);
+      renderRow(row, items);
+      items.forEach(i => endless.shown.add(mediaKey(i)));
+      endless.added++;
+      endless.misses = 0;
+      added = true;
+    } else {
+      endless.misses++;
+    }
+  } catch (e) {
+    endless.misses++;
+    console.warn("[sharky] endless row failed", e);
+  } finally {
+    endless.loading = false;
+  }
+  /* Still near the bottom (or that genre had nothing playable)? Keep going. */
+  if (!added || endlessNearBottom()) setTimeout(loadEndlessRow, 50);
+}
+
+function endlessNearBottom() {
+  if (!endless.sentinel || rowsSection.classList.contains("hidden")) return false;
+  const r = endless.sentinel.getBoundingClientRect();
+  return r.top < window.innerHeight * 2.5;
+}
+
+function startEndlessRows() {
+  if (endless.sentinel) return;
+  const s = document.createElement("div");
+  s.className = "endless-sentinel";
+  s.setAttribute("aria-hidden", "true");
+  s.style.height = "1px";
+  rowsSection.appendChild(s);
+  endless.sentinel = s;
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) loadEndlessRow();
+    }, { rootMargin: "0px 0px 1500px 0px" }).observe(s);
+  } else {
+    window.addEventListener("scroll", () => { if (endlessNearBottom()) loadEndlessRow(); }, { passive: true });
+  }
 }
 
 init();

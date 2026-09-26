@@ -956,3 +956,18 @@ body.sidebar-open .nav-links { opacity: .35; }
 .opt-item.focused { background: #fff; color: #141414; border-color: #fff; }
 .opt-danger { color: #ff8a8a; }
 .opt-danger.focused { background: var(--red); color: #fff; border-color: #fff; }
+
+/* "READY" - in the TorBox library, cached or pinned, so it plays at once. */
+.card-ready {
+  position: absolute;
+  top: 0.5vw;
+  right: 0.5vw;
+  padding: 0.18vw 0.5vw;
+  border-radius: 0.25vw;
+  background: #22c55e;
+  color: #04130a;
+  font-size: 0.72vw;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}

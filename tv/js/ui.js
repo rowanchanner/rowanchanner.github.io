@@ -37,6 +37,8 @@
     art.appendChild(img);
 
     if (item.kind === 'tv') art.appendChild(el('span', 'card-badge', 'SERIES'));
+    /* In your TorBox library, cached or pinned: plays straight away. */
+    if (opts.ready) art.appendChild(el('span', 'card-ready', 'READY'));
 
     /* Continue-watching cards carry how far in you got. */
     if (opts.progress != null && opts.progress > 0) {

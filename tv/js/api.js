@@ -285,8 +285,8 @@
        Answers are cached for the life of the app run, chunked, and run a few
        at a time. Returns a map of "kind:id" -> true. A null return means the
        check could not be done at all, and the caller shows everything. */
-    libraryAvailable: function (items, onProgress) {
-      if (!CFG.LIBRARY_ONLY) return Promise.resolve(null);
+    libraryAvailable: function (items, onProgress, force) {
+      if (!CFG.LIBRARY_ONLY && !force) return Promise.resolve(null);
 
       var uniq = {}, pending = [];
       (items || []).forEach(function (it) {
