@@ -32,127 +32,102 @@
   var homeLoaded = false;
   var pools = { movie: [], tv: [] };
 
-  /* ── Endless home ─────────────────────────────────────────────────────────
-     Scroll to the bottom and more rows arrive: first every genre the fixed
-     rows above don't cover, then the same list again from deeper TMDB pages,
-     round and round, so it never simply runs out. Each row is filtered to the
-     library like the rest of Home, and never repeats a title already on
-     screen. Capped, because a Fire Stick has to hold every card it draws. */
-  var MORE_ROWS = [
-    { title: 'Thrillers',            ep: '/discover/movie?with_genres=53&sort_by=popularity.desc',    kind: 'movie' },
-    { title: 'Crime Dramas',         ep: '/discover/tv?with_genres=80&sort_by=popularity.desc',       kind: 'tv' },
-    { title: 'Adventure',            ep: '/discover/movie?with_genres=12&sort_by=popularity.desc',    kind: 'movie' },
-    { title: 'Comedy Series',        ep: '/discover/tv?with_genres=35&sort_by=popularity.desc',       kind: 'tv' },
-    { title: 'Crime Films',          ep: '/discover/movie?with_genres=80&sort_by=popularity.desc',    kind: 'movie' },
-    { title: 'Sci-Fi & Fantasy Series', ep: '/discover/tv?with_genres=10765&sort_by=popularity.desc', kind: 'tv' },
-    { title: 'Family Night',         ep: '/discover/movie?with_genres=10751&sort_by=popularity.desc', kind: 'movie' },
-    { title: 'Drama Series',         ep: '/discover/tv?with_genres=18&sort_by=popularity.desc',       kind: 'tv' },
-    { title: 'Fantasy',              ep: '/discover/movie?with_genres=14&sort_by=popularity.desc',    kind: 'movie' },
-    { title: 'Action & Adventure Series', ep: '/discover/tv?with_genres=10759&sort_by=popularity.desc', kind: 'tv' },
-    { title: 'Mystery',              ep: '/discover/movie?with_genres=9648&sort_by=popularity.desc',  kind: 'movie' },
-    { title: 'Animated Series',      ep: '/discover/tv?with_genres=16&sort_by=popularity.desc',       kind: 'tv' },
-    { title: 'Romance',              ep: '/discover/movie?with_genres=10749&sort_by=popularity.desc', kind: 'movie' },
-    { title: 'Mystery Series',       ep: '/discover/tv?with_genres=9648&sort_by=popularity.desc',     kind: 'tv' },
-    { title: 'War',                  ep: '/discover/movie?with_genres=10752&sort_by=popularity.desc', kind: 'movie' },
-    { title: 'Reality TV',           ep: '/discover/tv?with_genres=10764&sort_by=popularity.desc',    kind: 'tv' },
-    { title: 'History',              ep: '/discover/movie?with_genres=36&sort_by=popularity.desc',    kind: 'movie' },
-    { title: 'Docuseries',           ep: '/discover/tv?with_genres=99&sort_by=popularity.desc',       kind: 'tv' },
-    { title: 'Music',                ep: '/discover/movie?with_genres=10402&sort_by=popularity.desc', kind: 'movie' },
-    { title: 'Westerns',             ep: '/discover/movie?with_genres=37&sort_by=popularity.desc',    kind: 'movie' },
-    { title: 'Hidden Gems',          ep: '/discover/movie?sort_by=vote_average.desc&vote_count.gte=300', kind: 'movie' },
-    { title: 'Binge-worthy Series',  ep: '/discover/tv?sort_by=vote_average.desc&vote_count.gte=300',    kind: 'tv' }
-  ];
-  var MORE_MAX_ROWS = 60;      // hard stop for a stick's memory
-  var more = { next: 0, loading: false, added: 0, shown: {}, misses: 0 };
-
-  function resetMore() {
-    more = { next: 0, loading: false, added: 0, shown: {}, misses: 0 };
-  }
-
-  /* Titles on screen right now, so a new row brings new things. */
-  function markShown(host) {
-    [].forEach.call((host || document).querySelectorAll('#homeRows .card'), function (c) {
-      if (c.__item && c.__item.key) more.shown[c.__item.key] = 1;
-    });
-  }
-
-  function loadMoreRows() {
-    if (more.loading || !homeLoaded || more.added >= MORE_MAX_ROWS) return Promise.resolve();
-    if (more.misses > MORE_ROWS.length * 2) return Promise.resolve();   // nothing left to find
-    more.loading = true;
-    var host = document.getElementById('homeRows');
-    markShown(host);
-
-    var idx = more.next++;
-    var def = MORE_ROWS[idx % MORE_ROWS.length];
-    var lap = Math.floor(idx / MORE_ROWS.length);       // 0, 1, 2 ... deeper each time round
-    var startPage = 1 + lap * CFG.ROW_PAGES;
-    var jobs = [];
-    for (var p = 0; p < CFG.ROW_PAGES; p++) {
-      jobs.push(API.tmdb(withPageParam(def.ep, startPage + p)).catch(function () { return null; }));
-    }
-    var spin = UI.spinner('Loading more');
-    spin.classList.add('more-spinner');
-    host.appendChild(spin);
-
-    return Promise.all(jobs).then(function (pages) {
-      var seen = {}, list = [];
-      pages.forEach(function (d) {
-        ((d && d.results) || []).forEach(function (raw) {
-          var it = API.normalise(raw, def.kind);
-          if (!it || seen[it.key] || more.shown[it.key]) return;
-          if (!it.card && !it.poster) return;
-          seen[it.key] = 1; list.push(it);
-        });
-      });
-      return API.libraryAvailable(list).then(function (keep) {
-        return list.filter(function (i) { return !keep || keep[i.key]; });
-      });
-    }).then(function (owned) {
-      if (spin.parentNode) spin.parentNode.removeChild(spin);
-      if (owned.length < CFG.ROW_MIN) { more.misses++; return false; }
-      more.misses = 0;
-      var title = lap ? 'More ' + def.title : def.title;
-      var block = UI.row('more' + idx, title, owned.slice(0, CFG.ROW_MAX));
-      block.classList.add('row-more');
-      host.appendChild(block);
-      more.added++;
-      markShown(host);
-      return true;
-    }).catch(function () {
-      if (spin.parentNode) spin.parentNode.removeChild(spin);
-      more.misses++;
-      return false;
-    }).then(function (added) {
-      more.loading = false;
-      /* A row that came back empty (nothing in the library for it) should not
-         leave the bottom of the page with nothing to scroll to. */
-      if (!added) return loadMoreRows();
-      maybeLoadMore();
-    });
-  }
+  /* ── Endless rows ─────────────────────────────────────────────────────────
+     Every genre/chart row on Home keeps going sideways: when the highlight
+     gets near the end of a row, the next TMDB pages for that row are fetched,
+     filtered to what the library can play, and added on the end. It only
+     stops when TMDB has nothing more to give (or at a cap, because a Fire
+     Stick has to hold every card it draws). */
+  var ENDLESS_MAX = 400;        // cards per row, for the stick's memory
+  var ENDLESS_AHEAD = 6;        // start fetching when this close to the end
+  var ENDLESS_BATCH = 2;        // TMDB pages per fetch
+  var rowSources = {};          // track id -> { def, page, keys, loading, done }
 
   function withPageParam(endpoint, page) {
     var clean = endpoint.replace(/([?&])page=\d+&?/, '$1').replace(/[?&]$/, '');
     return clean + (clean.indexOf('?') >= 0 ? '&' : '?') + 'page=' + page;
   }
 
-  /* Near the bottom (within about a screen and a half)? Fetch the next row. */
-  function maybeLoadMore() {
-    var sc = document.getElementById('screen-home');
-    if (!sc || sc.classList.contains('off') || !homeLoaded) return;
-    var left = sc.scrollHeight - (sc.scrollTop + sc.clientHeight);
-    if (left < sc.clientHeight * 1.5) loadMoreRows();
+  function makeEndless(def, items) {
+    var keys = {};
+    items.forEach(function (it) { keys[it.key] = 1; });
+    rowSources['track-' + def.id] = {
+      def: def, page: CFG.ROW_PAGES + 1, keys: keys,
+      loading: false, done: false, dry: 0
+    };
+  }
+
+  function extendRow(track) {
+    var src = rowSources[track.id];
+    if (!src || src.loading || src.done) return;
+    if (track.children.length >= ENDLESS_MAX) { src.done = true; return; }
+    src.loading = true;
+    var def = src.def;
+    var first = src.page;
+    src.page += ENDLESS_BATCH;
+    var jobs = [];
+    for (var p = 0; p < ENDLESS_BATCH; p++) {
+      jobs.push(API.tmdb(withPageParam(def.ep, first + p)).catch(function () { return null; }));
+    }
+    Promise.all(jobs).then(function (pages) {
+      var list = [], last = false, got = false;
+      pages.forEach(function (d) {
+        if (!d) return;
+        got = true;
+        if (d.total_pages && d.page >= d.total_pages) last = true;
+        (d.results || []).forEach(function (raw) {
+          var it = API.normalise(raw, def.kind);
+          if (!it || src.keys[it.key] || (!it.card && !it.poster)) return;
+          src.keys[it.key] = 1;
+          list.push(it);
+        });
+      });
+      if (!got) { src.page = first; throw new Error('offline'); }  // try the same pages next time
+      if (last || first > 500) src.done = true;
+      return API.libraryAvailable(list).then(function (keep) {
+        return list.filter(function (i) { return !keep || keep[i.key]; });
+      });
+    }).then(function (owned) {
+      if (!track.isConnected) return;
+      owned.forEach(function (it) {
+        if (track.children.length >= ENDLESS_MAX) return;
+        track.appendChild(UI.card(it, { scope: def.id }));
+      });
+      src.dry = owned.length ? 0 : src.dry + 1;
+      if (src.dry >= 5) src.done = true;     // 10 pages in a row with nothing playable
+      src.loading = false;
+      /* Nothing playable in those pages? Keep digging while you're still
+         sitting near the end, so the row never just stops. */
+      if (!owned.length) checkEndless(document.activeElement);
+    }).catch(function () {
+      src.loading = false;
+    });
+  }
+
+  function checkEndless(el) {
+    if (!el || !el.closest) return;
+    var track = el.closest('.row-track');
+    if (!track || !rowSources[track.id]) return;
+    var cards = track.children;
+    var idx = [].indexOf.call(cards, el);
+    if (idx >= 0 && cards.length - 1 - idx <= ENDLESS_AHEAD) extendRow(track);
   }
 
   function wireEndless() {
-    var sc = document.getElementById('screen-home');
-    if (!sc || sc.__endless) return;
-    sc.__endless = true;
-    sc.addEventListener('scroll', maybeLoadMore, { passive: true });
-    /* The remote moves focus rather than scrolling, so watch that too. */
-    sc.addEventListener('focusin', maybeLoadMore);
-    document.addEventListener('keydown', function () { setTimeout(maybeLoadMore, 250); });
+    if (wireEndless.done) return;
+    wireEndless.done = true;
+    document.addEventListener('nav:focus', function (e) {
+      checkEndless(e.detail && e.detail.el);
+    });
+    /* Mouse / touch scrolling on the website's copy of the app. */
+    document.addEventListener('scroll', function (e) {
+      var vp = e.target;
+      if (!vp || !vp.classList || !vp.classList.contains('row-viewport')) return;
+      if (vp.scrollLeft + vp.clientWidth > vp.scrollWidth - vp.clientWidth) {
+        var t = vp.querySelector('.row-track');
+        if (t) extendRow(t);
+      }
+    }, true);
   }
   var lastRegion = '';
   var pendingCharts = [[], []];
@@ -339,7 +314,7 @@
 
     host.innerHTML = '';
     host.appendChild(UI.spinner('Loading your library'));
-    resetMore();
+    rowSources = {};
     wireEndless();
 
     var region = CFG.REGION;
@@ -411,6 +386,7 @@
         if (items.length < CFG.ROW_MIN) return;
         items.forEach(function (it) { usedRecently[it.key] = (usedRecently[it.key] || 0) + 1; });
         host.appendChild(UI.row(def.id, def.title, items));
+        makeEndless(def, items);
       });
 
       if (!host.querySelector('.card')) {
@@ -418,8 +394,6 @@
           'Nothing came back from the library. Check the server address in Settings.'));
       }
       homeLoaded = true;
-      /* Fill the first screen's worth straight away if the page is short. */
-      setTimeout(maybeLoadMore, 400);
     }).catch(function (e) {
       host.innerHTML = '';
       host.appendChild(UI.empty('Could not load: ' + (e && e.message ? e.message : 'unknown error')));

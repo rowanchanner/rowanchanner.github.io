@@ -371,6 +371,7 @@ function renderRow(row, items, opts = {}) {
     return;
   }
   filtered.forEach(i => row.appendChild(createCard(i, opts)));
+  row.__items = filtered;
 }
 
 function rememberRow(recentRows, items, keepRows = 2) {
@@ -927,125 +928,108 @@ async function init() {
   }
   startHeroCarousel(heroPool);
 
-  /* Everything already on the page, so endless rows only bring new titles. */
-  [...allPlayable, ...trendingMovies, ...trendingTv].forEach(i => {
-    const k = mediaKey(i);
-    if (k) endless.shown.add(k);
-  });
-  startEndlessRows();
+  /* Every row keeps going sideways as you scroll it. */
+  [
+    [rowMap.trendingMovies, "/trending/movie/week", "movie", trendingMovies],
+    [rowMap.popularMovies,  "/movie/popular",       "movie", popularMovies],
+    [rowMap.topMovies,      "/movie/top_rated",     "movie", topMovies],
+    [rowMap.trendingTv,     "/trending/tv/week",    "tv",    trendingTv],
+    [rowMap.popularTv,      "/tv/popular",          "tv",    popularTv],
+    [rowMap.topTv,          "/tv/top_rated",        "tv",    topTv],
+    [rowMap.action,    "/discover/movie?with_genres=28&sort_by=popularity.desc",    "movie", action],
+    [rowMap.comedy,    "/discover/movie?with_genres=35&sort_by=popularity.desc",    "movie", comedy],
+    [rowMap.horror,    "/discover/movie?with_genres=27&sort_by=popularity.desc",    "movie", horror],
+    [rowMap.scifi,     "/discover/movie?with_genres=878&sort_by=popularity.desc",   "movie", scifi],
+    [rowMap.romance,   "/discover/movie?with_genres=10749&sort_by=popularity.desc", "movie", romance],
+    [rowMap.animation, "/discover/movie?with_genres=16&sort_by=popularity.desc",    "movie", animation],
+    [rowMap.doc,       "/discover/movie?with_genres=99&sort_by=popularity.desc",    "movie", doc],
+  ].forEach(([row, ep, type, first]) => makeRowEndless(row, ep, type, playableOnly(first, keep), ROW_PAGES + 1));
 }
 
-/* ── Endless homepage ────────────────────────────────────────────────────
-   Scroll to the bottom and more rows arrive: every genre the fixed rows above
-   don't cover, then the same list again from deeper TMDB pages, round and
-   round. Each row is filtered to what the library can play (same check as
-   the rest of the page, failing open the same way) and never repeats a title
-   already on screen. */
-const ENDLESS_ROWS = [
-  { title: "Thrillers",               ep: "/discover/movie?with_genres=53&sort_by=popularity.desc",    type: "movie" },
-  { title: "Crime Dramas",            ep: "/discover/tv?with_genres=80&sort_by=popularity.desc",       type: "tv" },
-  { title: "Adventure",               ep: "/discover/movie?with_genres=12&sort_by=popularity.desc",    type: "movie" },
-  { title: "Comedy Series",           ep: "/discover/tv?with_genres=35&sort_by=popularity.desc",       type: "tv" },
-  { title: "Crime Films",             ep: "/discover/movie?with_genres=80&sort_by=popularity.desc",    type: "movie" },
-  { title: "Sci-Fi & Fantasy Series", ep: "/discover/tv?with_genres=10765&sort_by=popularity.desc",    type: "tv" },
-  { title: "Family Night",            ep: "/discover/movie?with_genres=10751&sort_by=popularity.desc", type: "movie" },
-  { title: "Drama Series",            ep: "/discover/tv?with_genres=18&sort_by=popularity.desc",       type: "tv" },
-  { title: "Fantasy",                 ep: "/discover/movie?with_genres=14&sort_by=popularity.desc",    type: "movie" },
-  { title: "Action & Adventure Series", ep: "/discover/tv?with_genres=10759&sort_by=popularity.desc",  type: "tv" },
-  { title: "Mystery",                 ep: "/discover/movie?with_genres=9648&sort_by=popularity.desc",  type: "movie" },
-  { title: "Animated Series",         ep: "/discover/tv?with_genres=16&sort_by=popularity.desc",       type: "tv" },
-  { title: "War",                     ep: "/discover/movie?with_genres=10752&sort_by=popularity.desc", type: "movie" },
-  { title: "Mystery Series",          ep: "/discover/tv?with_genres=9648&sort_by=popularity.desc",     type: "tv" },
-  { title: "History",                 ep: "/discover/movie?with_genres=36&sort_by=popularity.desc",    type: "movie" },
-  { title: "Reality TV",              ep: "/discover/tv?with_genres=10764&sort_by=popularity.desc",    type: "tv" },
-  { title: "Music",                   ep: "/discover/movie?with_genres=10402&sort_by=popularity.desc", type: "movie" },
-  { title: "Docuseries",              ep: "/discover/tv?with_genres=99&sort_by=popularity.desc",       type: "tv" },
-  { title: "Westerns",                ep: "/discover/movie?with_genres=37&sort_by=popularity.desc",    type: "movie" },
-  { title: "Hidden Gems",             ep: "/discover/movie?sort_by=vote_average.desc&vote_count.gte=300", type: "movie" },
-  { title: "Binge-worthy Series",     ep: "/discover/tv?sort_by=vote_average.desc&vote_count.gte=300",    type: "tv" },
-];
-const ENDLESS_MAX_ROWS = 80;
-const ENDLESS_MIN_ITEMS = 6;
-const endless = { next: 0, loading: false, added: 0, misses: 0, shown: new Set(), sentinel: null };
+/* ── Endless rows ───────────────────────────────────────────────────────
+   Scroll a row sideways (arrows, trackpad, swipe or the TV remote) and more
+   titles keep arriving on the end: first the rest of what was already fetched
+   for that row, then the next TMDB pages, each filtered to what the library
+   can actually play. Stops only when TMDB runs out, or at a cap so a phone
+   isn't asked to hold thousands of cards. */
+const ENDLESS_ROW_MAX = 400;
+const ENDLESS_BATCH = 12;          // cards added per top-up
+const ENDLESS_PAGES = 2;           // TMDB pages fetched per trip
 
-async function loadEndlessRow() {
-  if (endless.loading || endless.added >= ENDLESS_MAX_ROWS) return;
-  if (endless.misses > ENDLESS_ROWS.length * 2) return;            // nothing left to find
-  endless.loading = true;
-  const idx = endless.next++;
-  const def = ENDLESS_ROWS[idx % ENDLESS_ROWS.length];
-  const lap = Math.floor(idx / ENDLESS_ROWS.length);                  // deeper pages each lap
-  let added = false;
+function makeRowEndless(row, ep, type, spare, nextPage) {
+  if (!row || row.__endless) return;
+  const src = {
+    row, ep, type, page: nextPage, loading: false, done: false, dry: 0,
+    queue: [], keys: new Set(),
+  };
+  /* Whatever renderLibraryRow put on screen is already "used". */
+  (row.__items || []).forEach(i => src.keys.add(mediaKey(i)));
+  (spare || []).forEach(i => {
+    const k = mediaKey(i);
+    if (k && !src.keys.has(k)) { src.keys.add(k); src.queue.push(i); }
+  });
+  row.__endless = src;
+  row.addEventListener("scroll", () => checkRowEndless(row), { passive: true });
+  row.addEventListener("focusin", () => setTimeout(() => checkRowEndless(row), 120));
+  checkRowEndless(row);
+}
+
+function rowNearEnd(row) {
+  return row.scrollLeft + row.clientWidth * 2.5 >= row.scrollWidth;
+}
+
+function checkRowEndless(row) {
+  const src = row.__endless;
+  if (!src || src.loading || src.done) return;
+  if (!rowNearEnd(row)) return;
+  topUpRow(src);
+}
+
+async function topUpRow(src) {
+  const { row } = src;
+  if (row.querySelectorAll(".movie-card").length >= ENDLESS_ROW_MAX) { src.done = true; return; }
+  src.loading = true;
   try {
-    const pages = await Promise.all([1, 2, 3].map(n =>
-      getList(endpointWithPage(def.ep, lap * 3 + n), def.type).catch(() => [])));
-    const seen = new Set();
-    const fresh = pages.flat().filter(i => {
-      const k = mediaKey(i);
-      if (!k || seen.has(k) || endless.shown.has(k)) return false;
-      if (!i.poster_path && !i.backdrop_path) return false;
-      seen.add(k);
-      return true;
-    });
-    const keep = fresh.length ? await libraryAvailable(fresh) : null;
-    const items = playableOnly(fresh, keep).slice(0, 20);
-    if (items.length >= ENDLESS_MIN_ITEMS) {
-      const block = document.createElement("div");
-      block.className = "movie-row-block endless-row";
-      block.dataset.cat = def.type === "tv" ? "tv" : "movies";
-      block.innerHTML =
-        '<div class="section-header"><h2></h2></div>' +
-        '<div class="row-viewport">' +
-          '<button class="row-arrow left">&#10094;</button>' +
-          '<div class="movie-row"></div>' +
-          '<button class="row-arrow right">&#10095;</button>' +
-        '</div>';
-      block.querySelector("h2").textContent = lap ? "More " + def.title : def.title;
-      const row = block.querySelector(".movie-row");
-      block.querySelector(".row-arrow.left").addEventListener("click",
-        () => row.scrollBy({ left: -row.clientWidth * .8, behavior: "smooth" }));
-      block.querySelector(".row-arrow.right").addEventListener("click",
-        () => row.scrollBy({ left:  row.clientWidth * .8, behavior: "smooth" }));
-      rowsSection.insertBefore(block, endless.sentinel);
-      renderRow(row, items);
-      items.forEach(i => endless.shown.add(mediaKey(i)));
-      endless.added++;
-      endless.misses = 0;
-      added = true;
-    } else {
-      endless.misses++;
+    /* Keep pulling pages until there is a batch's worth to add (or we've
+       tried a fair few pages and the library simply doesn't have more). */
+    let tries = 0;
+    while (src.queue.length < ENDLESS_BATCH && !src.done && tries < 4) {
+      tries++;
+      const first = src.page;
+      src.page += ENDLESS_PAGES;
+      const pages = await Promise.all(
+        Array.from({ length: ENDLESS_PAGES }, (_, i) =>
+          fetchTMDB(endpointWithPage(src.ep, first + i)).catch(() => null)));
+      if (pages.every(d => !d)) { src.page = first; break; }        // offline: retry next scroll
+      const fresh = [];
+      pages.forEach(d => {
+        if (!d) return;
+        if (d.total_pages && d.page >= d.total_pages) src.done = true;
+        (d.results || []).forEach(raw => {
+          const i = normalizeItem(raw, src.type);
+          const k = mediaKey(i);
+          if (!k || src.keys.has(k) || (!i.poster_path && !i.backdrop_path)) return;
+          src.keys.add(k);
+          fresh.push(i);
+        });
+      });
+      if (first > 500) src.done = true;
+      const keep = fresh.length ? await libraryAvailable(fresh) : null;
+      const owned = playableOnly(fresh, keep);
+      src.dry = owned.length ? 0 : src.dry + 1;
+      if (src.dry >= 5) src.done = true;
+      src.queue.push(...owned);
     }
+    const batch = src.queue.splice(0, ENDLESS_BATCH);
+    batch.forEach(i => row.appendChild(createCard(i)));
+    if (!src.queue.length && src.done && !batch.length) return;
   } catch (e) {
-    endless.misses++;
     console.warn("[sharky] endless row failed", e);
   } finally {
-    endless.loading = false;
+    src.loading = false;
   }
-  /* Still near the bottom (or that genre had nothing playable)? Keep going. */
-  if (!added || endlessNearBottom()) setTimeout(loadEndlessRow, 50);
-}
-
-function endlessNearBottom() {
-  if (!endless.sentinel || rowsSection.classList.contains("hidden")) return false;
-  const r = endless.sentinel.getBoundingClientRect();
-  return r.top < window.innerHeight * 2.5;
-}
-
-function startEndlessRows() {
-  if (endless.sentinel) return;
-  const s = document.createElement("div");
-  s.className = "endless-sentinel";
-  s.setAttribute("aria-hidden", "true");
-  s.style.height = "1px";
-  rowsSection.appendChild(s);
-  endless.sentinel = s;
-  if ("IntersectionObserver" in window) {
-    new IntersectionObserver(entries => {
-      if (entries.some(e => e.isIntersecting)) loadEndlessRow();
-    }, { rootMargin: "0px 0px 1500px 0px" }).observe(s);
-  } else {
-    window.addEventListener("scroll", () => { if (endlessNearBottom()) loadEndlessRow(); }, { passive: true });
-  }
+  /* Still near the end (wide screen, or nothing playable came back)? Go again. */
+  if (!src.done || src.queue.length) setTimeout(() => checkRowEndless(row), 60);
 }
 
 init();
