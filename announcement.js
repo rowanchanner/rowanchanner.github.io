@@ -67,7 +67,7 @@
         '<p>We got hit with a <b>£200 hosting charge</b>, so we had to shut everything down, ' +
           're-evaluate, and move Sharky to a brand new server.</p>' +
         '<p>Our new API can be found at:</p>' +
-        '<a class="sa-api" href="' + NEW_API + '/status.json" target="_blank" rel="noopener">' + NEW_API + '</a>' +
+        '<a class="sa-api" href="' + NEW_API + '/" target="_blank" rel="noopener">' + NEW_API + '</a>' +
         '<p>The player should now be working again. If you find any bugs, please let us know in the Discord!</p>' +
         '<a class="sa-discord" href="' + DISCORD_URL + '" target="_blank" rel="noopener">' +
           '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.2.5c1.6.4 2.9 1 4.1 1.8a13.7 13.7 0 0 0-1.9-.6 16.5 16.5 0 0 0-3.2-.3h-.4a16.5 16.5 0 0 0-3.2.3c-.6.1-1.3.3-1.9.6a15 15 0 0 1 4.1-1.8L12.6 3a19.8 19.8 0 0 0-4.9 1.4C4.9 8.3 4.2 12 4.5 15.7a19.9 19.9 0 0 0 6 3l1.2-1.7a12.9 12.9 0 0 1-2-1l.4-.3a14.2 14.2 0 0 0 12 0l.4.3c-.6.4-1.3.7-2 1l1.2 1.7a19.9 19.9 0 0 0 6-3c.4-4.3-.7-8-3.4-11.3ZM9.7 13.5c-1.2 0-2.1-1.1-2.1-2.4 0-1.3.9-2.4 2.1-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4Zm4.6 0c-1.2 0-2.1-1.1-2.1-2.4 0-1.3.9-2.4 2.1-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4Z"/></svg>' +
