@@ -8,7 +8,7 @@
   'use strict';
 
   var DEFAULTS = {
-    api:  'https://sharky.37.27.213.143.sslip.io',
+    api:  'https://api.sharkmovie.co.uk',
     tmdb: '47745852f22c21e3362f4907231538e1'
   };
 

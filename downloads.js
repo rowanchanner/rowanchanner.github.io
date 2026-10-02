@@ -5,7 +5,7 @@
 (function() {
   const CACHE_NAME       = "sharky-downloads-v1";
   const STORAGE_KEY      = "sharky_movies_2_downloads";
-  const SHARKY_API       = "https://sharky.37.27.213.143.sslip.io";
+  const SHARKY_API       = "https://api.sharkmovie.co.uk";
 
   const listeners = new Set();
   function emit(evt) { listeners.forEach(fn => { try { fn(evt); } catch (e) { console.warn(e); } }); }
