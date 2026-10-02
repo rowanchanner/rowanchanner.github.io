@@ -114,8 +114,14 @@
     var bail = setTimeout(go, INTRO_MAX_MS);
   }
 
+  /* Never stack on top of the big announcement: wait until it is closed. */
+  function afterAnnouncement(fn) {
+    if (document.getElementById('sharkyAnnouncement')) { setTimeout(function () { afterAnnouncement(fn); }, 500); return; }
+    fn();
+  }
+
   function start() {
-    whenIntroDone(function () { setTimeout(build, DELAY_MS); });
+    whenIntroDone(function () { setTimeout(function () { afterAnnouncement(build); }, DELAY_MS); });
   }
 
   if (document.readyState === 'loading') {
