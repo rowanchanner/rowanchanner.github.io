@@ -3,7 +3,7 @@
    Exposes `window.GroupWatch` for movie/tv/roulette pages.
    ============================================================== */
 (function() {
-  const SHARKY_API = "https://sharky-movies-api.onrender.com";
+  const SHARKY_API = "https://sharky.37.27.213.143.sslip.io";
 
   function code6() {
     return Math.random().toString(36).slice(2, 8).toUpperCase();

@@ -247,7 +247,7 @@ function removeContinueItem(item) {
   refreshBecauseWatched();
 }
 
-const SHARKY_API = 'https://sharky-movies-api.onrender.com';
+const SHARKY_API = 'https://sharky.37.27.213.143.sslip.io';
 const LIBRARY_FILTER_TIMEOUT_MS = 8000;
 const sharkyTimeoutSignal = ms =>
   window.AbortSignal && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;

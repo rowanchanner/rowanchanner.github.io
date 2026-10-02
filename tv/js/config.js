@@ -8,7 +8,7 @@
   'use strict';
 
   var DEFAULTS = {
-    api:  'https://sharky-movies-api.onrender.com',
+    api:  'https://sharky.37.27.213.143.sslip.io',
     tmdb: '47745852f22c21e3362f4907231538e1'
   };
 
@@ -18,7 +18,10 @@
 
   w.CFG = {
     /* Sharky API — the player, the library check, the streams. */
-    get API() { return (stored.api || DEFAULTS.api).replace(/\/+$/, ''); },
+    /* An address saved back when the server was on Render is ignored: that
+       server is gone, and the default now points at the new one. */
+    get API() { var a = stored.api && !/onrender\.com/.test(stored.api) ? stored.api : DEFAULTS.api;
+                return a.replace(/\/+$/, ''); },
     set API(v) { stored.api = String(v || '').replace(/\/+$/, ''); save(); },
 
     /* TMDB — artwork and metadata only. */
