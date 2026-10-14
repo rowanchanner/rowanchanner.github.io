@@ -323,9 +323,9 @@
           const showBackdrop = currentShow && currentShow.backdrop_path;
           let thumb = '', thumbClass = '';
           if (ep.still_path) {
-            thumb = `background-image:url("${IMG_URL}${ep.still_path}")`;
+            thumb = `background-image:url('${IMG_URL}${ep.still_path}')`;
           } else if (showBackdrop) {
-            thumb = `background-image:linear-gradient(rgba(8,8,12,.58),rgba(8,8,12,.58)),url("${IMG_URL}${showBackdrop}")`;
+            thumb = `background-image:linear-gradient(rgba(8,8,12,.58),rgba(8,8,12,.58)),url('${IMG_URL}${showBackdrop}')`;
             thumbClass = 'is-fallback';
           } else {
             thumbClass = 'no-image';
