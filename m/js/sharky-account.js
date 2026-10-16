@@ -552,6 +552,7 @@
           '<p class="sa-p">Signed in as <b style="color:#fff">' + esc(acct.email) + '</b></p>' +
           '<form><input class="sa-in sa-f" id="sa-lcode" placeholder="Code on the TV" value="' + esc(code) +
           '" autocapitalize="characters" style="text-align:center;font-size:1.5rem;letter-spacing:5px;font-weight:800">' +
+          '<p class="sa-p" style="margin:-4px 0 8px;font-size:.85rem">Check it matches the code on your TV right now.</p>' +
           '<div class="sa-err" id="sa-err"></div>' +
           '<button class="sa-btn sa-pri sa-f" data-a="linkok" type="submit">Sign in the TV</button></form>' +
           '<button class="sa-link sa-f" data-a="linkswitch">Use a different account</button></div>';
@@ -675,7 +676,14 @@
       err(''); busy(true);
       call('pair_approve', { code: val('lcode').trim() }).then(function () {
         lsDel('sharky_link_code'); screen = ''; show('linked');
-      }).catch(function (e) { err(e.message); }).then(function () { busy(false); });
+      }).catch(function (e) {
+        /* An old code (the TV made a new one): clear it so the right one
+           can be typed straight in. */
+        lsDel('sharky_link_code');
+        var f = $('#sa-lcode');
+        if (f && /isn.t on a TV|expired/i.test(e.message)) { f.value = ''; try { f.focus(); } catch (x) {} }
+        err(e.message);
+      }).then(function () { busy(false); });
       return;
     }
   }
@@ -739,9 +747,31 @@
   }
 
   /* ── QR sign-in (TV) ─────────────────────────────────────────────────── */
+  /* Keep the same code if the app is closed and reopened, so a phone that
+     already scanned it still matches. Only ask for a new one once it has
+     really expired. */
+  function getPairCode() {
+    var saved = jget('sharky_pair', null);
+    if (saved && saved.code && Date.now() - (saved.at || 0) < 13 * 60 * 1000) {
+      return call('pair_poll', { code: saved.code }).then(function (r) {
+        if (r.state === 'waiting') return { code: saved.code, expires_in: r.expires_in || 600, at: saved.at };
+        if (r.state === 'done') return { done: r };
+        return fresh();
+      }, fresh);
+    }
+    return fresh();
+    function fresh() {
+      return call('pair_start', {}).then(function (d) {
+        jset('sharky_pair', { code: d.code, at: Date.now() });
+        return d;
+      });
+    }
+  }
+
   function startPair() {
     stopPairPoll();
-    call('pair_start', {}).then(function (d) {
+    getPairCode().then(function (d) {
+      if (d.done) { lsDel('sharky_pair'); signedIn(d.done); return; }
       if (screen !== 'welcome' || !root) return;
       var url = (opt.linkUrl || '') + '?c=' + d.code;
       var codeEl = $('#sa-code'), qrEl = $('#sa-qr');
@@ -755,10 +785,10 @@
       var started = Date.now();
       pollTimer = setInterval(function () {
         if (screen !== 'welcome' || !root) { stopPairPoll(); return; }
-        if (Date.now() - started > (d.expires_in || 600) * 1000 - 5000) { startPair(); return; }
+        if (Date.now() - started > (d.expires_in || 600) * 1000 - 5000) { lsDel('sharky_pair'); startPair(); return; }
         call('pair_poll', { code: d.code }).then(function (r) {
-          if (r.state === 'done') signedIn(r);
-          else if (r.state === 'expired') startPair();
+          if (r.state === 'done') { lsDel('sharky_pair'); signedIn(r); }
+          else if (r.state === 'expired') { lsDel('sharky_pair'); startPair(); }
         }).catch(function () {});
       }, 2500);
     }).catch(function (e) { err(e.message + ' - retrying'); setTimeout(function () { if (screen === 'welcome') startPair(); }, 8000); });
