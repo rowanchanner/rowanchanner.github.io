@@ -182,9 +182,9 @@
 (function () {
   var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
   var q = bust ? '?v=' + encodeURIComponent(bust) : '';
-  var files = ['compat', 'config', 'store', 'api', 'nav', 'ui',
+  var files = ['compat', 'config', 'qrcode', 'sharky-account', 'store', 'api', 'nav', 'ui',
                'keyboard', 'region', 'intro', 'player', 'screens', 'options',
-               'sidebar', 'app'];
+               'sidebar', 'app', 'account-tv'];
   window.SHARKY_BUILD = bust || 'bundled';
   for (var i = 0; i < files.length; i++) {
     document.write('<script src="js/' + files[i] + '.js' + q + '"><\/script>');

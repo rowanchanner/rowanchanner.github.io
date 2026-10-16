@@ -7,6 +7,18 @@
 
   <link rel="stylesheet" href="style.css" />
   <style>
+    .nav-account{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06);color:#fff;font:inherit;font-weight:700;
+      font-size:.88rem;cursor:pointer;white-space:nowrap}
+    .nav-account:hover{background:rgba(229,9,20,.85);border-color:transparent}
+    .nav-account.signed-in{padding:0 12px 0 0;border:0;background:none;gap:9px}
+    .nav-account.signed-in .sa-av{width:34px;height:34px;font-size:1.25rem;border-radius:8px}
+    .nav-account-name{max-width:110px;overflow:hidden;text-overflow:ellipsis}
+    @media (max-width:700px){.nav-account-name{display:none}}
+  </style>
+  <script src="sharky-account.js?v=20261016-accounts"></script>
+  <script src="account-web.js?v=20261016-accounts"></script>
+  <style>
     .sharky-rank{position:absolute;top:8px;left:8px;z-index:3;background:#e50914;color:#fff;
       font-weight:900;font-size:.85rem;line-height:1;padding:5px 8px;border-radius:6px;
       box-shadow:0 3px 10px rgba(0,0,0,.5);pointer-events:none}
@@ -79,6 +91,7 @@
     </div>
 
     <div class="nav-right">
+      <button type="button" id="accountBtn" class="nav-account">Sign in</button>
       <!-- Quick entry points for each device type. -->
       <a href="/tv/" class="nav-cta nav-cta-tv">
         <span class="nav-cta-ico">&#128250;</span>
@@ -97,7 +110,7 @@
         <span class="search-icon">&#9906;</span>
         <input id="searchInput" class="search-bar" type="text" placeholder="Titles, people, genres" />
       </div>
-      <div class="profile-icon" title="Profile">S</div>
+
     </div>
   </header>
 

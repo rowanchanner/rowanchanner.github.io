@@ -820,6 +820,25 @@
     var host = document.getElementById('settingsBody');
     host.innerHTML = '';
 
+    /* Account and profile come first: they are what people look for. */
+    if (w.SharkyAccount && SharkyAccount.account) {
+      var prof = SharkyAccount.profile;
+      host.appendChild(settingRow(
+        'Profile',
+        prof ? prof.name : 'None chosen',
+        'Switch profile',
+        function () { SharkyAccount.open('profiles'); },
+        'set-profile'
+      ));
+      host.appendChild(settingRow(
+        'Account',
+        SharkyAccount.account.email,
+        'Sign out',
+        function () { SharkyAccount.signOut(); },
+        'set-account'
+      ));
+    }
+
     host.appendChild(settingRow(
       'Server address',
       CFG.API,
