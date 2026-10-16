@@ -355,7 +355,9 @@
         try { t.blur(); } catch (err) {}
         current = t;
         step(dir);
-      } else if (back) {
+      } else if (back && key !== 'Backspace' && code !== 8) {
+        /* Backspace in a text box is deleting a letter, never "back" -
+           treating it as back closed the phone keyboard mid-word. */
         e.preventDefault();
         try { t.blur(); } catch (err) {}
       }

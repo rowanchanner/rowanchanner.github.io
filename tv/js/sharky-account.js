@@ -37,6 +37,8 @@
   var opt = {}, acct = null, root = null, screen = '', stack = [];
   var applying = false, pushTimer = null, pollTimer = null, syncing = false;
   var kbTarget = null, kbShift = false, focusEl = null, pending = null;
+  var mustPick = false;          // TV/APK start-up: a profile has to be chosen
+  var mergeOnce = false;         // first pick after browsing signed out: merge, never overwrite
 
   /* ── Small helpers ───────────────────────────────────────────────────── */
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -121,6 +123,20 @@
     return call('data_get', { profile: pid }).then(function (d) {
       if (!acct || acct.pid !== pid) return;
       var server = d.data || {}, mod = jget(S_MOD, {}), changed = false, out = {};
+      if (mergeOnce) {
+        /* Guest history meets an account that already has history: combine
+           the two. Last-write-wins here would wipe the account's history. */
+        mergeOnce = false;
+        var now = Date.now();
+        KEYS.forEach(function (k) {
+          var sv = server[k], lv = lsGet(k);
+          if (!sv || lv == null || lv === sv.v) return;
+          try {
+            var merged = mergeVal(JSON.parse(sv.v), JSON.parse(lv));
+            apply(k, JSON.stringify(merged)); mod[k] = now; changed = true;
+          } catch (e) {}
+        });
+      }
       KEYS.forEach(function (k) {
         var s = server[k], lm = mod[k] || 0, lv = lsGet(k);
         if (s && (s.at || 0) > lm) {
@@ -144,6 +160,36 @@
       if (needPush) return call('data_put', { profile: pid, data: out });
     }).catch(function (e) { console.warn('[sharky] sync:', e.message); })
       .then(function () { syncing = false; });
+  }
+
+  /* Combine two copies of the same kind of history. Lists: one entry per
+     title (or per episode for the apps' continue list), newest wins, newest
+     first. Maps: per key, newest wins, merging nested maps. */
+  function stamp(x) { return (x && (x.at || x.lastWatched || x.updatedAt)) || 0; }
+  function idOf(x) {
+    if (!x || typeof x !== 'object') return JSON.stringify(x);
+    return x.key || ((x.kind || x.media_type || 'movie') + ':' + x.id);
+  }
+  function mergeVal(a, b) {
+    if (Array.isArray(a) && Array.isArray(b)) {
+      var byId = {}, order = [];
+      b.concat(a).forEach(function (x) {
+        var id = idOf(x);
+        if (!(id in byId)) { order.push(id); byId[id] = x; }
+        else if (stamp(x) > stamp(byId[id])) byId[id] = x;
+      });
+      var out = order.map(function (id) { return byId[id]; });
+      if (out.some(stamp)) out.sort(function (x, y) { return stamp(y) - stamp(x); });
+      return out;
+    }
+    if (a && b && typeof a === 'object' && typeof b === 'object') {
+      if (stamp(a) || stamp(b)) return stamp(b) > stamp(a) ? b : a;
+      var o = {};
+      Object.keys(a).forEach(function (k) { o[k] = a[k]; });
+      Object.keys(b).forEach(function (k) { o[k] = (k in o) ? mergeVal(o[k], b[k]) : b[k]; });
+      return o;
+    }
+    return b != null ? b : a;
   }
 
   function trim(out) {
@@ -180,6 +226,10 @@
     var appAt = mod['sharkytv_continue'] || 0;
     if (appAt > webAt && Array.isArray(app)) {
       var webOut = Array.isArray(web) ? web.slice() : [], tvp = jget('sharky_movies_2_tv_progress', {}), tvpDirty = false;
+      // Removed (or finished) on the apps since the website last changed: drop it here too.
+      var inApp = {};
+      app.forEach(function (r) { inApp[(r.kind || 'movie') + ':' + r.id] = 1; });
+      webOut = webOut.filter(function (x) { return inApp[(x.media_type || 'movie') + ':' + x.id]; });
       app.slice().reverse().forEach(function (r) {
         if ((r.at || 0) <= webAt) return;
         var kind = r.kind || 'movie';
@@ -201,6 +251,10 @@
     } else if (webAt > appAt && Array.isArray(web)) {
       // website -> apps
       var appOut = Array.isArray(app) ? app.slice() : [], tvp2 = jget('sharky_movies_2_tv_progress', {});
+      // Removed on the website since the apps last changed: drop it there too.
+      var inWeb = {};
+      web.forEach(function (x) { inWeb[(x.media_type || 'movie') + ':' + x.id] = 1; });
+      appOut = appOut.filter(function (r) { return inWeb[(r.kind || 'movie') + ':' + r.id]; });
       web.slice().reverse().forEach(function (x) {
         if ((x.lastWatched || 0) <= appAt) return;
         var kind = x.media_type || 'movie', p = tvp2[x.id] || {};
@@ -266,7 +320,9 @@
 
   /* ── Choosing a profile ──────────────────────────────────────────────── */
   function choose(pid) {
+    mustPick = false;
     var prev = acct.pid;
+    if (!prev) mergeOnce = KEYS.some(function (k) { var v = lsGet(k); return v && v !== '[]' && v !== '{}'; });
     if (prev && prev !== pid) clearLocal();       // never mix two profiles' history
     acct.pid = pid; save();
     close();
@@ -291,7 +347,7 @@
     var st = document.createElement('style');
     st.id = 'sa-css';
     st.textContent =
-      '#sa-root{position:fixed;inset:0;z-index:2147483600;background:radial-gradient(circle at 50% 0%,#1c1424,#07070b 70%);' +
+      '#sa-root{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483600;background:radial-gradient(circle at 50% 0%,#1c1424,#07070b 70%);' +
       'color:#fff;font-family:Outfit,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;overflow:auto;' +
       '-webkit-tap-highlight-color:transparent}' +
       '#sa-root.sa-modal{background:rgba(4,4,8,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
@@ -312,41 +368,41 @@
       '.sa-err{color:#ff6b6b;text-align:center;font-size:.92rem;min-height:1.2em;margin:4px 0 10px}' +
       '.sa-ok{color:#4ade80}' +
       '.sa-x{position:absolute;top:6px;right:6px;background:none;border:2px solid transparent;color:#aaa;font-size:1.6rem;cursor:pointer;border-radius:8px;padding:2px 10px}' +
-      '.sa-av{display:inline-flex;align-items:center;justify-content:center;width:100%;aspect-ratio:1;border-radius:12px;font-size:2.4rem;line-height:1}' +
+      '.sa-av{display:-webkit-flex;display:flex;align-items:center;justify-content:center;width:100%;height:112px;border-radius:12px;font-size:2.4rem;line-height:1}' +
       '.sa-av-big{font-size:3.4rem}' +
-      '.sa-profs{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;margin:10px 0 24px}' +
-      '.sa-prof{width:130px;background:none;border:3px solid transparent;border-radius:16px;padding:6px;color:#ddd;cursor:pointer;font-family:inherit;text-align:center}' +
+      '.sa-profs{display:flex;flex-wrap:wrap;justify-content:center;margin:10px 0 24px}' +
+      '.sa-prof{width:130px;margin:0 11px 18px;background:none;border:3px solid transparent;border-radius:16px;padding:6px;color:#ddd;cursor:pointer;font-family:inherit;text-align:center}' +
       '.sa-prof .sa-name{display:block;margin-top:8px;font-size:1rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
       '.sa-prof:hover,.sa-prof:focus{color:#fff}' +
       '.sa-add .sa-av{background:#1d1d29;border:2px dashed #444;font-size:3rem;color:#888}' +
       '.sa-editing .sa-prof .sa-av{opacity:.55}' +
       '.sa-editing .sa-prof .sa-av::after{content:"\\270E";position:absolute;font-size:1.6rem}' +
       '.sa-prof .sa-av{position:relative}' +
-      '.sa-avs{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:6px 0 16px}' +
-      '.sa-avpick{background:none;border:3px solid transparent;border-radius:14px;padding:3px;cursor:pointer}' +
+      '.sa-avs{display:flex;flex-wrap:wrap;margin:6px -5px 16px}' +
+      '.sa-avpick{width:16.66%;margin:0;background:none;border:3px solid transparent;border-radius:14px;padding:3px;cursor:pointer}' +
       '.sa-avpick.sa-sel{border-color:#fff}' +
-      '.sa-avpick .sa-av{font-size:1.7rem}' +
-      '.sa-two{display:flex;gap:34px;align-items:center;flex-wrap:wrap;justify-content:center}' +
+      '.sa-avpick .sa-av{font-size:1.7rem;height:52px}' +
+      '.sa-two{display:flex;align-items:center;flex-wrap:wrap;justify-content:center}.sa-two>*{margin:0 17px 16px}' +
       '.sa-qr{background:#fff;border-radius:14px;padding:14px;width:250px;height:250px;display:flex;align-items:center;justify-content:center}' +
       '.sa-qr img,.sa-qr svg{width:100%;height:100%;image-rendering:pixelated}' +
       '.sa-code{font-size:2rem;font-weight:900;letter-spacing:6px;text-align:center;margin:10px 0 2px;color:#fff}' +
       '.sa-col{flex:1 1 320px;max-width:420px}' +
       '.sa-kb{margin:6px 0 12px}' +
-      '.sa-kr{display:flex;gap:6px;margin-bottom:6px;justify-content:center}' +
-      '.sa-k{flex:1 1 0;min-width:0;padding:11px 0;border-radius:8px;border:2px solid transparent;background:#23232f;color:#fff;font-size:1.05rem;font-weight:700;font-family:inherit}' +
+      '.sa-kr{display:flex;margin:0 -3px 6px;justify-content:center}' +
+      '.sa-k{flex:1 1 0;min-width:0;margin:0 3px;padding:11px 0;border-radius:8px;border:2px solid transparent;background:#23232f;color:#fff;font-size:1.05rem;font-weight:700;font-family:inherit}' +
       '.sa-k.sa-kw{flex:2 1 0;font-size:.85rem}' +
       '.sa-k.sa-kon{background:#e50914}' +
       '#sa-root .sa-f.sa-focus{border-color:#fff!important;box-shadow:0 0 0 3px rgba(229,9,20,.75);transform:scale(1.03)}' +
       '.sa-prof.sa-focus{transform:scale(1.08)!important}' +
       '.sa-menu{position:fixed;z-index:2147483500;background:#14141e;border:1px solid #2c2c3c;border-radius:12px;padding:6px;' +
       'min-width:220px;box-shadow:0 16px 40px rgba(0,0,0,.7);font-family:Outfit,system-ui,sans-serif}' +
-      '.sa-menu button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;color:#eee;padding:10px 12px;' +
+      '.sa-menu button{display:flex;align-items:center;width:100%;background:none;border:0;color:#eee;padding:10px 12px;' +
       'border-radius:8px;cursor:pointer;font-family:inherit;font-size:.95rem;text-align:left}' +
       '.sa-menu button:hover{background:#23232f}' +
-      '.sa-menu .sa-av{width:30px;font-size:1.1rem;border-radius:7px}' +
+      '.sa-menu .sa-av{width:30px;height:30px;margin-right:10px;font-size:1.1rem;border-radius:7px}' +
       '.sa-menu .sa-email{color:#888;font-size:.8rem;padding:6px 12px 8px;border-bottom:1px solid #26263a;margin-bottom:4px}' +
       (isTV() ? '.sa-box{width:min(620px,calc(100vw - 64px))}.sa-wide{width:min(1100px,calc(100vw - 64px))}.sa-h{font-size:2.2rem}' +
-                '.sa-in,.sa-btn{font-size:1.25rem;padding:16px 18px}.sa-prof{width:170px}.sa-prof .sa-name{font-size:1.25rem}' : '');
+                '.sa-in,.sa-btn{font-size:1.25rem;padding:16px 18px}.sa-prof{width:170px}.sa-prof .sa-av{height:152px}.sa-prof .sa-name{font-size:1.25rem}' : '');
     document.head.appendChild(st);
   }
 
@@ -379,6 +435,7 @@
 
   function canClose() {
     if (screen === 'link' || screen === 'linked') return !onLinkPage();
+    if (mustPick) return false;
     if (!opt.required) return true;
     return !!(acct && acct.pid);
   }
@@ -819,7 +876,10 @@
       }
       if (!acct) { if (opt.required) open('welcome'); fireChange(); return; }
       refreshAccount();
-      if (opt.askProfileOnStart || !acct.pid) { open('profiles'); return; }
+      if (opt.askProfileOnStart || !acct.pid) {
+        if (opt.askProfileOnStart) mustPick = true;
+        open('profiles'); return;
+      }
       fireChange();
       sync();
     };
@@ -827,6 +887,20 @@
     setInterval(function () { if (acct && acct.pid && !document.hidden) sync(); }, 90000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden && acct && acct.pid) sync(); });
     w.addEventListener('pagehide', function () { if (pushTimer) { clearTimeout(pushTimer); sync(); } });
+  }
+
+  /* Mobile website, signed out: it uses the app's layout and storage, so bring
+     across the Continue Watching / My List the visitor already had on the
+     full website. Only ever fills an EMPTY app history; signed-in visitors
+     get theirs from the account instead. */
+  function importWebHistory() {
+    if (acct) return false;
+    var c = lsGet('sharkytv_continue'), l = lsGet('sharkytv_mylist');
+    if ((c && c !== '[]') || (l && l !== '[]')) return false;
+    var fake = { 'sharky_movies_2_continue_watching': 1, 'sharky_movies_2_my_list': 1 };
+    var did = convert(fake);
+    if (did) fire();
+    return did;
   }
 
   /* Website: the menu behind the avatar in the navbar. */
@@ -843,8 +917,15 @@
          '<button data-m="signout">Sign out</button>';
     m.className = 'sa-menu'; m.innerHTML = h;
     m.style.top = (r.bottom + 8) + 'px';
-    m.style.right = Math.max(8, w.innerWidth - r.right) + 'px';
+    m.style.left = '8px';
     document.body.appendChild(m);
+    /* Line up under the button but never off either edge (on a phone the
+       button sits on the left, on a PC on the right). */
+    var mw = m.offsetWidth, left = r.right - mw;
+    if (left < 8) left = r.left;
+    left = Math.max(8, Math.min(left, w.innerWidth - mw - 8));
+    m.style.left = left + 'px';
+    m.style.maxWidth = (w.innerWidth - 16) + 'px';
     m.addEventListener('click', function (e) {
       var b = e.target.closest('[data-m]'); if (!b) return;
       var a = b.getAttribute('data-m');
@@ -867,6 +948,7 @@
     menu: menu,
     signOut: signOut,
     back: backKey,
+    importWebHistory: importWebHistory,
     sync: sync,
     avatarHtml: avatarHtml,
     get account() { return acct; },

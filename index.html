@@ -1,6 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    /* Phones get the app-style mobile site (/m/). "Full website" in its
+       settings sets sharky_full_site, and ?full=1 / ?mobile=1 switch by hand.
+       Tablets and computers stay here. */
+    (function () {
+      try {
+        var q = location.search;
+        if (/[?&]full=1/.test(q)) { localStorage.setItem('sharky_full_site', '1'); return; }
+        if (/[?&]mobile=1/.test(q)) localStorage.removeItem('sharky_full_site');
+        if (localStorage.getItem('sharky_full_site') === '1') return;
+        var ua = navigator.userAgent;
+        var phone = /iPhone|iPod|Windows Phone|Android.+Mobile|Mobile.+Firefox/i.test(ua) ||
+          (/Android/i.test(ua) && Math.min(screen.width, screen.height) < 600);
+        if (phone) location.replace('/m/' + location.hash);
+      } catch (e) {}
+    })();
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sharky Movies 2</title>
@@ -16,7 +33,7 @@
     .nav-account-name{max-width:110px;overflow:hidden;text-overflow:ellipsis}
     @media (max-width:700px){.nav-account-name{display:none}}
   </style>
-  <script src="sharky-account.js?v=20261016-accounts"></script>
+  <script src="sharky-account.js?v=20261016c"></script>
   <script src="account-web.js?v=20261016-accounts"></script>
   <style>
     .sharky-rank{position:absolute;top:8px;left:8px;z-index:3;background:#e50914;color:#fff;
@@ -31,7 +48,7 @@
   <meta name="description" content="Sharky Movies 2 — stream movies and TV in HD with the Sharky Player, less ads, multi-server fallback." />
   <!-- TV remote / D-pad navigation. Loaded early so page
        scripts can read window.SharkyTV when building URLs. -->
-  <script src="tvnav.js"></script>
+  <script src="tvnav.js?v=20261016b"></script>
 </head>
 
 <body>
@@ -365,5 +382,22 @@
   <script src="script.js?v=20261016-top-watched"></script>
   <script src="announcement.js?v=20261002"></script>
   <script src="support-popup.js"></script>
+  <script>
+    /* On a phone that chose the full website: a way back to the mobile one. */
+    (function () {
+      try {
+        if (localStorage.getItem('sharky_full_site') !== '1') return;
+        if (!/iPhone|iPod|Android/i.test(navigator.userAgent)) return;
+        var b = document.createElement('a');
+        b.href = '/m/?mobile=1';
+        b.textContent = '\ud83d\udcf1 Mobile site';
+        b.onclick = function () { try { localStorage.removeItem('sharky_full_site'); } catch (e) {} };
+        b.style.cssText = 'position:fixed;left:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:9000;' +
+          'background:#e50914;color:#fff;font:800 .85rem Outfit,sans-serif;padding:10px 14px;border-radius:999px;' +
+          'text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,.6)';
+        document.body.appendChild(b);
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>

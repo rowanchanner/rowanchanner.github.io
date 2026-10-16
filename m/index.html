@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>Sharky Movies</title>
+<meta name="description" content="Films and series, no ads.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sharky">
+<link rel="apple-touch-icon" href="img/logo.png">
+<link rel="icon" href="/favicon.ico">
+<style>
+  /* Website-only extras (the APK has its own native bars). */
+  #acctBtn{margin-right:6px;height:34px;min-width:34px;padding:0 13px;border-radius:999px;border:1px solid rgba(255,255,255,.25);
+    background:rgba(255,255,255,.08);color:#fff;font:700 .85rem Outfit,system-ui,sans-serif;cursor:pointer}
+  #acctBtn.signed-in{padding:0;border:0;background:none;width:34px}
+  #acctBtn.signed-in .sa-av{width:34px;height:34px;font-size:1.2rem;border-radius:8px}
+  #player{height:100vh;height:100dvh}
+</style>
+<link rel="stylesheet" href="css/phone.css?v=20261016m">
+</head>
+<body>
+<div id="app">
+
+  <!-- Top bar: logo, Films / Series chips, settings -->
+  <header id="topbar">
+    <div class="tb-row">
+      <img class="tb-logo" src="img/logo.png" alt="Sharky">
+      <div class="tb-spacer"></div>
+      <button class="icon-btn" id="openSettings" aria-label="Settings">
+        <svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
+      </button>
+    </div>
+    <div class="chips" id="chips">
+      <button class="chip" data-mode="tv">Series</button>
+      <button class="chip" data-mode="movie">Films</button>
+      <button class="chip chip-x" data-mode="all" aria-label="Show everything">&times;</button>
+    </div>
+  </header>
+
+  <main id="view-home" class="view active">
+    <section id="hero" class="hero"></section>
+    <div id="rows"></div>
+    <div class="end-pad"></div>
+  </main>
+
+  <main id="view-search" class="view">
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24"><path d="M10.5 3a7.5 7.5 0 0 1 6 12l4.3 4.3-1.4 1.4-4.3-4.3A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z"/></svg>
+      <input id="searchInput" type="search" placeholder="Search films and series" autocomplete="off" enterkeyhint="search">
+      <button id="searchClear" class="icon-btn small" aria-label="Clear">&times;</button>
+    </div>
+    <div id="searchHint" class="section-title">Popular searches</div>
+    <div id="searchResults" class="poster-grid"></div>
+    <div class="end-pad"></div>
+  </main>
+
+  <main id="view-list" class="view">
+    <h1 class="page-title">My List</h1>
+    <div id="listBody"></div>
+    <div class="end-pad"></div>
+  </main>
+
+  <!-- Bottom tabs -->
+  <nav id="tabs">
+    <button class="tab active" data-tab="home">
+      <svg viewBox="0 0 24 24"><path d="M12 3 2 11h3v10h6v-6h2v6h6V11h3z"/></svg><span>Home</span>
+    </button>
+    <button class="tab" data-tab="search">
+      <svg viewBox="0 0 24 24"><path d="M10.5 3a7.5 7.5 0 0 1 6 12l4.3 4.3-1.4 1.4-4.3-4.3A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z"/></svg><span>Search</span>
+    </button>
+    <button class="tab" data-tab="list">
+      <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg><span>My List</span>
+    </button>
+  </nav>
+
+  <!-- Details: slides up over everything -->
+  <section id="details" class="sheet" aria-hidden="true">
+    <div class="sheet-scroll" id="detailsScroll">
+      <div class="d-media" id="dMedia">
+        <button class="icon-btn round d-close" id="detailsClose" aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z"/></svg>
+        </button>
+      </div>
+      <div class="d-body" id="dBody"></div>
+    </div>
+  </section>
+
+  <!-- Settings -->
+  <section id="settings" class="sheet" aria-hidden="true">
+    <div class="sheet-scroll">
+      <div class="settings-head">
+        <button class="icon-btn" id="settingsClose" aria-label="Back">
+          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+        </button>
+        <h1 class="page-title">Settings</h1>
+      </div>
+      <div id="settingsBody"></div>
+    </div>
+  </section>
+
+  <!-- Player: the API's own player, full screen, sideways -->
+  <div id="player" aria-hidden="true">
+    <div class="player-load" id="playerLoad"><div class="spinner"></div><div id="playerStatus">Loading</div></div>
+    <iframe id="playerFrame" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+    <button id="playerClose" class="icon-btn round" aria-label="Close player">
+      <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+    </button>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="js/config.js?v=20261016m"></script>
+<script src="js/region.js?v=20261016m"></script>
+<script src="js/api.js?v=20261016m"></script>
+<script src="js/sharky-account.js?v=20261016m"></script>
+<script src="js/store.js?v=20261016m"></script>
+<script src="js/phone.js?v=20261016m"></script>
+<script src="js/account-mweb.js?v=20261016m"></script>
+</body>
+</html>
