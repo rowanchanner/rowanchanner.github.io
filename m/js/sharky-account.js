@@ -939,7 +939,8 @@
     if (old) { old.parentNode.removeChild(old); return; }
     if (!acct) { open('welcome'); return; }
     css();
-    var m = document.createElement('div'), r = anchor.getBoundingClientRect(), h = '<div class="sa-email">' + esc(acct.email) + '</div>';
+    var m = document.createElement('div'), r = anchor.getBoundingClientRect(), h = '<div class="sa-email">' + esc(acct.email) +
+      '<br><b style="color:#ddd">Switch profile</b></div>';
     acct.profiles.forEach(function (p) {
       h += '<button data-m="pick:' + p.id + '">' + avatarHtml(p.avatar) + esc(p.name) + (p.id === acct.pid ? ' ✓' : '') + '</button>';
     });
