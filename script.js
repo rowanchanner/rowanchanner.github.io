@@ -622,6 +622,39 @@ function saveContinueWatching(item) {
   const filtered = list.filter(x => !(Number(x.id) === Number(item.id) && x.media_type === item.media_type));
   setStorage(STORAGE_CONTINUE, [clean, ...filtered].slice(0, 20));
 }
+/* ── Most watched on Sharky ─────────────────────────────────────────────────
+   What people here actually watched this week, counted by the server (a view
+   = someone watching 2+ minutes). Hidden until there are a few titles, so a
+   quiet week never shows a stub of a row. Never blocks the rest of the page. */
+async function renderSharkyTop() {
+  const block = document.getElementById("sharkyTopBlock");
+  const row = document.getElementById("sharkyTopRow");
+  if (!block || !row) return;
+  try {
+    const r = await fetch(`${SHARKY_API}/top-watched`, { cache: "no-store" });
+    const d = await r.json();
+    const top = (d && d.items) || [];
+    if (top.length < 3) { block.classList.add("hidden"); return; }
+    const details = await Promise.all(top.slice(0, 15).map(t =>
+      fetch(`${BASE_URL}/${t.kind === "tv" ? "tv" : "movie"}/${encodeURIComponent(t.id)}?api_key=${API_KEY}&language=en-US`)
+        .then(x => x.ok ? x.json() : null)
+        .then(j => j && j.id ? normalizeItem(j, t.kind === "tv" ? "tv" : "movie") : null)
+        .catch(() => null)));
+    const items = details.filter(Boolean);
+    if (items.length < 3) { block.classList.add("hidden"); return; }
+    block.classList.remove("hidden");
+    renderRow(row, items);
+    Array.from(row.children).forEach((card, i) => {
+      const b = document.createElement("span");
+      b.className = "sharky-rank";
+      b.textContent = "#" + (i + 1);
+      card.appendChild(b);
+    });
+  } catch (e) {
+    block.classList.add("hidden");
+  }
+}
+
 function renderContinueWatching() {
   const list = getStorage(STORAGE_CONTINUE);
   if (!list.length) { continueBlock.classList.add("hidden"); rowMap.continue.innerHTML = ""; return; }
@@ -876,6 +909,7 @@ async function init() {
   const tvFallback = playableOnly([...trendingTv, ...popularTv, ...topTv], keep);
 
   renderContinueWatching();
+  renderSharkyTop();
   const movieRecentRows = [];
   const tvRecentRows = [];
   const allPlayable = [...movieFallback, ...tvFallback];

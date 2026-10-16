@@ -6,6 +6,11 @@
   <title>Sharky Movies 2</title>
 
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .sharky-rank{position:absolute;top:8px;left:8px;z-index:3;background:#e50914;color:#fff;
+      font-weight:900;font-size:.85rem;line-height:1;padding:5px 8px;border-radius:6px;
+      box-shadow:0 3px 10px rgba(0,0,0,.5);pointer-events:none}
+  </style>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
@@ -181,6 +186,15 @@
         </div>
       </div>
 
+      <div class="movie-row-block hidden" id="sharkyTopBlock" data-cat="top watched">
+        <div class="section-header"><h2>Most Watched on Sharky</h2><span class="see-all" style="opacity:1;color:var(--muted);text-transform:none;letter-spacing:0">This week</span></div>
+        <div class="row-viewport">
+          <button class="row-arrow left"  aria-label="Scroll left">&#10094;</button>
+          <div class="movie-row" id="sharkyTopRow"></div>
+          <button class="row-arrow right" aria-label="Scroll right">&#10095;</button>
+        </div>
+      </div>
+
       <div class="movie-row-block" id="moviesBlock" data-cat="trending movies">
         <div class="section-header"><h2>Trending Now</h2><span class="see-all">See All &rsaquo;</span></div>
         <div class="row-viewport">
@@ -335,7 +349,7 @@
   </div>
 
   <script src="downloads.js"></script>
-  <script src="script.js?v=20260904-because-dedupe"></script>
+  <script src="script.js?v=20261016-top-watched"></script>
   <script src="announcement.js?v=20261002"></script>
   <script src="support-popup.js"></script>
 </body>
