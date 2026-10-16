@@ -32,6 +32,32 @@
     .nav-account.signed-in .sa-av{width:34px;height:34px;font-size:1.25rem;border-radius:8px}
     .nav-account-name{max-width:110px;overflow:hidden;text-overflow:ellipsis}
     @media (max-width:700px){.nav-account-name{display:none}}
+    /* The navbar had grown wider than the screen at every size, pushing the
+       search box off the right edge. Search first, short button labels,
+       no two-line menu items, and tighter spacing on smaller screens. */
+    .nav-link{white-space:nowrap}
+    .nav-right .search-wrap{order:-2}
+    .nav-right #accountBtn{order:-1}
+    .nav-right{min-width:0}
+    .nav-cta .nav-cta-text{display:none}
+    .nav-cta{padding:8px 12px;margin-right:0}
+    .nav-cta-tv:after{content:"TV";font-weight:800}
+    .nav-cta-app:after{content:"TV app";font-weight:800}
+    .nav-cta-mobile:after{content:"Phone app";font-weight:800}
+    @media (max-width:1700px){
+      .nav-left,.nav-right{gap:14px}
+      .nav-links{gap:16px}
+    }
+    @media (max-width:1750px){
+      .nav-cta-app,.nav-cta-mobile{display:none}
+      .old-version-btn{display:none}
+    }
+    @media (max-width:1250px){
+      .nav-links{gap:12px}
+      .nav-link{font-size:.85rem}
+      .nav-cta-tv{display:none}
+      .search-bar{width:170px}
+    }
   </style>
   <script src="sharky-account.js?v=20261016c"></script>
   <script src="account-web.js?v=20261016-accounts"></script>
@@ -379,7 +405,7 @@
   </div>
 
   <script src="downloads.js"></script>
-  <script src="script.js?v=20261016-top-watched"></script>
+  <script src="script.js?v=20261016-mw10"></script>
   <script src="announcement.js?v=20261002"></script>
   <script src="support-popup.js"></script>
   <script>

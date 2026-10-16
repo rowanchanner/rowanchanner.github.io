@@ -271,6 +271,55 @@
     }).catch(function () { row.remove(); });
   }
 
+  /* ── Most watched on Sharky ───────────────────────────────────────────────
+     Always ten: what people here watched most (the server tops up from the
+     last month and from the most-played titles), and if it still has fewer
+     than ten - a brand-new server - this week's trending fills the rest. */
+  function loadMostWatched() {
+    return fetch(CFG.API + '/top-watched', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return { items: [] }; })
+      .then(function (d) {
+        var top = ((d && d.items) || []).slice(0, 10);
+        return Promise.all(top.map(function (t) {
+          var kind = t.kind === 'tv' ? 'tv' : 'movie';
+          return API.tmdb('/' + kind + '/' + encodeURIComponent(t.id))
+            .then(function (raw) { return API.normalise(raw, kind); })
+            .catch(function () { return null; });
+        }));
+      })
+      .then(function (items) {
+        items = items.filter(function (i) { return i && (i.poster || i.card); });
+        if (items.length >= 10) return items.slice(0, 10);
+        return API.tmdb('/trending/all/week').then(function (d) {
+          var seen = {};
+          items.forEach(function (i) { seen[i.key] = 1; });
+          ((d && d.results) || []).forEach(function (r) {
+            var it = API.normalise(r);
+            if (!it || seen[it.key] || items.length >= 10 || !(it.poster || it.card)) return;
+            seen[it.key] = 1;
+            items.push(it);
+          });
+          return items;
+        }).catch(function () { return items; });
+      });
+  }
+
+  function mostWatchedRow(host, token) {
+    var row = el('section', 'row');
+    row.appendChild(el('h2', 'row-title', 'Most Watched on Sharky'));
+    var track = el('div', 'track');
+    skeletons(track, 3);
+    row.appendChild(track);
+    host.appendChild(row);
+    loadMostWatched().then(function (items) {
+      if (token !== homeToken) return;
+      track.innerHTML = '';
+      if (!items.length) { row.remove(); return; }
+      items.slice(0, 10).forEach(function (it, i) { track.appendChild(top10Card(it, i + 1)); });
+    }).catch(function () { row.remove(); });
+  }
+
   function recentRow(host, token) {
     var row = el('section', 'row');
     row.appendChild(el('h2', 'row-title', 'Recently Added <small>new in the library</small>'));
@@ -293,6 +342,7 @@
     host.innerHTML = '';
     if (rowObserver) rowObserver.disconnect();
     personalRows(host);
+    if (mode === 'all') mostWatchedRow(host, token);
     if (mode !== 'tv') top10Row(host, 'movie', token);
     if (mode !== 'movie') top10Row(host, 'tv', token);
     recentRow(host, token);

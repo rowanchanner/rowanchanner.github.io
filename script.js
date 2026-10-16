@@ -634,14 +634,29 @@ async function renderSharkyTop() {
     const r = await fetch(`${SHARKY_API}/top-watched`, { cache: "no-store" });
     const d = await r.json();
     const top = (d && d.items) || [];
-    if (top.length < 3) { block.classList.add("hidden"); return; }
-    const details = await Promise.all(top.slice(0, 15).map(t =>
+    const details = await Promise.all(top.slice(0, 10).map(t =>
       fetch(`${BASE_URL}/${t.kind === "tv" ? "tv" : "movie"}/${encodeURIComponent(t.id)}?api_key=${API_KEY}&language=en-US`)
         .then(x => x.ok ? x.json() : null)
         .then(j => j && j.id ? normalizeItem(j, t.kind === "tv" ? "tv" : "movie") : null)
         .catch(() => null)));
-    const items = details.filter(Boolean);
-    if (items.length < 3) { block.classList.add("hidden"); return; }
+    let items = details.filter(i => i && (i.poster_path || i.backdrop_path));
+    /* Always ten: top up from this week's trending if the server is short. */
+    if (items.length < 10) {
+      try {
+        const tr = await fetch(`${BASE_URL}/trending/all/week?api_key=${API_KEY}&language=en-US`).then(x => x.json());
+        const seen = new Set(items.map(i => i.media_type + ":" + i.id));
+        for (const r of (tr && tr.results) || []) {
+          if (items.length >= 10) break;
+          if (r.media_type !== "movie" && r.media_type !== "tv") continue;
+          const it = normalizeItem(r, r.media_type);
+          if (seen.has(it.media_type + ":" + it.id) || !(it.poster_path || it.backdrop_path)) continue;
+          seen.add(it.media_type + ":" + it.id);
+          items.push(it);
+        }
+      } catch (e) {}
+    }
+    items = items.slice(0, 10);
+    if (!items.length) { block.classList.add("hidden"); return; }
     block.classList.remove("hidden");
     renderRow(row, items);
     Array.from(row.children).forEach((card, i) => {

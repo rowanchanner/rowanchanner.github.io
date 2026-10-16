@@ -364,6 +364,7 @@
          per title — so it is slotted in when it arrives rather than holding
          up the rest of the page. */
       renderRecentlyAdded(host);
+      renderMostWatched(host);
 
       /* The charts go straight under Continue Watching, where Netflix puts
          them: they are the most "today" thing on the screen. */
@@ -452,6 +453,53 @@
 
   function refreshPersonalRows() {
     renderPersonalRows();
+  }
+
+  /* ── Most watched on Sharky ───────────────────────────────────────────────
+     Always ten: what people here watched most (the server tops up from the
+     last month and from the most-played titles), and if it still has fewer
+     than ten - a brand-new server - this week's trending fills the rest. */
+  function loadMostWatched() {
+    return fetch(CFG.API + '/top-watched', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return { items: [] }; })
+      .then(function (d) {
+        var top = ((d && d.items) || []).slice(0, 10);
+        return Promise.all(top.map(function (t) {
+          var kind = t.kind === 'tv' ? 'tv' : 'movie';
+          return API.tmdb('/' + kind + '/' + encodeURIComponent(t.id))
+            .then(function (raw) { return API.normalise(raw, kind); })
+            .catch(function () { return null; });
+        }));
+      })
+      .then(function (items) {
+        items = items.filter(function (i) { return i && (i.poster || i.card); });
+        if (items.length >= 10) return items.slice(0, 10);
+        return API.tmdb('/trending/all/week').then(function (d) {
+          var seen = {};
+          items.forEach(function (i) { seen[i.key] = 1; });
+          ((d && d.results) || []).forEach(function (r) {
+            var it = API.normalise(r);
+            if (!it || seen[it.key] || items.length >= 10 || !(it.poster || it.card)) return;
+            seen[it.key] = 1;
+            items.push(it);
+          });
+          return items;
+        }).catch(function () { return items; });
+      });
+  }
+
+  function renderMostWatched(host) {
+    host = host || document.getElementById('homeRows');
+    loadMostWatched().then(function (items) {
+      if (!items.length || document.getElementById('block-mostwatched')) return;
+      var block = UI.row('mostwatched', 'Most Watched on Sharky', items.slice(0, 10), { ranked: true });
+      /* Under Continue Watching / My List / Recently Added, above the charts. */
+      var after = host.querySelector('#block-recent') || host.querySelector('#block-mylist') || host.querySelector('#block-continue');
+      if (after && after.nextSibling) host.insertBefore(block, after.nextSibling);
+      else if (after) host.appendChild(block);
+      else host.insertBefore(block, host.firstChild);
+    });
   }
 
   /* ── Recently Added ───────────────────────────────────────────────────────
