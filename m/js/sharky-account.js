@@ -35,7 +35,7 @@
   ];
 
   var opt = {}, acct = null, root = null, screen = '', stack = [];
-  var applying = false, pushTimer = null, pollTimer = null, syncing = false;
+  var applying = false, pushTimer = null, pollTimer = null, syncing = false, vTimer = null;
   var kbTarget = null, kbShift = false, focusEl = null, pending = null;
   var mustPick = false;          // TV/APK start-up: a profile has to be chosen
   var mergeOnce = false;         // first pick after browsing signed out: merge, never overwrite
@@ -117,7 +117,7 @@
   /* Pull, keep whichever copy of each key is newer, convert between the
      website's format and the apps', then push the merged bundle back. */
   function sync() {
-    if (!acct || !acct.pid || syncing) return Promise.resolve();
+    if (!acct || !acct.pid || syncing || acct.verified === false) return Promise.resolve();
     syncing = true;
     var pid = acct.pid;
     return call('data_get', { profile: pid }).then(function (d) {
@@ -332,13 +332,40 @@
 
   function signedIn(d) {
     var had = !!(acct && acct.pid);
-    acct = { token: d.token, email: d.email, profiles: d.profiles || [], pid: null, max: d.max_profiles || 5 };
+    acct = { token: d.token, email: d.email, profiles: d.profiles || [], pid: null, max: d.max_profiles || 5,
+             verified: d.verified !== false };
     save();
     fireChange();
     stopPairPoll();
     screen = ''; stack = [];                  // nothing to go "back" to once signed in
+    if (!acct.verified) { if (!root) open('verify'); else show('verify'); return; }
+    afterVerified();
+  }
+
+  function afterVerified() {
+    screen = ''; stack = [];
     if (pending) { var p = pending; pending = null; p(); return; }
     show('profiles');
+  }
+
+  /* ── Email verification ──────────────────────────────────────────────── */
+  /* While the "check your email" screen is up, keep asking the server, so
+     tapping the link on a phone moves the TV (or this page) on by itself. */
+  function startVerifyPoll() {
+    stopVerifyPoll();
+    vTimer = setInterval(function () {
+      if (screen !== 'verify' || !root || !acct) { stopVerifyPoll(); return; }
+      call('me', {}).then(function (d) { if (d.verified !== false) verifiedNow(d); }).catch(function () {});
+    }, 4000);
+  }
+  function stopVerifyPoll() { clearInterval(vTimer); vTimer = null; }
+  function verifiedNow(d) {
+    stopVerifyPoll();
+    if (!acct) return;
+    acct.verified = true;
+    if (d && d.profiles) acct.profiles = d.profiles;
+    save(); fireChange();
+    if (root && screen === 'verify') afterVerified();
   }
 
   /* ── UI ──────────────────────────────────────────────────────────────── */
@@ -425,7 +452,7 @@
   }
 
   function close() {
-    stopPairPoll();
+    stopPairPoll(); stopVerifyPoll();
     if (root && root.parentNode) root.parentNode.removeChild(root);
     root = null; screen = ''; stack = []; kbTarget = null; focusEl = null;
     try { document.dispatchEvent(new CustomEvent('sharky:account-closed')); } catch (e) {}
@@ -435,6 +462,7 @@
 
   function canClose() {
     if (screen === 'link' || screen === 'linked') return !onLinkPage();
+    if (screen === 'verify') return !opt.required && !onLinkPage();
     if (mustPick) return false;
     if (!opt.required) return true;
     return !!(acct && acct.pid);
@@ -540,6 +568,17 @@
         '<button class="sa-btn sa-pri sa-f" data-a="psave" type="submit">Save</button></form>' +
         (p.id && acct && acct.profiles.length > 1 ? '<button class="sa-btn sa-f" data-a="pdel">Delete profile</button>' : '') +
         '<button class="sa-link sa-f" data-a="back">Cancel</button></div>';
+    } else if (name === 'verify') {
+      h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div><div class="sa-h">Check your email</div>' +
+        '<p class="sa-p">We sent a code to <b style="color:#fff">' + esc(acct && acct.email) + '</b>.<br>' +
+        (tv ? 'Tap the link in the email on your phone - this screen moves on by itself - or type the code here.'
+            : 'Tap the link in the email, or type the code here.') + '</p><form>' +
+        field('vcode', 'text', '6-digit code') +
+        '<div class="sa-err" id="sa-err"></div>' + (tv ? '<div class="sa-kb" id="sa-kb"></div>' : '') +
+        '<button class="sa-btn sa-pri sa-f" data-a="vok" type="submit">Verify</button></form>' +
+        '<button class="sa-btn sa-f" data-a="vsend">Resend email</button>' +
+        '<p class="sa-p" style="font-size:.85rem;margin:10px 0 0">Not there? Check your spam or junk folder.</p>' +
+        '<button class="sa-link sa-f" data-a="signout">Wrong email? Sign out</button></div>';
     } else if (name === 'link') {
       var code = (data && data.code) || '';
       if (!acct) {
@@ -566,6 +605,12 @@
     root.innerHTML = h;
     if (tv && $('#sa-kb')) buildKb();
     if (name === 'welcome' && tv) startPair();
+    if (name === 'verify') {
+      var vc = $('#sa-vcode');
+      if (vc) { vc.setAttribute('maxlength', '6'); vc.style.textAlign = 'center'; vc.style.letterSpacing = '6px'; vc.style.fontWeight = '800';
+                if (!tv) { vc.setAttribute('inputmode', 'numeric'); vc.setAttribute('autocomplete', 'one-time-code'); } }
+      startVerifyPoll();
+    } else stopVerifyPoll();
     var first = root.querySelector('.sa-prof.sa-f') || root.querySelector('input.sa-f:not([type=hidden])') || root.querySelector('.sa-pri') || root.querySelector('.sa-f');
     if (name === 'edit' && $('#sa-pname') && !tv) first = $('#sa-pname');
     if (first) focus(first, !tv && first.tagName === 'INPUT');
@@ -612,6 +657,19 @@
       lsSet('sharky_acct_last', em2);
       call('signup', { email: em2, password: val('pw') }).then(signedIn)
         .catch(function (e) { err(e.message); }).then(function () { busy(false); });
+      return;
+    }
+    if (cmd === 'vok') {
+      err(''); busy(true);
+      call('verify_confirm', { code: val('vcode') }).then(verifiedNow)
+        .catch(function (e) { err(e.message); }).then(function () { busy(false); });
+      return;
+    }
+    if (cmd === 'vsend') {
+      err(''); busy(true);
+      call('verify_send', {}).then(function (d) {
+        if (d.verified) verifiedNow(d); else err(d.message || 'Sent', true);
+      }).catch(function (e) { err(e.message); }).then(function () { busy(false); });
       return;
     }
     if (cmd === 'reset1') {
@@ -886,6 +944,10 @@
     if (!acct) return Promise.resolve();
     return call('me', {}).then(function (d) {
       acct.profiles = d.profiles; acct.email = d.email;
+      var wasV = acct.verified !== false;
+      acct.verified = d.verified !== false;
+      if (!acct.verified && !root) { save(); fireChange(); open('verify'); return; }
+      if (acct.verified && !wasV) { save(); fireChange(); if (acct.pid) sync(); }
       var still = acct.profiles.some(function (p) { return p.id === acct.pid; });
       if (acct.pid && !still) { acct.pid = null; clearLocal(); fire(); }
       save(); fireChange();
@@ -905,6 +967,7 @@
         return;
       }
       if (!acct) { if (opt.required) open('welcome'); fireChange(); return; }
+      if (acct.verified === false) { fireChange(); open('verify'); refreshAccount(); return; }
       refreshAccount();
       if (opt.askProfileOnStart || !acct.pid) {
         if (opt.askProfileOnStart) mustPick = true;
@@ -944,6 +1007,7 @@
     acct.profiles.forEach(function (p) {
       h += '<button data-m="pick:' + p.id + '">' + avatarHtml(p.avatar) + esc(p.name) + (p.id === acct.pid ? ' ✓' : '') + '</button>';
     });
+    if (acct.verified === false) h = '<button data-m="verify" style="color:#fbbf24">✉ Verify your email</button>' + h;
     h += '<button data-m="manage">✎ Manage profiles</button><button data-m="password">🔑 Change password</button>' +
          '<button data-m="signout">Sign out</button>';
     m.className = 'sa-menu'; m.innerHTML = h;
@@ -963,6 +1027,7 @@
       m.parentNode.removeChild(m);
       if (a.indexOf('pick:') === 0) choose(Number(a.slice(5)));
       else if (a === 'manage') open('manage');
+      else if (a === 'verify') open('verify');
       else if (a === 'password') open('password');
       else if (a === 'signout') signOut();
     });
