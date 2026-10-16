@@ -756,7 +756,7 @@
     $('playerClose').style.display = '';
     $('playerStatus').textContent = 'Loading ' + item.title + (item.kind === 'tv' ? ' · S' + (season || 1) + ':E' + (episode || 1) : '');
     if (N && N.enterPlayer) N.enterPlayer();
-    else webFullscreen(p);
+    else { webFullscreen(p); sideways(); setTimeout(sideways, 500); }
     var f = $('playerFrame');
     frameGo(f, embedUrl(item, season, episode));
     clearTimeout(loadT);
@@ -778,6 +778,22 @@
       if (r && r.then) r.then(lock).catch(function () {}); else lock();
     } catch (e) {}
   }
+  /* iPhone (and any browser that won't turn the screen): if the phone is
+     still upright, turn the player itself sideways, like the app does. As
+     soon as the phone is actually turned, the normal layout takes over. */
+  function sideways() {
+    var p = $('player');
+    if (!p) return;
+    var on = !N && p.classList.contains('open') && window.innerHeight > window.innerWidth;
+    p.classList.toggle('sideways', on);
+    if (on) {
+      p.style.setProperty('--pw', window.innerWidth + 'px');
+      p.style.setProperty('--ph', window.innerHeight + 'px');
+    }
+  }
+  window.addEventListener('resize', function () { setTimeout(sideways, 60); });
+  window.addEventListener('orientationchange', function () { setTimeout(sideways, 300); });
+
   function webExitFullscreen() {
     try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
     try {
@@ -800,6 +816,7 @@
     if (!N) webExitFullscreen();
     try { frameGo($('playerFrame'), 'about:blank'); } catch (e) {}
     p.classList.remove('open');
+    p.classList.remove('sideways');
     p.setAttribute('aria-hidden', 'true');
     clearTimeout(loadT);
     if (N && N.exitPlayer) N.exitPlayer();
