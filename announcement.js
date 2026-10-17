@@ -1,121 +1,151 @@
-/* announcement.js — a big, one-off notice every visitor has to close.
- *
- * Self-contained: builds its own markup and styles. It stays up until the
- * visitor clicks the cross, and once closed it never comes back for that
- * announcement. To post a NEW announcement later, change ANNOUNCE_ID (and the
- * text) — everyone will see it once more.
+/* announcement.js - the pop-up announcement on the website, mobile site and
+ * TV app. What it says, and when it shows, is set on the admin page
+ * (api.sharkmovie.co.uk/admin/accounts -> Announcements); this file only asks
+ * the server what is live right now. Each announcement shows once - closing
+ * it remembers its id. Works with a mouse, a touch screen and a TV remote
+ * (OK, Back). ES5 only: old Fire TV WebViews load this too.
  */
 (function () {
   'use strict';
 
-  var ANNOUNCE_ID  = '2026-10-02-new-server';
-  var KEY          = 'sharky_announcement_closed';
-  var DISCORD_URL  = 'https://discord.gg/F7PP27VXnh';
-  var NEW_API      = 'https://api.sharkmovie.co.uk';
+  var API = 'https://api.sharkmovie.co.uk/announcement';
+  var KEY = 'sharky_announcement_closed';
   var INTRO_MAX_MS = 8000;
+  var shown = false;
 
-  try { if (localStorage.getItem(KEY) === ANNOUNCE_ID) return; } catch (e) {}
+  function closedId() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
 
   var CSS =
-    '#sharkyAnnouncement{position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;' +
-      'justify-content:center;padding:20px;background:rgba(0,0,0,.78);backdrop-filter:blur(6px);' +
-      '-webkit-backdrop-filter:blur(6px);opacity:0;transition:opacity .25s ease}' +
+    '#sharkyAnnouncement{position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483600;display:-webkit-box;display:-webkit-flex;display:flex;' +
+      '-webkit-box-align:center;-webkit-align-items:center;align-items:center;-webkit-box-pack:center;-webkit-justify-content:center;justify-content:center;' +
+      'padding:20px;box-sizing:border-box;background:rgba(0,0,0,.82);opacity:0;-webkit-transition:opacity .25s ease;transition:opacity .25s ease}' +
     '#sharkyAnnouncement.show{opacity:1}' +
-    '#sharkyAnnouncement .sa-card{position:relative;width:100%;max-width:680px;max-height:calc(100vh - 40px);' +
-      'overflow:auto;background:#111118;color:#f2f2f5;border:2px solid #e50914;border-radius:16px;' +
-      'padding:34px 34px 30px;box-shadow:0 24px 80px rgba(0,0,0,.8);font-family:inherit;' +
-      'transform:translateY(12px) scale(.98);transition:transform .25s ease}' +
-    '#sharkyAnnouncement.show .sa-card{transform:none}' +
-    '#sharkyAnnouncement .sa-close{position:absolute;top:12px;right:12px;width:52px;height:52px;' +
-      'border-radius:50%;border:2px solid rgba(255,255,255,.25);background:#1d1d27;color:#fff;' +
-      'font-size:2rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
-      'transition:background .15s,border-color .15s}' +
-    '#sharkyAnnouncement .sa-close:hover,#sharkyAnnouncement .sa-close:focus-visible{background:#e50914;' +
-      'border-color:#e50914;outline:none}' +
-    '#sharkyAnnouncement .sa-tag{display:inline-block;background:#e50914;color:#fff;font-weight:800;' +
-      'font-size:.8rem;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border-radius:999px;margin-bottom:14px}' +
-    '#sharkyAnnouncement h2{margin:0 60px 16px 0;font-size:clamp(1.5rem,3.4vw,2.1rem);line-height:1.2;font-weight:900}' +
-    '#sharkyAnnouncement p{margin:0 0 14px;font-size:clamp(1.02rem,2.1vw,1.2rem);line-height:1.6;color:#d6d6de}' +
-    '#sharkyAnnouncement .sa-api{display:block;margin:6px 0 18px;padding:12px 16px;background:#1b1b26;' +
-      'border:1px solid #2e2e3e;border-radius:10px;font-family:ui-monospace,Consolas,monospace;' +
-      'font-size:clamp(1rem,2.2vw,1.15rem);color:#7dd3fc;word-break:break-all;text-decoration:none}' +
-    '#sharkyAnnouncement .sa-discord{display:inline-flex;align-items:center;gap:10px;margin-top:6px;' +
-      'background:#5865f2;color:#fff;font-weight:800;font-size:1.05rem;padding:12px 20px;border-radius:10px;' +
-      'text-decoration:none}' +
-    '#sharkyAnnouncement .sa-discord:hover{background:#4752c4}' +
+    '#sharkyAnnouncement .sa-card{position:relative;width:100%;max-width:680px;max-height:90%;overflow:auto;box-sizing:border-box;' +
+      'background:#111118;color:#f2f2f5;border:2px solid #e50914;border-radius:16px;padding:34px 34px 30px;' +
+      'box-shadow:0 24px 80px rgba(0,0,0,.8);font-family:inherit;text-align:left}' +
+    '#sharkyAnnouncement .sa-close{position:absolute;top:12px;right:12px;width:52px;height:52px;border-radius:50%;' +
+      'border:2px solid rgba(255,255,255,.25);background:#1d1d27;color:#fff;font-size:2rem;line-height:44px;cursor:pointer;padding:0;text-align:center}' +
+    '#sharkyAnnouncement .sa-close:hover,#sharkyAnnouncement .sa-close:focus{background:#e50914;border-color:#e50914;outline:none}' +
+    '#sharkyAnnouncement .sa-tag{display:inline-block;background:#e50914;color:#fff;font-weight:800;font-size:.8rem;' +
+      'letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border-radius:999px;margin-bottom:14px}' +
+    '#sharkyAnnouncement h2{margin:0 60px 16px 0;font-size:1.7rem;line-height:1.2;font-weight:900;color:#fff}' +
+    '#sharkyAnnouncement p{margin:0 0 14px;font-size:1.1rem;line-height:1.6;color:#d6d6de}' +
+    '#sharkyAnnouncement .sa-go{display:inline-block;margin-top:6px;background:#e50914;color:#fff;font-weight:800;' +
+      'font-size:1.05rem;padding:12px 20px;border-radius:10px;text-decoration:none}' +
+    '#sharkyAnnouncement .sa-go:focus{outline:3px solid #fff}' +
     '#sharkyAnnouncement .sa-hint{margin:18px 0 0;font-size:.85rem;color:#8a8a99}' +
-    '@media (max-width:560px){#sharkyAnnouncement .sa-card{padding:26px 20px 22px}' +
-      '#sharkyAnnouncement .sa-close{width:46px;height:46px}}';
+    '@media (max-width:560px){#sharkyAnnouncement .sa-card{padding:26px 20px 22px}#sharkyAnnouncement h2{font-size:1.4rem}' +
+      '#sharkyAnnouncement p{font-size:1rem}#sharkyAnnouncement .sa-close{width:46px;height:46px;line-height:38px}}' +
+    '@media (min-width:1700px){#sharkyAnnouncement .sa-card{max-width:900px}#sharkyAnnouncement h2{font-size:2.4rem}' +
+      '#sharkyAnnouncement p{font-size:1.5rem}}';
 
-  function build() {
-    if (document.getElementById('sharkyAnnouncement')) return;
-
+  function build(a) {
+    if (shown || document.getElementById('sharkyAnnouncement')) return;
+    shown = true;
     var style = document.createElement('style');
     style.textContent = CSS;
     document.head.appendChild(style);
+
+    var paras = String(a.body || '').replace(/\r/g, '').split(/\n\s*\n/), body = '';
+    for (var i = 0; i < paras.length; i++) {
+      if (paras[i].replace(/\s/g, '')) body += '<p>' + esc(paras[i]).replace(/\n/g, '<br>') + '</p>';
+    }
+    var link = /^https?:\/\//i.test(a.link || '') ? a.link : '';
+    var tv = !!document.getElementById('sa-tv-marker') || /\/tv\//.test(location.pathname);
 
     var wrap = document.createElement('div');
     wrap.id = 'sharkyAnnouncement';
     wrap.setAttribute('role', 'dialog');
     wrap.setAttribute('aria-modal', 'true');
-    wrap.setAttribute('aria-labelledby', 'saTitle');
     wrap.innerHTML =
       '<div class="sa-card">' +
         '<button class="sa-close" type="button" aria-label="Close announcement">&times;</button>' +
         '<span class="sa-tag">Announcement</span>' +
-        '<h2 id="saTitle">Sorry the player hasn’t worked today</h2>' +
-        '<p>We got hit with a <b>£200 hosting charge</b>, so we had to shut everything down, ' +
-          're-evaluate, and move Sharky to a brand new server.</p>' +
-        '<p>Our new API can be found at:</p>' +
-        '<a class="sa-api" href="' + NEW_API + '/" target="_blank" rel="noopener">' + NEW_API + '</a>' +
-        '<p>The player should now be working again. If you find any bugs, please let us know in the Discord!</p>' +
-        '<a class="sa-discord" href="' + DISCORD_URL + '" target="_blank" rel="noopener">' +
-          '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.2.5c1.6.4 2.9 1 4.1 1.8a13.7 13.7 0 0 0-1.9-.6 16.5 16.5 0 0 0-3.2-.3h-.4a16.5 16.5 0 0 0-3.2.3c-.6.1-1.3.3-1.9.6a15 15 0 0 1 4.1-1.8L12.6 3a19.8 19.8 0 0 0-4.9 1.4C4.9 8.3 4.2 12 4.5 15.7a19.9 19.9 0 0 0 6 3l1.2-1.7a12.9 12.9 0 0 1-2-1l.4-.3a14.2 14.2 0 0 0 12 0l.4.3c-.6.4-1.3.7-2 1l1.2 1.7a19.9 19.9 0 0 0 6-3c.4-4.3-.7-8-3.4-11.3ZM9.7 13.5c-1.2 0-2.1-1.1-2.1-2.4 0-1.3.9-2.4 2.1-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4Zm4.6 0c-1.2 0-2.1-1.1-2.1-2.4 0-1.3.9-2.4 2.1-2.4s2.2 1.1 2.2 2.4c0 1.3-1 2.4-2.2 2.4Z"/></svg>' +
-          '<span>Join the Discord</span>' +
-        '</a>' +
-        '<p class="sa-hint">Click the × in the corner to close this.</p>' +
+        '<h2>' + esc(a.title) + '</h2>' + body +
+        (link ? '<a class="sa-go" href="' + esc(link) + '" target="_blank" rel="noopener">' + esc(a.link_text || 'Find out more') + '</a>' : '') +
+        '<p class="sa-hint">' + (tv ? 'Press OK or Back to close.' : 'Click the &times; in the corner to close this.') + '</p>' +
       '</div>';
-
     document.body.appendChild(wrap);
     var prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';      // no scrolling the page behind it
+    document.body.style.overflow = 'hidden';
+    var closeBtn = wrap.querySelector('.sa-close'), goBtn = wrap.querySelector('.sa-go');
 
-    var closeBtn = wrap.querySelector('.sa-close');
-    closeBtn.addEventListener('click', function () {
-      try { localStorage.setItem(KEY, ANNOUNCE_ID); } catch (e) {}
-      wrap.classList.remove('show');
+    function close() {
+      try { localStorage.setItem(KEY, a.id); } catch (e) {}
+      window.removeEventListener('keydown', onKey, true);
+      wrap.className = '';
       document.body.style.overflow = prevOverflow;
       setTimeout(function () { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 260);
-    });
+    }
+    /* A TV remote: OK closes (or opens the button if it is focused), Back
+       closes, left/right/up/down move between the two. Nothing reaches the
+       app underneath while this is up. */
+    function onKey(e) {
+      var k = e.key, c = e.keyCode;
+      var back = k === 'Escape' || k === 'GoBack' || k === 'BrowserBack' || c === 27 || c === 4 || c === 10009 || c === 461 ||
+                 (k === 'Backspace' || c === 8);
+      var ok = k === 'Enter' || c === 13 || c === 23;
+      var arrow = c >= 37 && c <= 40;
+      if (!back && !ok && !arrow) return;
+      e.preventDefault();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      e.stopPropagation();
+      if (back) { close(); return; }
+      if (ok) {
+        if (goBtn && document.activeElement === goBtn) { window.open(link, '_blank'); return; }
+        close(); return;
+      }
+      if (goBtn) (document.activeElement === goBtn ? closeBtn : goBtn).focus();
+    }
+    window.addEventListener('keydown', onKey, true);
+    closeBtn.addEventListener('click', close);
+    wrap.addEventListener('click', function (e) { if (e.target === wrap) close(); });
 
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        wrap.classList.add('show');
-        try { closeBtn.focus({ preventScroll: true }); } catch (e) {}   // a TV remote's OK closes it
-      });
-    });
+    setTimeout(function () {
+      wrap.className = 'show';
+      try { closeBtn.focus(); } catch (e) {}
+    }, 30);
   }
 
-  /* Same as the support popup: wait for the SHARKY intro splash to finish,
-     or the notice sits underneath it where nobody can click it. */
-  function whenIntroDone(fn) {
-    var body = document.body;
-    if (!body) { setTimeout(function () { whenIntroDone(fn); }, 50); return; }
-    if (body.classList.contains('intro-done') || !document.getElementById('intro')) { fn(); return; }
-    var fired = false, obs = null;
-    function go() {
-      if (fired) return; fired = true;
-      if (obs) { try { obs.disconnect(); } catch (e) {} }
-      clearTimeout(bail); fn();
-    }
-    if (window.MutationObserver) {
-      obs = new MutationObserver(function () { if (document.body.classList.contains('intro-done')) go(); });
-      obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    }
-    var bail = setTimeout(go, INTRO_MAX_MS);
+  /* Wait until nothing else is on top: the SHARKY intro on the website, and
+     the sign-in / "Who's watching?" screen on the TV app. */
+  function whenClear(fn) {
+    var t0 = new Date().getTime();
+    (function check() {
+      var b = document.body;
+      var intro = b && document.getElementById('intro') && b.className.indexOf('intro-done') < 0 &&
+                  new Date().getTime() - t0 < INTRO_MAX_MS;
+      var acct = window.SharkyAccount && window.SharkyAccount.isOpen;
+      var player = document.querySelector('#player.open');
+      if (!b || intro || acct || player) { setTimeout(check, 700); return; }
+      fn();
+    })();
   }
 
-  function start() { whenIntroDone(function () { setTimeout(build, 300); }); }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
+  function fetchIt() {
+    try {
+      var x = new XMLHttpRequest();
+      x.open('GET', API, true);
+      x.timeout = 12000;
+      x.onload = function () {
+        if (x.status !== 200) return;
+        var a = null;
+        try { a = JSON.parse(x.responseText); } catch (e) { return; }
+        if (!a || !a.id || !a.title || closedId() === a.id) return;
+        whenClear(function () { if (closedId() !== a.id) setTimeout(function () { build(a); }, 300); });
+      };
+      x.send();
+    } catch (e) {}
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fetchIt);
+  else fetchIt();
+  /* Apps that stay open for hours (the TV) look again every 15 minutes, so a
+     scheduled announcement still appears without a restart. */
+  setInterval(function () { if (!shown) fetchIt(); }, 15 * 60 * 1000);
 })();
