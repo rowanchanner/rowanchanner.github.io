@@ -27,6 +27,11 @@
   var S_MOD = 'sharky_acct_mod';
   var MAX_BYTES = 60 * 1024;
 
+  /* "What do you mainly watch Sharky on?" - asked at sign-up, and once of
+     anyone who signed up before the question existed. */
+  var DEVICES = [['tv_browser', 'TV browser'], ['tv_app', 'TV app'], ['firestick', 'Fire Stick app'],
+                 ['phone', 'Phone'], ['computer', 'Computer'], ['other', 'Other']];
+  var devAsked = false;
   var AVATARS = [
     ['🦈', '#0e7490'], ['🍿', '#b91c1c'], ['👽', '#15803d'],
     ['🐱', '#a16207'], ['🐶', '#7c2d12'], ['🦊', '#c2410c'],
@@ -327,13 +332,14 @@
     acct.pid = pid; save();
     close();
     fire(); fireChange();
+    setTimeout(maybeAskDevices, 600);
     return sync().then(function () { fire(); });
   }
 
   function signedIn(d) {
     var had = !!(acct && acct.pid);
     acct = { token: d.token, email: d.email, profiles: d.profiles || [], pid: null, max: d.max_profiles || 5,
-             verified: d.verified !== false };
+             verified: d.verified !== false, devices: d.devices === undefined ? undefined : d.devices };
     save();
     fireChange();
     stopPairPoll();
@@ -379,6 +385,10 @@
       '-webkit-tap-highlight-color:transparent}' +
       '#sa-root.sa-modal{background:rgba(4,4,8,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
       '#sa-root *{box-sizing:border-box}' +
+      '.sa-devs{margin:4px 0 12px;text-align:left}.sa-devq{font-size:.95rem;color:#ccc;margin:6px 0 8px}' +
+      '.sa-dev{display:inline-block;margin:0 6px 8px 0;padding:10px 14px;border-radius:999px;border:2px solid #333;background:#16161f;' +
+      'color:#ddd;font:inherit;font-size:.95rem;cursor:pointer}' +
+      '.sa-dev.sa-sel{border-color:#e50914;background:#2a0d10;color:#fff}.sa-dev.sa-sel:before{content:"\\2713  "}' +
       '.sa-box{width:min(460px,calc(100vw - 32px));padding:28px 24px;margin:auto;position:relative}' +
       '.sa-wide{width:min(980px,calc(100vw - 32px))}' +
       '.sa-logo{font-weight:900;font-size:1.6rem;color:#e50914;letter-spacing:-.5px;text-align:center;margin-bottom:6px}' +
@@ -463,9 +473,29 @@
   function canClose() {
     if (screen === 'link' || screen === 'linked') return !onLinkPage();
     if (screen === 'verify') return !opt.required && !onLinkPage();
+    if (screen === 'devices') return !opt.required;
     if (mustPick) return false;
     if (!opt.required) return true;
     return !!(acct && acct.pid);
+  }
+
+  function devPicker() {
+    var h = '<div class="sa-devs"><div class="sa-devq">What do you mainly watch Sharky on? <span style="color:#888">(tick all that apply)</span></div>';
+    for (var i = 0; i < DEVICES.length; i++) {
+      h += '<button type="button" class="sa-dev sa-f" data-a="dev:' + DEVICES[i][0] + '">' + DEVICES[i][1] + '</button>';
+    }
+    return h + '</div>';
+  }
+  function devPicked() {
+    var out = [];
+    [].forEach.call(root ? root.querySelectorAll('.sa-dev.sa-sel') : [], function (b) { out.push(b.getAttribute('data-a').slice(4)); });
+    return out;
+  }
+  /* Signed in, profile chosen, nothing else on screen, never answered: ask once. */
+  function maybeAskDevices() {
+    if (devAsked || root || !acct || !acct.pid || acct.verified === false || acct.devices !== null) return;
+    devAsked = true;
+    open('devices');
   }
 
   function show(name, data) {
@@ -513,7 +543,8 @@
       h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div><div class="sa-h">Create an account</div><form>' +
         field('email', 'email', 'Email') + field('pw', 'password', 'Password (6+ characters)') +
         field('pw2', 'password', 'Password again') +
-        '<div class="sa-err" id="sa-err"></div>' + (tv ? '<div class="sa-kb" id="sa-kb"></div>' : '') +
+        (tv ? '<div class="sa-kb" id="sa-kb"></div>' : '') + devPicker() +
+        '<div class="sa-err" id="sa-err"></div>' +
         '<button class="sa-btn sa-pri sa-f" data-a="signup" type="submit">Create account</button></form>' +
         '<button class="sa-link sa-f" data-a="go:signin">Already have one? Sign in</button>' +
         (stack.length ? '<button class="sa-link sa-f" data-a="back">← Back</button>' : '') + '</div>';
@@ -568,6 +599,11 @@
         '<button class="sa-btn sa-pri sa-f" data-a="psave" type="submit">Save</button></form>' +
         (p.id && acct && acct.profiles.length > 1 ? '<button class="sa-btn sa-f" data-a="pdel">Delete profile</button>' : '') +
         '<button class="sa-link sa-f" data-a="back">Cancel</button></div>';
+    } else if (name === 'devices') {
+      h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div><div class="sa-h">One quick question</div>' +
+        '<p class="sa-p">It helps us know what to work on next.</p>' + devPicker() +
+        '<div class="sa-err" id="sa-err"></div>' +
+        '<button class="sa-btn sa-pri sa-f" data-a="devsave">Save</button></div>';
     } else if (name === 'verify') {
       h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div><div class="sa-h">Check your email</div>' +
         '<p class="sa-p">We sent a code to <b style="color:#fff">' + esc(acct && acct.email) + '</b>.<br>' +
@@ -652,11 +688,28 @@
     if (cmd === 'signup') {
       err('');
       if (val('pw') !== val('pw2')) { err('The two passwords don’t match'); return; }
+      var devs = devPicked();
+      if (!devs.length) { err('Tick at least one thing you watch Sharky on'); return; }
       busy(true);
       var em2 = val('email').trim();
       lsSet('sharky_acct_last', em2);
-      call('signup', { email: em2, password: val('pw') }).then(signedIn)
+      call('signup', { email: em2, password: val('pw'), devices: devs }).then(signedIn)
         .catch(function (e) { err(e.message); }).then(function () { busy(false); });
+      return;
+    }
+    if (cmd === 'dev') {
+      var db = root.querySelector('[data-a="dev:' + arg + '"]');
+      if (db) db.classList.toggle('sa-sel');
+      return;
+    }
+    if (cmd === 'devsave') {
+      var picks = devPicked();
+      if (!picks.length) { err('Tick at least one'); return; }
+      err(''); busy(true);
+      call('set_devices', { devices: picks }).then(function (d) {
+        if (acct) { acct.devices = d.devices || picks; save(); }
+        close();
+      }).catch(function (e) { err(e.message); }).then(function () { busy(false); });
       return;
     }
     if (cmd === 'vok') {
@@ -945,9 +998,11 @@
     return call('me', {}).then(function (d) {
       acct.profiles = d.profiles; acct.email = d.email;
       var wasV = acct.verified !== false;
+      acct.devices = d.devices === undefined ? acct.devices : d.devices;
       acct.verified = d.verified !== false;
       if (!acct.verified && !root) { save(); fireChange(); open('verify'); return; }
       if (acct.verified && !wasV) { save(); fireChange(); if (acct.pid) sync(); }
+      setTimeout(maybeAskDevices, 800);
       var still = acct.profiles.some(function (p) { return p.id === acct.pid; });
       if (acct.pid && !still) { acct.pid = null; clearLocal(); fire(); }
       save(); fireChange();
