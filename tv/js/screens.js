@@ -207,18 +207,26 @@
      on a preview is a poor trade against the thing you are about to play — so
      this is a Settings toggle rather than a default, and it stops the moment
      the highlight moves or anything starts playing. */
-  var previewTimer = null;
+  var previewTimer = null, detTimer = null, bbTrailer = null, detTrailer = null;
+
+  /* Both trailer spots use trailer.js: it keeps the still up until YouTube's
+     own title and buttons have gone, loops without flashing them, and tries
+     another trailer if one won't play. */
+  function trailers() {
+    if (!bbTrailer && window.TVTrailer && document.getElementById('bbPreview')) {
+      bbTrailer = TVTrailer.create(document.getElementById('bbPreview'), document.getElementById('billboard'), 'previewing');
+    }
+    if (!detTrailer && window.TVTrailer && document.getElementById('detPreview')) {
+      detTrailer = TVTrailer.create(document.getElementById('detPreview'), document.getElementById('detailsBackdrop'), 'previewing');
+    }
+  }
 
   function stopPreview() {
-    clearTimeout(previewTimer);
-    previewTimer = null;
-    var frame = document.getElementById('bbPreview');
-    if (frame && frame.getAttribute('src')) {
-      frame.removeAttribute('src');
-      frame.classList.add('off');
-    }
-    var bb = document.getElementById('billboard');
-    if (bb) bb.classList.remove('previewing');
+    clearTimeout(previewTimer); previewTimer = null;
+    clearTimeout(detTimer); detTimer = null;
+    trailers();
+    if (bbTrailer) bbTrailer.stop();
+    if (detTrailer) detTrailer.stop();
   }
 
   function queuePreview(item) {
@@ -226,17 +234,8 @@
     if (Player.isOpen) return;
     previewTimer = setTimeout(function () {
       if (billboardItem !== item || Player.isOpen || Screens.name !== 'home') return;
-      API.trailerKey(item.kind, item.id).then(function (key) {
-        if (!key || billboardItem !== item || Player.isOpen) return;
-        if (Screens.name !== 'home') return;
-        var frame = document.getElementById('bbPreview');
-        if (!frame) return;
-        frame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(key) +
-          '?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1' +
-          '&playlist=' + encodeURIComponent(key) + '&iv_load_policy=3&disablekb=1';
-        frame.classList.remove('off');
-        document.getElementById('billboard').classList.add('previewing');
-      });
+      trailers();
+      if (bbTrailer) bbTrailer.play(item.kind, item.id);
     }, 2200);
   }
 
@@ -677,6 +676,16 @@
 
     detail = { item: item, season: 1, episodes: [] };
 
+    /* Trailer behind the details, once you've stayed a moment. */
+    if (CFG.PREVIEWS) {
+      clearTimeout(detTimer);
+      detTimer = setTimeout(function () {
+        if (Screens.name !== 'details' || !detail || detail.item !== item || Player.isOpen) return;
+        trailers();
+        if (detTrailer) detTrailer.play(item.kind, item.id);
+      }, 1500);
+    }
+
     return API.details(item.kind, item.id).then(function (d) {
       detail.tmdb = d;
       host.innerHTML = '';
@@ -915,10 +924,10 @@
     ));
 
     host.appendChild(settingRow(
-      'Trailer previews on the billboard',
+      'Trailer previews',
       CFG.PREVIEWS
-        ? 'On \u2014 the trailer plays behind the artwork after a moment'
-        : 'Off \u2014 a still instead. A Fire Stick has one video decoder, and this spends it',
+        ? 'On \u2014 trailers play behind the artwork on Home and on a title\u2019s page'
+        : 'Off \u2014 a still picture instead',
       CFG.PREVIEWS ? 'Turn off' : 'Turn on',
       function () {
         CFG.PREVIEWS = !CFG.PREVIEWS;
