@@ -234,8 +234,8 @@
     if (Player.isOpen) return;
     previewTimer = setTimeout(function () {
       if (billboardItem !== item || Player.isOpen || Screens.name !== 'home') return;
-      trailers();
-      if (bbTrailer) bbTrailer.play(item.kind, item.id);
+      /* The highlighted card plays its own trailer now (one video decoder on
+         a Fire Stick), so the billboard keeps its still. */
     }, 2200);
   }
 
@@ -926,7 +926,7 @@
     host.appendChild(settingRow(
       'Trailer previews',
       CFG.PREVIEWS
-        ? 'On \u2014 trailers play behind the artwork on Home and on a title\u2019s page'
+        ? 'On \u2014 rest on a title and its trailer plays; also on a title\u2019s page'
         : 'Off \u2014 a still picture instead',
       CFG.PREVIEWS ? 'Turn off' : 'Turn on',
       function () {
@@ -1086,6 +1086,7 @@
     currentName = name;
 
     stopPreview();
+    if (window.TVTrailer) TVTrailer.stopCard();
     [].forEach.call(document.querySelectorAll('.screen'), function (s) {
       s.classList.add('off');
     });

@@ -11,8 +11,9 @@
   'use strict';
   var all = [];
 
-  function create(frame, host, showClass) {
-    var t = { frame: frame, host: host, cls: showClass || 'previewing', keys: [], timer: null, reveal: null, my: 0 };
+  function create(frame, host, showClass, revealMs) {
+    var t = { frame: frame, host: host, cls: showClass || 'previewing', keys: [], timer: null, reveal: null, my: 0,
+              revealMs: revealMs || 3500 };
     all.push(t);
     t.play = function (kind, id) {
       t.stop();
@@ -28,7 +29,7 @@
       clearTimeout(t.timer); clearTimeout(t.reveal); t.reveal = null;
       t.keys = [];
       if (t.frame.getAttribute('src')) t.frame.removeAttribute('src');
-      t.frame.className = 'off';
+      t.frame.classList.add('off');
       hide(t);
     };
     return t;
@@ -50,7 +51,7 @@
     t.frame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(key) +
       '?autoplay=1&mute=1&controls=0&fs=0&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1' +
       '&cc_load_policy=0&enablejsapi=1&origin=' + encodeURIComponent(location.protocol + '//' + location.host);
-    t.frame.className = '';
+    t.frame.classList.remove('off');
     clearTimeout(t.timer);
     t.timer = setTimeout(function () { next(t); }, 14000);     // never started: try another
   }
@@ -76,7 +77,7 @@
       if (st === 1) {
         clearTimeout(t.timer);
         if (!t.reveal && t.host.className.indexOf(t.cls) < 0) {
-          (function (tt) { tt.reveal = setTimeout(function () { tt.reveal = null; show(tt); }, 3500); })(t);
+          (function (tt) { tt.reveal = setTimeout(function () { tt.reveal = null; show(tt); }, tt.revealMs); })(t);
         }
       } else {
         clearTimeout(t.reveal); t.reveal = null;
@@ -94,5 +95,43 @@
     }
   }, 700);
 
-  w.TVTrailer = { create: create, stopAll: function () { for (var i = 0; i < all.length; i++) all[i].stop(); } };
+  /* ── Card previews: rest on a card for a second and its picture becomes
+     the trailer, like Netflix. One frame, moved from card to card, so only
+     one trailer ever plays. */
+  var cardT = null, cardTimer = null, cardEl = null;
+  function stopCard() {
+    clearTimeout(cardTimer); cardTimer = null;
+    if (cardT) cardT.stop();
+    cardEl = null;
+  }
+  function cardFocus(el) {
+    stopCard();
+    if (!el || !el.classList || !el.classList.contains('card') || !el.__item) return;
+    if (!(w.CFG && w.CFG.PREVIEWS)) return;
+    var item = el.__item;
+    if (!item.id || (item.kind !== 'movie' && item.kind !== 'tv')) return;
+    cardEl = el;
+    cardTimer = setTimeout(function () {
+      if (cardEl !== el || (w.Player && w.Player.isOpen)) return;
+      if (w.Nav && w.Nav.current && w.Nav.current !== el) return;
+      var art = el.querySelector('.card-art');
+      if (!art) return;
+      if (!cardT) {
+        var f = document.createElement('iframe');
+        f.className = 'card-trailer off';
+        f.setAttribute('title', 'Trailer');
+        f.setAttribute('allow', 'autoplay; encrypted-media');
+        f.setAttribute('frameborder', '0');
+        f.setAttribute('tabindex', '-1');
+        cardT = create(f, art, 'previewing', 2500);
+      }
+      var img = art.querySelector('img');
+      art.insertBefore(cardT.frame, img ? img.nextSibling : art.firstChild);
+      cardT.host = art;
+      cardT.play(item.kind, item.id);
+    }, 1000);
+  }
+
+  w.TVTrailer = { create: create, cardFocus: cardFocus, stopCard: stopCard,
+                  stopAll: function () { stopCard(); for (var i = 0; i < all.length; i++) all[i].stop(); } };
 })(window);

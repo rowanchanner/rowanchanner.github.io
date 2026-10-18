@@ -119,6 +119,8 @@
     /* The backdrop follows the highlight around the home screen. */
     document.addEventListener('nav:focus', function (e) {
       var el = e.detail.el;
+      /* Rest on a card and it turns into its trailer (or stop the last one). */
+      if (window.TVTrailer) TVTrailer.cardFocus(el);
       if (!el.classList.contains('card') || !el.__item) return;
       if (Screens.name === 'home') Screens.setHero(el.__item);
     });
