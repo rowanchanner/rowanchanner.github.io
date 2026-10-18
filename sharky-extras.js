@@ -60,6 +60,14 @@
     '.sx-c .sx-del{background:none;border:0;color:#888;font:inherit;font-size:.78rem;cursor:pointer;margin-left:8px;padding:0}' +
     '.sx-c .sx-del:hover{color:#e50914}' +
     '.sx-empty{color:#777;padding:14px 0;border-top:1px solid #23232e}' +
+    '.sx-sort{float:right;display:inline-flex;gap:4px}.sx-sort button{background:#1c1c26;color:#aaa;border:1px solid #2c2c3a;border-radius:999px;padding:5px 12px;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer}' +
+    '.sx-sort button.on{background:#fff;color:#111;border-color:#fff}' +
+    '.sx-acts{display:flex;gap:14px;margin-top:6px;align-items:center}' +
+    '.sx-acts button{background:none;border:0;color:#999;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer;padding:2px 0}' +
+    '.sx-acts button:hover{color:#fff}.sx-acts .sx-like.on{color:#e50914}.sx-acts .sx-del{margin-left:0}' +
+    '.sx-replies .sx-c{border-top:0;padding:10px 0 0}.sx-replies .sx-av,.sx-replies .sx-av .sa-av{width:30px!important;height:30px!important;flex-basis:30px;font-size:1rem!important}' +
+    '.sx-rbox textarea{min-height:42px;margin-top:10px}.sx-rbox .sx-cancel{background:#2a2a36;color:#ddd;border:0;border-radius:8px;padding:9px 14px;font:inherit;font-weight:700;cursor:pointer}' +
+    '.sx-removed{color:#777;font-style:italic}' +
     '.sx-trailer.sx-in{position:absolute;top:0;left:0;right:0;bottom:0;max-width:none;width:auto;aspect-ratio:auto;margin:0;border-radius:0;box-shadow:none;z-index:0;background:transparent!important}' +
     '.sx-in .sx-tbtns{z-index:3;right:10px;bottom:auto;top:10px}.sx-in .sx-tlabel,.sx-in .sx-shade{display:none}' +
     '.sx-in .sx-tb{padding:6px 10px;font-size:.75rem}' +
@@ -224,15 +232,54 @@
     if (s < 86400 * 30) return Math.floor(s / 86400) + 'd ago';
     return new Date(t * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
   }
+  var sortMode = ls('sharky_cmt_sort') === 'new' ? 'new' : 'top';
+  function cHtml(c, parentId) {
+    var reply = !!parentId;
+    if (c.removed) {
+      return '<div class="sx-c" data-id="' + c.id + '"><div class="sx-av"></div><div class="sx-box">' +
+        '<div class="sx-text sx-removed">Comment deleted</div>' +
+        '<div class="sx-replies">' + c.replies.map(function (r) { return cHtml(r, c.id); }).join('') + '</div>' +
+        '<div class="sx-rbox" data-rbox="' + c.id + '"></div></div></div>';
+    }
+    return '<div class="sx-c" data-id="' + c.id + '"><div class="sx-av">' + avatar(c.avatar) + '</div><div class="sx-box">' +
+      '<div><span class="sx-who">' + esc(c.name) + '</span><span class="sx-when">' + ago(c.at) + '</span></div>' +
+      '<div class="sx-text">' + esc(c.text) + '</div>' +
+      '<div class="sx-acts"><button class="sx-like' + (c.liked ? ' on' : '') + '" data-like="' + c.id + '" aria-label="Like">' +
+      (c.liked ? '&#9829;' : '&#9825;') + ' <span>' + (c.likes || '') + '</span></button>' +
+      '<button data-reply="' + (parentId || c.id) + '" data-to="' + esc(c.name) + '">Reply</button>' +
+      (c.mine ? '<button class="sx-del" data-del="' + c.id + '">Delete</button>' : '') + '</div>' +
+      (reply ? '' : '<div class="sx-replies">' + (c.replies || []).map(function (r) { return cHtml(r, c.id); }).join('') + '</div>' +
+                    '<div class="sx-rbox" data-rbox="' + c.id + '"></div>') +
+      '</div></div>';
+  }
   function render() {
-    countEl.textContent = comments.length ? '(' + comments.length + ')' : '';
+    var total = 0;
+    comments.forEach(function (c) { total += (c.removed ? 0 : 1) + (c.replies || []).length; });
+    countEl.textContent = total ? '(' + total + ')' : '';
+    [].forEach.call(document.querySelectorAll('.sx-sort button'), function (b) { b.className = b.getAttribute('data-sort') === sortMode ? 'on' : ''; });
     if (!comments.length) { listEl.innerHTML = '<div class="sx-empty">No comments yet - be the first.</div>'; return; }
-    listEl.innerHTML = comments.map(function (c) {
-      return '<div class="sx-c"><div class="sx-av">' + avatar(c.avatar) + '</div><div class="sx-box">' +
-        '<div><span class="sx-who">' + esc(c.name) + '</span><span class="sx-when">' + ago(c.at) + '</span>' +
-        (c.mine ? '<button class="sx-del" data-del="' + c.id + '">Delete</button>' : '') + '</div>' +
-        '<div class="sx-text">' + esc(c.text) + '</div></div></div>';
-    }).join('');
+    var list = comments.slice();
+    if (sortMode === 'top') {
+      list.sort(function (a, b) {
+        var sa = (a.likes || 0) + (a.replies || []).length * 0.5, sb = (b.likes || 0) + (b.replies || []).length * 0.5;
+        return sb - sa || b.at - a.at;
+      });
+    } else list.sort(function (a, b) { return b.at - a.at; });
+    listEl.innerHTML = list.map(function (c) { return cHtml(c); }).join('');
+  }
+  function findC(cid) {
+    for (var i = 0; i < comments.length; i++) {
+      if (comments[i].id === cid) return comments[i];
+      var rs = comments[i].replies || [];
+      for (var j = 0; j < rs.length; j++) if (rs[j].id === cid) return rs[j];
+    }
+    return null;
+  }
+  /* Not allowed yet: show why at the top box and bring it into view. */
+  function gate() {
+    if (!needAccount()) return false;
+    try { msgEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+    return true;
   }
   function renderCompose() {
     var p = prof();
@@ -280,7 +327,7 @@
   function buildComments(target) {
     var sec = document.createElement('section');
     sec.className = target ? 'sx-comments sx-m' : 'sx-comments';
-    sec.innerHTML = '<h2>Comments <span></span></h2>' +
+    sec.innerHTML = '<h2>Comments <span></span><span class="sx-sort"><button data-sort="top">Top</button><button data-sort="new">Newest</button></span></h2>' +
       '<div class="sx-compose"><div class="sx-av"></div><div class="sx-box">' +
       '<textarea maxlength="600" placeholder="Add a comment…"></textarea>' +
       '<div class="sx-row"><span class="sx-n"></span><button class="sx-post">Post</button></div>' +
@@ -290,7 +337,7 @@
     else if (after) after.parentNode.insertBefore(sec, after.nextSibling);
     else if (before) before.parentNode.insertBefore(sec, before);
     else ($('main') || document.body).appendChild(sec);
-    listEl = $('.sx-list', sec); countEl = $('h2 span', sec); boxEl = $('textarea', sec);
+    listEl = $('.sx-list', sec); countEl = $('h2 > span', sec); boxEl = $('textarea', sec);
     msgEl = $('.sx-msg', sec); postBtn = $('.sx-post', sec); avEl = $('.sx-compose .sx-av', sec); nEl = $('.sx-n', sec);
     boxEl.addEventListener('focus', function () { if (!acct()) needAccount(); });
     boxEl.addEventListener('input', count);
@@ -299,12 +346,53 @@
     sec.addEventListener('click', function (e) {
       var g = e.target.closest ? e.target.closest('[data-go]') : null;
       if (g && window.SharkyAccount) { say(''); SharkyAccount.open(g.getAttribute('data-go')); return; }
-      var d = e.target.closest ? e.target.closest('[data-del]') : null;
+      var t = e.target.closest ? e.target : null;
+      if (!t) return;
+      var so = t.closest('[data-sort]');
+      if (so) { sortMode = so.getAttribute('data-sort'); ls('sharky_cmt_sort', sortMode); render(); return; }
+      var lk = t.closest('[data-like]');
+      if (lk) {
+        if (gate()) return;
+        var lc = findC(Number(lk.getAttribute('data-like')));
+        if (!lc) return;
+        lc.liked = !lc.liked; lc.likes = Math.max(0, (lc.likes || 0) + (lc.liked ? 1 : -1)); render();
+        api('comment_like', { id: lc.id }).then(function (d2) { lc.liked = d2.liked; lc.likes = d2.likes; render(); })
+          .catch(function (er) { lc.liked = !lc.liked; lc.likes = Math.max(0, lc.likes + (lc.liked ? 1 : -1)); render(); say(esc(er.message)); });
+        return;
+      }
+      var rp = t.closest('[data-reply]');
+      if (rp) {
+        if (gate()) return;
+        var pidr = rp.getAttribute('data-reply'), box = listEl.querySelector('[data-rbox="' + pidr + '"]');
+        if (!box) return;
+        if (!box.innerHTML) {
+          box.innerHTML = '<textarea maxlength="600" placeholder="Reply to ' + esc(rp.getAttribute('data-to') || '') + '…"></textarea>' +
+            '<div class="sx-row"><span class="sx-n"></span><button class="sx-cancel" data-rcancel="' + pidr + '">Cancel</button>' +
+            '<button class="sx-post" data-rpost="' + pidr + '">Reply</button></div>';
+        }
+        box.querySelector('textarea').focus();
+        return;
+      }
+      var rc = t.closest('[data-rcancel]');
+      if (rc) { var b2 = listEl.querySelector('[data-rbox="' + rc.getAttribute('data-rcancel') + '"]'); if (b2) b2.innerHTML = ''; return; }
+      var rpost = t.closest('[data-rpost]');
+      if (rpost) {
+        if (gate()) return;
+        var par = Number(rpost.getAttribute('data-rpost')), b3 = listEl.querySelector('[data-rbox="' + par + '"]');
+        var txt = b3 && b3.querySelector('textarea') ? b3.querySelector('textarea').value.trim() : '';
+        if (!txt) return;
+        rpost.disabled = true;
+        api('comment_add', { kind: kind, id: id, text: txt, profile: acct().pid, parent: par }).then(function (d3) {
+          var pc = findC(par);
+          if (pc) { (pc.replies = pc.replies || []).push(d3.comment); }
+          render();
+        }).catch(function (er) { rpost.disabled = false; say(esc(er.message)); gate(); });
+        return;
+      }
+      var d = t.closest('[data-del]');
       if (d && confirm('Delete your comment?')) {
-        var cid = Number(d.getAttribute('data-del'));
-        api('comment_delete', { id: cid }).then(function () {
-          comments = comments.filter(function (c) { return c.id !== cid; }); render();
-        }).catch(function (er) { say(esc(er.message)); });
+        api('comment_delete', { id: Number(d.getAttribute('data-del')) }).then(load)
+          .catch(function (er) { say(esc(er.message)); });
       }
     });
     /* Signing in / switching profile: refresh who you're posting as and
