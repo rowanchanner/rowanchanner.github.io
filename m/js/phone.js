@@ -527,6 +527,7 @@
   var detailStack = [];   // "More like this" → details → back walks this
 
   function openDetails(item, fromStack) {
+    if (window.SharkyExtras) window.SharkyExtras.stop();
     if (detail && !fromStack) detailStack.push(detail.item);
     detail = { item: item, season: 1 };
     var sheet = $('details');
@@ -557,6 +558,7 @@
   }
 
   function closeDetails() {
+    if (window.SharkyExtras) window.SharkyExtras.stop();
     var sheet = $('details');
     if (detailStack.length) { openDetails(detailStack.pop(), true); return; }
     sheet.classList.remove('open');
@@ -692,6 +694,9 @@
     if (tabEp) tabEp.addEventListener('click', showEpisodes);
     tabMore.addEventListener('click', showMore);
     if (tabEp) showEpisodes(); else showMore();
+    /* Mobile website: trailer in the banner, comments at the bottom
+       (sharky-extras.js - not part of the Android app). */
+    if (window.SharkyExtras && !N) window.SharkyExtras.mount(item.kind, item.id, $('dMedia'), body);
   }
 
   function loadEpisodes(item, season, host, resume) {
@@ -749,6 +754,7 @@
 
   function play(item, season, episode, epName) {
     ctx = { item: item, season: Number(season) || 0, episode: Number(episode) || 0, epName: epName || '' };
+    if (window.SharkyExtras) window.SharkyExtras.pause();
     var p = $('player');
     p.classList.add('open');
     p.setAttribute('aria-hidden', 'false');
