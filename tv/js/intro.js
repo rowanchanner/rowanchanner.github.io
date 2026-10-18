@@ -62,17 +62,22 @@
       audio.currentTime = 0;
       var p = audio.play();
       if (p && p.catch) p.catch(function () {});
+      /* Never talk over a film someone has started. */
+      var guard = setInterval(function () {
+        if (audio.paused || audio.ended) { clearInterval(guard); return; }
+        if (w.Player && w.Player.isOpen) { try { audio.pause(); } catch (e2) {} clearInterval(guard); }
+      }, 300);
     } catch (e) {}
   }
 
-  function finish() {
+  function finish(e) {
     if (done) return;
     done = true;
     clearTimeout(finishTimer);
     document.removeEventListener('keydown', finish, true);
 
     /* Duck the sting out with the picture rather than cutting it dead. */
-    if (audio && !audio.paused) {
+    if (audio && !audio.paused && e && e.type === 'keydown') {  /* the start sound runs longer than the picture: let it play out unless a key skips it */
       var steps = 12, i = 0;
       var fade = setInterval(function () {
         i++;
