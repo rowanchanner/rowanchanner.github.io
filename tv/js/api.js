@@ -239,30 +239,6 @@
         });
     },
 
-    /* Best few trailer keys, best first (the next is tried if one won't play). */
-    trailerKeys: function (kind, id) {
-      var k = 'all:' + kind + ':' + id;
-      if (k in trailerCache) return Promise.resolve(trailerCache[k]);
-      return tmdb('/' + (kind === 'tv' ? 'tv' : 'movie') + '/' + id + '/videos')
-        .then(function (d) {
-          var scored = [];
-          ((d && d.results) || []).forEach(function (v) {
-            if (v.site !== 'YouTube' || !v.key) return;
-            var score = 0;
-            if (v.type === 'Trailer') score += 100;
-            else if (v.type === 'Teaser') score += 60;
-            else return;
-            if (v.official) score += 30;
-            if ((v.iso_639_1 || 'en') === 'en') score += 20;
-            scored.push({ key: v.key, s: score });
-          });
-          scored.sort(function (a, b) { return b.s - a.s; });
-          trailerCache[k] = scored.slice(0, 4).map(function (x) { return x.key; });
-          return trailerCache[k];
-        })
-        .catch(function () { trailerCache[k] = []; return []; });
-    },
-
     /* The trailer's YouTube key, for the billboard preview. */
     trailerKey: function (kind, id) {
       var k = kind + ':' + id;
