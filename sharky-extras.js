@@ -31,7 +31,7 @@
   var css = document.createElement('style');
   css.textContent =
     '.sx-trailer{position:relative;width:100%;max-width:1100px;aspect-ratio:16/9;margin:18px 0 26px;border-radius:14px;overflow:hidden;background:#000;box-shadow:0 18px 50px rgba(0,0,0,.6)}' +
-    '.sx-trailer iframe{position:absolute;top:-1px;left:0;width:100%;height:calc(100% + 2px);border:0;pointer-events:none;opacity:0;transition:opacity .6s}' +
+    '.sx-trailer iframe{position:absolute;top:-1px;left:0;width:100%;height:calc(100% + 2px);border:0;pointer-events:none;opacity:0;transition:opacity .8s;transform:scale(1.32);transform-origin:center}' +
     '.sx-trailer.on iframe{opacity:1}' +
     '.sx-trailer .sx-shade{position:absolute;left:0;right:0;bottom:0;height:40%;background:linear-gradient(transparent,rgba(0,0,0,.65));pointer-events:none}' +
     '.sx-tbtns{position:absolute;right:14px;bottom:14px;display:flex;gap:8px;z-index:2}' +
@@ -83,18 +83,31 @@
     vids.sort(function (a, b) { return score(b) - score(a); });
     return vids.filter(function (v) { return score(v) >= 40; }).slice(0, 4);
   }
-  var candidates = [], backdrop = '', startTimer = null;
+  var candidates = [], backdrop = '', startTimer = null, revealTimer = null;
   /* YouTube tells the page how the video is doing once we say we're listening. */
   window.addEventListener('message', function (e) {
     if (!tFrame || !/youtube(-nocookie)?\.com$/.test((e.origin || '').replace(/^https?:\/\//, ''))) return;
     var d; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (x) { return; }
     if (!d) return;
     var state = d.event === 'onStateChange' ? d.info : (d.event === 'infoDelivery' && d.info ? d.info.playerState : undefined);
-    if (state === 1 && tBox) { clearTimeout(startTimer); tBox.className += ' on'; }
-    if (d.event === 'onError') nextTrailer();
+    if (d.event === 'onError') { nextTrailer(); return; }
+    if (state === undefined || !tBox) return;
+    /* YouTube puts its title and big buttons over the first few seconds and
+       over every pause / buffer / restart. Keep the backdrop up until
+       they've gone, and drop back to it whenever they would show. */
+    if (state === 1) {
+      clearTimeout(startTimer);
+      if (!revealTimer && !/\bon\b/.test(tBox.className)) {
+        revealTimer = setTimeout(function () { revealTimer = null; if (tBox && !/\bon\b/.test(tBox.className)) tBox.className += ' on'; }, 3500);
+      }
+    } else {
+      clearTimeout(revealTimer); revealTimer = null;
+      tBox.className = tBox.className.replace(/\s*\bon\b/g, '');
+      if (state === 0) { yt('seekTo', [0, true]); yt('playVideo'); }     // our own loop
+    }
   });
   function nextTrailer() {
-    clearTimeout(startTimer);
+    clearTimeout(startTimer); clearTimeout(revealTimer); revealTimer = null;
     if (tBox) { tBox.parentNode.removeChild(tBox); tBox = null; tFrame = null; }
     candidates.shift();
     if (candidates.length) buildTrailer(candidates[0]);
@@ -106,7 +119,7 @@
     tBox = document.createElement('div');
     tBox.className = mediaEl ? 'sx-trailer sx-in' : 'sx-trailer';
     var src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(v.key) +
-      '?autoplay=1&mute=1&controls=0&loop=1&playlist=' + encodeURIComponent(v.key) +
+      '?autoplay=1&mute=1&controls=0&fs=0&cc_load_policy=0' +
       '&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin);
     if (backdrop && !mediaEl) tBox.style.background = '#000 url("' + backdrop + '") center/cover';
     tBox.innerHTML = '<iframe tabindex="-1" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" src="' + src + '"></iframe>' +
@@ -309,7 +322,7 @@
 
   function stop() {
     mountNo++;
-    clearTimeout(startTimer);
+    clearTimeout(startTimer); clearTimeout(revealTimer); revealTimer = null;
     if (tBox && tBox.parentNode) tBox.parentNode.removeChild(tBox);
     tBox = null; tFrame = null; candidates = []; muted = true;
   }
