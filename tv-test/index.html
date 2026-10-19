@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141414">
+<title>Sharky Movies</title>
+<link rel="icon" href="img/logo-128.png">
+<script>
+(function () {
+  var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
+  document.write('<link rel="stylesheet" href="css/app.css' +
+                 (bust ? '?v=' + encodeURIComponent(bust) : '') + '">');
+})();
+</script>
+<noscript><link rel="stylesheet" href="css/app.css"></noscript>
+</head>
+<body data-screen="home">
+
+<!-- COLD OPEN
+     The wordmark from the website with a sting under it. Netflix earns its
+     ident by playing it every launch, so this does too - but any key gets you
+     past it, because theatre you cannot skip is a toll booth. -->
+<div id="intro" class="intro">
+  <div class="intro-inner">
+    <img id="introMark" class="intro-shark" src="img/logo.png" alt="">
+    <div class="intro-word">
+      <span>S</span><span>H</span><span>A</span><span>R</span><span>K</span><span>Y</span>
+    </div>
+    <div class="intro-sub">M O V I E S</div>
+  </div>
+</div>
+
+<!-- Loading state, once the ident has cleared. -->
+<div id="splash" class="off">
+  <img class="splash-shark" src="img/logo.png" alt="">
+  <div class="splash-word">SHARKY</div>
+  <div class="spinner"></div>
+  <div id="splashStatus" class="splash-status">Starting</div>
+</div>
+
+<div id="app">
+
+  <header id="topnav">
+    <div class="nav-brand">
+      <img class="nav-shark" src="img/logo-128.png" alt="">
+      <span class="nav-word">SHARKY</span>
+    </div>
+    <nav class="nav-links">
+      <button type="button" class="f nav-link on" data-screen="home" data-key="nav-home">Home</button>
+      <button type="button" class="f nav-link" data-screen="movies" data-key="nav-movies">Films</button>
+      <button type="button" class="f nav-link" data-screen="tv" data-key="nav-tv">Series</button>
+      <button type="button" class="f nav-link" data-screen="mylist" data-key="nav-list">My List</button>
+      <button type="button" class="f nav-link" data-screen="search" data-key="nav-search">Search</button>
+      <button type="button" class="f nav-link" data-screen="settings" data-key="nav-settings">Settings</button>
+    </nav>
+  </header>
+
+  <main id="main">
+
+    <!-- HOME -->
+    <section id="screen-home" class="screen scroller">
+      <div id="billboard">
+        <div id="billboardArt"></div>
+        <iframe id="bbPreview" class="off" title="Trailer"
+                allow="autoplay; encrypted-media" frameborder="0"></iframe>
+        <div class="bb-fade"></div>
+        <div class="bb-text">
+          <div id="bbKind" class="bb-kind"></div>
+          <!-- The show's own lettering when TMDB has it, the plain title when
+               it does not. One is always hidden. -->
+          <img id="bbLogo" class="bb-logo off" alt="">
+          <h1 id="bbTitle" class="bb-title"></h1>
+          <div id="bbMeta" class="bb-meta"></div>
+          <p id="bbDesc" class="bb-desc"></p>
+          <div class="bb-actions">
+            <button type="button" class="f btn btn-primary autofocus" id="bbPlay" data-key="bb-play"><span class="btn-ico">&#9654;</span>Play</button>
+            <button type="button" class="f btn" id="bbInfo" data-key="bb-info">More Info</button>
+            <button type="button" class="f btn btn-icon" id="bbList" data-key="bb-list" aria-label="Add to My List">+</button>
+          </div>
+        </div>
+      </div>
+      <div id="homeRows" class="rows"></div>
+    </section>
+
+    <!-- SEARCH -->
+    <section id="screen-search" class="screen off">
+      <div class="search-wrap">
+        <div class="search-left">
+          <div id="searchTerm" class="search-term placeholder">Search</div>
+          <div id="kbHost" class="kb"></div>
+        </div>
+        <div class="search-right scroller">
+          <div id="searchResults" class="search-results"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BROWSE -->
+    <section id="screen-browse" class="screen off scroller">
+      <h1 id="browseTitle" class="page-title">Films</h1>
+      <div id="browseBody"></div>
+    </section>
+
+    <!-- DETAILS -->
+    <section id="screen-details" class="screen off scroller">
+      <div id="detailsBackdrop" class="det-backdrop">
+        <iframe id="detPreview" class="off" title="Trailer" allow="autoplay; encrypted-media" frameborder="0"></iframe>
+      </div>
+      <div id="detailsBody" class="det-body"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="screen-settings" class="screen off scroller">
+      <h1 class="page-title">Settings</h1>
+      <div id="settingsBody"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- PLAYER -->
+<div id="playerOverlay" class="off">
+  <div id="playerLoading" class="po-loading">
+    <img class="po-shark" src="img/logo-128.png" alt="">
+    <div class="spinner"></div>
+    <div id="playerStatus" class="po-status">Loading stream</div>
+  </div>
+  <iframe id="playerFrame"
+          src="about:blank"
+          allow="autoplay *; fullscreen *; encrypted-media *; picture-in-picture *"
+          allowfullscreen
+          frameborder="0"></iframe>
+</div>
+
+<!-- TEXT ENTRY -->
+<div id="textEntry" class="modal off">
+  <div class="modal-box">
+    <h2 id="textEntryTitle">Enter</h2>
+    <div id="textEntryValue" class="te-value"></div>
+    <div id="textEntryKb" class="kb"></div>
+  </div>
+</div>
+
+<!-- CARD OPTIONS -->
+<div id="cardOptions" class="modal off">
+  <div class="modal-box small">
+    <h2 id="cardOptionsTitle">Options</h2>
+    <div id="cardOptionsList" class="opt-list"></div>
+  </div>
+</div>
+
+<!-- COUNTRY PICKER -->
+<div id="regionPicker" class="modal off">
+  <div class="modal-box">
+    <h2>Top 10 for which country?</h2>
+    <p class="modal-text">The charts show what is most watched — and actually streamable — where you are.</p>
+    <div id="regionGrid" class="region-grid"></div>
+  </div>
+</div>
+
+<!-- EXIT -->
+<div id="exitBox" class="modal off">
+  <div class="modal-box small">
+    <h2>Close Sharky?</h2>
+    <p class="modal-text">You can carry on where you left off next time.</p>
+    <div class="modal-actions">
+      <button type="button" id="exitNo" class="f btn btn-primary autofocus" data-key="exit-no">Keep watching</button>
+      <button type="button" id="exitYes" class="f btn" data-key="exit-yes">Close</button>
+    </div>
+  </div>
+</div>
+
+<audio id="identAudio" preload="auto">
+  <source src="audio/ident.mp3?v=3" type="audio/mpeg">
+  <source src="audio/ident.ogg?v=3" type="audio/ogg">
+</audio>
+
+<!-- The scripts are injected rather than written as plain tags so that the
+     cache-buster the shell puts on this page's URL is carried onto every one
+     of them. Without that a WebView happily serves yesterday's app.js from
+     cache and an update looks like it never happened. -->
+<script>
+(function () {
+  var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
+  var q = bust ? '?v=' + encodeURIComponent(bust) : '';
+  var files = ['compat', 'config', 'qrcode', 'sharky-account', 'store', 'api', 'trailer', 'nav', 'ui',
+               'keyboard', 'region', 'intro', 'player', 'screens', 'options',
+               'sidebar', 'app', 'account-tv', 'announcement'];
+  window.SHARKY_BUILD = bust || 'bundled';
+  for (var i = 0; i < files.length; i++) {
+    document.write('<script src="js/' + files[i] + '.js' + q + '"><\/script>');
+  }
+})();
+</script>
+</body>
+</html>
