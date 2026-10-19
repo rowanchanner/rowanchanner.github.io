@@ -923,7 +923,8 @@
       'set-region'
     ));
 
-    host.appendChild(settingRow(
+    /* Not in the Fire Stick app: its WebView can't draw YouTube video (grey box). */
+    if (!window.SharkyHost) host.appendChild(settingRow(
       'Trailer previews',
       CFG.PREVIEWS
         ? 'On \u2014 rest on a title and its trailer plays; also on a title\u2019s page'

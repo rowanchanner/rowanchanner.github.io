@@ -11,6 +11,9 @@
   'use strict';
   var all = [];
   /* Inside the Fire Stick app: see html.tv-app in app.css. */
+  /* The Fire Stick app's WebView can't draw YouTube's video (a grey box with
+     the captions on top), so trailers are off there; TV browsers keep them. */
+  var inApp = !!w.SharkyHost;
   try { if (w.SharkyHost) document.documentElement.className += ' tv-app'; } catch (e) {}
   /* Card trailers wait until the app has properly settled after starting. */
   var bootAt = Date.now(), introAt = 0;
@@ -38,6 +41,7 @@
     all.push(t);
     t.play = function (kind, id) {
       t.stop();
+      if (inApp) return;                 // Fire Stick app: YouTube video won't draw
       var my = ++t.my;
       API.trailerKeys(kind, id).then(function (keys) {
         if (my !== t.my || !keys.length) return;
@@ -129,7 +133,7 @@
   function cardFocus(el) {
     stopCard();
     if (!el || !el.classList || !el.classList.contains('card') || !el.__item) return;
-    if (killed || !settled() || !(w.CFG && w.CFG.PREVIEWS)) return;
+    if (inApp || killed || !settled() || !(w.CFG && w.CFG.PREVIEWS)) return;
     var item = el.__item;
     if (!item.id || (item.kind !== 'movie' && item.kind !== 'tv')) return;
     cardEl = el;
