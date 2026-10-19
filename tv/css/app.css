@@ -311,6 +311,36 @@ body.scrolled #topnav { background: #0a0a0a; }
   transition: opacity .7s ease;
 }
 #billboard.previewing #bbPreview { opacity: 1; }
+/* Details page: same trailer, behind the gradient, where the still is. */
+.det-backdrop { overflow: hidden; transition: opacity .7s ease; }
+#detPreview {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 100%;
+  height: 130%;
+  transform: translate(-50%, -50%) scale(1.32);
+  border: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .7s ease;
+}
+.det-backdrop.previewing #detPreview { opacity: 1; }
+.det-backdrop.previewing { opacity: 0.8; }
+/* Card preview: the card's picture becomes its trailer. Zoomed so YouTube's
+   bits at the edges are cropped off; the badge stays on top. */
+.card-art .card-trailer {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%) scale(1.5);
+  border: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .6s ease;
+}
+.card-art.previewing .card-trailer { opacity: 1; }
+.card-art .card-badge, .card-art .card-ready, .card-art .card-progress { z-index: 1; }
 #billboard.previewing #billboardArt { opacity: 0; transition: opacity .7s ease; }
 .bb-fade {
   position: absolute;

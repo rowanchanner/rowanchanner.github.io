@@ -104,7 +104,9 @@
 
     <!-- DETAILS -->
     <section id="screen-details" class="screen off scroller">
-      <div id="detailsBackdrop" class="det-backdrop"></div>
+      <div id="detailsBackdrop" class="det-backdrop">
+        <iframe id="detPreview" class="off" title="Trailer" allow="autoplay; encrypted-media" frameborder="0"></iframe>
+      </div>
       <div id="detailsBody" class="det-body"></div>
     </section>
 
@@ -182,7 +184,7 @@
 (function () {
   var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
   var q = bust ? '?v=' + encodeURIComponent(bust) : '';
-  var files = ['compat', 'config', 'qrcode', 'sharky-account', 'store', 'api', 'nav', 'ui',
+  var files = ['compat', 'config', 'qrcode', 'sharky-account', 'store', 'api', 'trailer', 'nav', 'ui',
                'keyboard', 'region', 'intro', 'player', 'screens', 'options',
                'sidebar', 'app', 'account-tv', 'announcement'];
   window.SHARKY_BUILD = bust || 'bundled';

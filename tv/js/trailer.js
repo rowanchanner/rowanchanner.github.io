@@ -10,6 +10,25 @@
 (function (w) {
   'use strict';
   var all = [];
+  /* Card trailers wait until the app has properly settled after starting. */
+  var bootAt = Date.now(), introAt = 0;
+  document.addEventListener('intro:done', function () { introAt = Date.now(); });
+  function settled() { return introAt && Date.now() - introAt > 6000 && Date.now() - bootAt > 9000; }
+
+  /* A YouTube frame must NEVER take over the screen. On a Fire Stick a frame
+     that goes fullscreen hides the whole app behind a black video surface, so
+     if one ever tries, pull it straight back out and stop all trailers. */
+  var killed = false;
+  function fsEl() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+  function onFs() {
+    var el = fsEl();
+    if (!el || el.tagName !== 'IFRAME' || (w.Player && w.Player.isOpen)) return;
+    killed = true;
+    try { if (document.exitFullscreen) document.exitFullscreen(); else if (document.webkitExitFullscreen) document.webkitExitFullscreen(); } catch (e) {}
+    try { api.stopAll(); } catch (e) {}
+  }
+  document.addEventListener('fullscreenchange', onFs);
+  document.addEventListener('webkitfullscreenchange', onFs);
 
   function create(frame, host, showClass, revealMs) {
     var t = { frame: frame, host: host, cls: showClass || 'previewing', keys: [], timer: null, reveal: null, my: 0,
@@ -43,7 +62,7 @@
 
   function load(t) {
     if (!t.keys.length) { t.stop(); return; }
-    if (w.Player && w.Player.isOpen) { t.stop(); return; }
+    if (killed || (w.Player && w.Player.isOpen) || document.hidden) { t.stop(); return; }
     var key = t.keys[0];
     t.frame.onload = function () {
       try { t.frame.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'tv' }), '*'); } catch (e) {}
@@ -107,7 +126,7 @@
   function cardFocus(el) {
     stopCard();
     if (!el || !el.classList || !el.classList.contains('card') || !el.__item) return;
-    if (!(w.CFG && w.CFG.PREVIEWS)) return;
+    if (killed || !settled() || !(w.CFG && w.CFG.PREVIEWS)) return;
     var item = el.__item;
     if (!item.id || (item.kind !== 'movie' && item.kind !== 'tv')) return;
     cardEl = el;
@@ -129,9 +148,10 @@
       art.insertBefore(cardT.frame, img ? img.nextSibling : art.firstChild);
       cardT.host = art;
       cardT.play(item.kind, item.id);
-    }, 1000);
+    }, 1200);
   }
 
-  w.TVTrailer = { create: create, cardFocus: cardFocus, stopCard: stopCard,
+  var api = { create: create, cardFocus: function (el) { try { cardFocus(el); } catch (e) {} }, stopCard: stopCard,
                   stopAll: function () { stopCard(); for (var i = 0; i < all.length; i++) all[i].stop(); } };
+  w.TVTrailer = api;
 })(window);

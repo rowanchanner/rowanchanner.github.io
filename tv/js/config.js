@@ -73,7 +73,11 @@
     /* Play the trailer behind the billboard once the highlight settles.
        OFF by default on purpose: a Fire Stick has one video decoder and it is
        better spent on playback than on a preview. */
-    get PREVIEWS() { return stored.previews === true; },
+    get PREVIEWS() {
+      /* Oct 2026: on for everyone once (it used to be off by default). */
+      if (stored.previewsV !== 2) { stored.previewsV = 2; stored.previews = true; save(); }
+      return stored.previews !== false;
+    },
     set PREVIEWS(v) { stored.previews = !!v; save(); },
 
     VERSION: '1.2.0',
