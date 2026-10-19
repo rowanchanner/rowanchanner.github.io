@@ -939,6 +939,19 @@
     ));
 
     host.appendChild(settingRow(
+      'Next episode',
+      CFG.NEXT_CONFIRM
+        ? 'Ask first \u2014 at the end of an episode, press OK on \u201cPlay next episode\u201d to carry on'
+        : 'Plays automatically \u2014 the next episode starts after a 10 second countdown',
+      CFG.NEXT_CONFIRM ? 'Play automatically' : 'Ask first',
+      function () {
+        CFG.NEXT_CONFIRM = !CFG.NEXT_CONFIRM;
+        renderSettings();
+      },
+      'set-nextconfirm'
+    ));
+
+    host.appendChild(settingRow(
       'Only show what is cached',
       CFG.LIBRARY_ONLY ? 'On — the home screen lists what plays instantly' :
                          'Off — the home screen lists everything TMDB promotes',

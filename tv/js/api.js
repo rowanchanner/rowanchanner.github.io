@@ -387,7 +387,8 @@
     embedUrl: function (item, season, episode) {
       var base = CFG.API + '/embed/';
       if ((item.kind || 'movie') === 'tv') {
-        return base + 'tv/' + item.id + '/' + (season || 1) + '/' + (episode || 1) + '?tv=1';
+        return base + 'tv/' + item.id + '/' + (season || 1) + '/' + (episode || 1) + '?tv=1' +
+          (CFG.NEXT_CONFIRM ? '&nextconfirm=1' : '');
       }
       return base + 'movie/' + item.id + '?tv=1';
     }

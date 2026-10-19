@@ -78,6 +78,11 @@
       if (stored.previewsV !== 2) { stored.previewsV = 2; stored.previews = true; save(); }
       return stored.previews !== false;
     },
+    /* Next episode: false = rolls on by itself after a countdown (default),
+       true = the card waits until you press Play. */
+    get NEXT_CONFIRM() { return stored.nextConfirm === true; },
+    set NEXT_CONFIRM(v) { stored.nextConfirm = !!v; save(); },
+
     set PREVIEWS(v) { stored.previews = !!v; save(); },
 
     VERSION: '1.2.0',
