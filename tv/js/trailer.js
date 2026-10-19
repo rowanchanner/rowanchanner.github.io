@@ -10,6 +10,8 @@
 (function (w) {
   'use strict';
   var all = [];
+  /* Inside the Fire Stick app: see html.tv-app in app.css. */
+  try { if (w.SharkyHost) document.documentElement.className += ' tv-app'; } catch (e) {}
   /* Card trailers wait until the app has properly settled after starting. */
   var bootAt = Date.now(), introAt = 0;
   document.addEventListener('intro:done', function () { introAt = Date.now(); });
@@ -120,6 +122,7 @@
   var cardT = null, cardTimer = null, cardEl = null;
   function stopCard() {
     clearTimeout(cardTimer); cardTimer = null;
+    if (cardEl) cardEl.className = cardEl.className.replace(/\s*\bhas-trailer\b/g, '');
     if (cardT) cardT.stop();
     cardEl = null;
   }
@@ -147,6 +150,7 @@
       var img = art.querySelector('img');
       art.insertBefore(cardT.frame, img ? img.nextSibling : art.firstChild);
       cardT.host = art;
+      try { el.className += ' has-trailer'; } catch (e) {}
       cardT.play(item.kind, item.id);
     }, 1200);
   }

@@ -1001,3 +1001,20 @@ body.sidebar-open .nav-links { opacity: .35; }
   letter-spacing: 0.06em;
   pointer-events: none;
 }
+
+
+/* Fire Stick app (Android WebView). Its video is drawn on a separate hardware
+   layer that goes BLACK under transforms, rounded clipping or opacity - which
+   is exactly how the trailers above are cropped and faded. So inside the app:
+   no zoom, no rounding, no fades, no lift on the focused card while a trailer
+   plays; the trailer is simply shown or hidden. */
+html.tv-app #bbPreview, html.tv-app #detPreview, html.tv-app .card-art .card-trailer {
+  transform: none; transition: none; opacity: 1; visibility: hidden;
+  top: 0; left: 0; width: 100%; height: 100%;
+}
+html.tv-app #billboard.previewing #bbPreview,
+html.tv-app .det-backdrop.previewing #detPreview,
+html.tv-app .card-art.previewing .card-trailer { visibility: visible; }
+html.tv-app .det-backdrop, html.tv-app .det-backdrop.previewing { opacity: 1; transition: none; }
+html.tv-app .card.focused.has-trailer { transform: none; }
+html.tv-app .card-art.previewing { border-radius: 0; overflow: visible; }
