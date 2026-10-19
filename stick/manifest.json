@@ -1,0 +1,20 @@
+{
+    "note":  "Sharky stick updates. Bump versionCode + sha256 when you publish a new APK.",
+    "apps":  [
+                 {
+                     "name":  "Sharky Home",
+                     "package":  "uk.co.sharkmovie.launcher",
+                     "versionCode":  3,
+                     "url":  "https://www.sharkmovie.co.uk/stick/SharkyHome.apk",
+                     "sha256":  "5e12b908ff903163bc97e8fc772f9e6bcc02a1aa45fa1667b8a079e1bd92852b"
+                 },
+                 {
+                     "name":  "Sharky TV",
+                     "package":  "uk.co.sharkmovie.tv",
+                     "versionCode":  1,
+                     "url":  "https://www.sharkmovie.co.uk/sharky-tv.apk",
+                     "sha256":  "6c107c1e6e369502619b68fd33c7bd55e96c3ffbf7aa880ae387492419e17fa8",
+                     "install":  true
+                 }
+             ]
+}
