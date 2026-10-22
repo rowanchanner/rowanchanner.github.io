@@ -274,39 +274,26 @@
     downloadBtn?.addEventListener('click', async () => {
       if (!movieId) return;
       const meta = { id: movieId, media_type: 'movie', sharky_title: (currentShow?.title || document.title.split(' — ')[0]) };
-      if (await window.SharkyDownloads.isDownloaded(meta)) {
-        await window.SharkyDownloads.deleteDownload(meta);
-        refreshDownloadBtn();
-        return;
-      }
-      // Enrich with what we've already loaded
       const item = Object.assign({}, currentShow || {}, meta);
       item.sharky_title = item.title || item.sharky_title;
       item.sharky_date  = item.release_date || item.sharky_date || '';
-      downloadBtn.disabled = true;
+
       downloadStatus.classList.add('on');
-      downloadFill.style.width = '0%';
+      downloadFill.style.width = '100%';
+      downloadText.textContent = 'Starting download to your Downloads folder…';
+
       try {
         await window.SharkyDownloads.startDownload(item, (p) => {
-          if (p.phase === 'connecting') downloadText.textContent = 'Connecting…';
-          if (p.phase === 'downloading') {
-            downloadText.textContent = p.pct != null
-              ? `${p.pct}%`
-              : `${(p.received/1024/1024).toFixed(1)} MB`;
-            if (p.pct != null) downloadFill.style.width = p.pct + '%';
-          }
           if (p.phase === 'done') {
-            downloadText.textContent = 'Saved offline ✓';
-            downloadFill.style.width = '100%';
+            downloadText.textContent = 'Downloading to Downloads folder ✓';
           }
         });
       } catch (err) {
         downloadText.textContent = 'Failed: ' + err.message;
         console.error(err);
       } finally {
-        downloadBtn.disabled = false;
-        refreshDownloadBtn();
-        setTimeout(() => downloadStatus.classList.remove('on'), 3000);
+        setTimeout(() => { downloadText.textContent = 'Downloading to Downloads folder ✓'; }, 1000);
+        setTimeout(() => { downloadStatus.classList.remove('on'); }, 4000);
       }
     });
 

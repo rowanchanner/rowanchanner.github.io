@@ -494,32 +494,23 @@
         vote_average: currentShow?.vote_average,
         overview:     currentShow?.overview,
       };
-      if (await window.SharkyDownloads.isDownloaded(meta)) {
-        await window.SharkyDownloads.deleteDownload(meta);
-        refreshDownloadBtn();
-        return;
-      }
-      downloadBtn.disabled = true;
+
       downloadStatus.classList.add('on');
-      downloadFill.style.width = '0%';
+      downloadFill.style.width = '100%';
+      downloadText.textContent = `Starting download for S${selectedSeason}E${selectedEpisode}…`;
+
       try {
         await window.SharkyDownloads.startDownload(meta, (p) => {
-          if (p.phase === 'connecting') downloadText.textContent = 'Connecting…';
-          if (p.phase === 'downloading') {
-            downloadText.textContent = p.pct != null
-              ? `${p.pct}%`
-              : `${(p.received/1024/1024).toFixed(1)} MB`;
-            if (p.pct != null) downloadFill.style.width = p.pct + '%';
+          if (p.phase === 'done') {
+            downloadText.textContent = `Downloading to Downloads folder ✓`;
           }
-          if (p.phase === 'done') { downloadText.textContent = 'Saved offline ✓'; downloadFill.style.width = '100%'; }
         });
       } catch (err) {
         downloadText.textContent = 'Failed: ' + err.message;
         console.error(err);
       } finally {
-        downloadBtn.disabled = false;
-        refreshDownloadBtn();
-        setTimeout(() => downloadStatus.classList.remove('on'), 3000);
+        setTimeout(() => { downloadText.textContent = `Downloading to Downloads folder ✓`; }, 1000);
+        setTimeout(() => { downloadStatus.classList.remove('on'); }, 4000);
       }
     });
 

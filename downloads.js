@@ -32,55 +32,27 @@
     return getList().some(x => x._k === k);
   }
 
+  function downloadUrl(item) {
+    const kind = item.media_type || "movie";
+    if (kind === "tv") {
+      return `${SHARKY_API}/download/tv/${item.id}/${item.season || 1}/${item.episode || 1}`;
+    }
+    return `${SHARKY_API}/download/movie/${item.id}`;
+  }
+
   async function startDownload(item, onProgress) {
-    if (!("caches" in window)) throw new Error("Cache API not supported");
-    const cache = await caches.open(CACHE_NAME);
-    const url   = proxyUrl(item);
+    const url = downloadUrl(item);
     onProgress?.({ phase: "connecting", pct: 0 });
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const total = Number(res.headers.get("Content-Length") || 0);
+    // Initiate real native file download directly into the user's Downloads folder
+    const a = document.createElement("a");
+    a.href = url;
+    a.setAttribute("download", "");
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 2000);
 
-    // Stream + accumulate so we can report progress
-    const reader = res.body.getReader();
-    const chunks = [];
-    let received = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      onProgress?.({
-        phase: "downloading",
-        received, total,
-        pct: total ? Math.round(received / total * 100) : null,
-      });
-    }
-    const blob = new Blob(chunks, { type: res.headers.get("Content-Type") || "video/mp4" });
-    await cache.put(url, new Response(blob, {
-      headers: { "Content-Type": blob.type, "Content-Length": String(blob.size) },
-    }));
-
-    // Track metadata
-    const list = getList().filter(x => x._k !== key(item));
-    list.unshift({
-      _k: key(item),
-      id: item.id,
-      media_type: item.media_type || "movie",
-      season: item.season || null,
-      episode: item.episode || null,
-      sharky_title: item.sharky_title || item.title || item.name || "Untitled",
-      sharky_date:  item.sharky_date  || item.release_date || item.first_air_date || "",
-      poster_path:  item.poster_path  || null,
-      backdrop_path: item.backdrop_path || null,
-      vote_average: item.vote_average || 0,
-      overview:     item.overview     || "",
-      cachedUrl:    url,
-      bytes:        blob.size,
-      addedAt:      Date.now(),
-    });
-    setList(list);
     onProgress?.({ phase: "done", pct: 100 });
     emit({ type: "added", item });
     return true;
