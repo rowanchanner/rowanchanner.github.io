@@ -853,6 +853,64 @@ function openOfflinePlayer(meta, blobUrl) {
 }
 
 /* ── Search ─────────────────────────────────────────────── */
+/* ── Search ─────────────────────────────────────────────────
+   One box, several kinds of match, shown in this order:
+     1. Titles   - TMDB /search/multi (a film literally called "Horror"
+                   comes first because TMDB ranks exact titles high).
+     2. Genre    - "horror", "scary", "sci fi", "kids", "anime"... -> TMDB
+                   /discover by genre (movies + TV), most popular first.
+     3. Topic    - TMDB keywords ("zombie", "christmas", "heist",
+                   "superhero") -> /discover with_keywords.
+     4. People   - search an actor/director -> what they're known for.
+   Words like "movies", "films", "shows", "tv", "series" are ignored for
+   matching, but "horror films" only shows films and "horror shows" only TV. */
+const SEARCH_GENRES = [
+  // [aliases, movie genre id, tv genre id, label]
+  [["action"],                                   28,    10759, "Action"],
+  [["adventure"],                                12,    10759, "Adventure"],
+  [["animation","animated","anime","cartoon","cartoons"], 16, 16, "Animation"],
+  [["comedy","comedies","funny","comedic"],      35,    35,    "Comedy"],
+  [["crime","gangster","gangsters"],             80,    80,    "Crime"],
+  [["documentary","documentaries","doc","docs"], 99,    99,    "Documentary"],
+  [["drama","dramas"],                           18,    18,    "Drama"],
+  [["family","kids","kid","children","childrens"], 10751, 10762, "Family & Kids"],
+  [["fantasy"],                                  14,    10765, "Fantasy"],
+  [["history","historical"],                     36,    null,  "History"],
+  [["horror","horrors","scary"],                 27,    null,  "Horror"],
+  [["music","musical","musicals"],               10402, null,  "Music"],
+  [["mystery","mysteries"],                      9648,  9648,  "Mystery"],
+  [["romance","romantic","romcom","rom com"], 10749, null, "Romance"],
+  [["sci fi","scifi","sci-fi","science fiction","sf"], 878, 10765, "Sci-Fi"],
+  [["thriller","thrillers","suspense"],          53,    null,  "Thriller"],
+  [["war"],                                      10752, 10768, "War"],
+  [["western","westerns","cowboy"],              37,    37,    "Western"],
+  [["reality","reality tv"],                     null,  10764, "Reality"],
+  [["soap","soaps"],                             null,  10766, "Soap"],
+  [["talk show","talk shows"],                   null,  10767, "Talk"],
+  [["news"],                                     null,  10763, "News"],
+];
+const SEARCH_FILLER = /\b(movies?|films?|shows?|tv|series|programmes?|programs?|the best|best|top|good)\b/g;
+
+function searchIntent(q) {
+  const low = q.toLowerCase().replace(/[^a-z0-9\- ]+/g, " ").replace(/\s+/g, " ").trim();
+  let only = null;
+  if (/\b(movies?|films?)\b/.test(low)) only = "movie";
+  else if (/\b(shows?|tv|series|programmes?|programs?)\b/.test(low)) only = "tv";
+  const core = low.replace(SEARCH_FILLER, " ").replace(/\s+/g, " ").trim();
+  const flat = core.replace(/-/g, " ");
+  const genre = SEARCH_GENRES.find(g => g[0].some(a => a === core || a === flat));
+  return { core: core || low, only, genre };
+}
+
+function searchSubhead(text) {
+  const h = document.createElement("h3");
+  h.className = "search-subhead";
+  h.style.cssText = "grid-column:1/-1;margin:18px 0 4px;font-size:1.05rem;font-weight:700;color:var(--muted,#aaa)";
+  h.textContent = text;
+  return h;
+}
+
+let searchSeq = 0;
 async function runSearch() {
   const q = searchInput.value.trim();
   if (q.length < 2) {
@@ -860,15 +918,115 @@ async function runSearch() {
     rowsSection.classList.remove("hidden");
     return;
   }
+  const mySeq = ++searchSeq;
   rowsSection.classList.add("hidden");
   searchSection.classList.remove("hidden");
   searchTitle.textContent = `Results for "${q}"`;
   showSkeletonGrid(searchGrid, 12);
-  const data = await fetchTMDB(`/search/multi?query=${encodeURIComponent(q)}`);
-  const results = (data?.results || [])
-    .filter(i => i.media_type === "movie" || i.media_type === "tv")
-    .map(i => normalizeItem(i));
-  renderGrid(searchGrid, results);
+
+  const { core, only, genre } = searchIntent(q);
+  const today = TODAY_ISO;
+  const wantMovie = only !== "tv", wantTv = only !== "movie";
+  const enc = encodeURIComponent;
+
+  const jobs = {
+    multi:   fetchTMDB(`/search/multi?query=${enc(q)}&include_adult=false`),
+    multi2:  core !== q.toLowerCase() ? fetchTMDB(`/search/multi?query=${enc(core)}&include_adult=false`) : null,
+    gMovie:  genre && genre[1] && wantMovie ? fetchTMDB(`/discover/movie?with_genres=${genre[1]}&sort_by=popularity.desc&vote_count.gte=300&primary_release_date.lte=${today}&include_adult=false`) : null,
+    gMovie2: genre && genre[1] && wantMovie ? fetchTMDB(`/discover/movie?with_genres=${genre[1]}&sort_by=popularity.desc&vote_count.gte=300&primary_release_date.lte=${today}&include_adult=false&page=2`) : null,
+    gTv:     genre && genre[2] && wantTv ? fetchTMDB(`/discover/tv?with_genres=${genre[2]}&sort_by=popularity.desc&vote_count.gte=100&first_air_date.lte=${today}`) : null,
+    kw:      core.length >= 3 ? fetchTMDB(`/search/keyword?query=${enc(genre ? genre[3].toLowerCase() : core)}`) : null,
+  };
+  const keys = Object.keys(jobs);
+  const vals = await Promise.all(keys.map(k => jobs[k]));
+  const R = Object.fromEntries(keys.map((k, i) => [k, vals[i]]));
+  if (mySeq !== searchSeq) return;               // a newer search has started
+
+  const seen = new Set();
+  const take = (arr, type) => (arr || [])
+    .map(i => normalizeItem(i, type || i.media_type))
+    .filter(i => (i.media_type === "movie" || i.media_type === "tv")
+              && (i.poster_path || i.backdrop_path)
+              && (!only || i.media_type === only))
+    .filter(i => { const k = mediaKey(i); if (!k || seen.has(k)) return false; seen.add(k); return true; });
+
+  const multiAll = [...(R.multi?.results || []), ...(R.multi2?.results || [])];
+
+  // 1. Titles. Exact title matches first, then TMDB's own order.
+  const coreKey = titleKey({ sharky_title: core });
+  const titles = take(multiAll.filter(i => i.media_type !== "person"))
+    .map((i, n) => ({ i, n, exact: titleKey(i) === coreKey || titleKey(i) === titleKey({ sharky_title: q }) }))
+    .sort((a, b) => (b.exact - a.exact) || (a.n - b.n))
+    .map(x => x.i);
+
+  // 2. Genre.
+  let genreItems = [];
+  if (genre) {
+    genreItems = [...take(R.gMovie?.results, "movie"), ...take(R.gTv?.results, "tv"), ...take(R.gMovie2?.results, "movie")]
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  }
+
+  // 3. Topic keyword (only when it isn't a genre). Exact keyword name only,
+  //    so "batman" doesn't drag in every film tagged with some odd keyword.
+  let topicItems = [], topicName = "";
+  const kwWant = genre ? genre[3].toLowerCase() : core;
+  const kwHit = (R.kw?.results || []).find(k => (k.name || "").toLowerCase() === kwWant);
+  const kwForGenreTv = genre && !genre[2] && wantTv;      // e.g. horror: TMDB TV has no horror genre
+  if (kwHit && (!genre || kwForGenreTv)) {
+    topicName = kwHit.name;
+    const [km, kt] = await Promise.all([
+      wantMovie && !genre ? fetchTMDB(`/discover/movie?with_keywords=${kwHit.id}&sort_by=popularity.desc&vote_count.gte=20&primary_release_date.lte=${today}&include_adult=false`) : null,
+      wantTv ? fetchTMDB(`/discover/tv?with_keywords=${kwHit.id}&sort_by=popularity.desc&vote_count.gte=${genre ? 50 : 10}&first_air_date.lte=${today}`) : null,
+    ]);
+    if (mySeq !== searchSeq) return;
+    topicItems = [...take(km?.results, "movie"), ...take(kt?.results, "tv")]
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    if (genre) {                     // genre search: these are just more of the genre (TV side)
+      genreItems = [...genreItems, ...topicItems].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      topicItems = []; topicName = "";
+    }
+  }
+
+  // 4. People: the best-matching person's best-known work.
+  let personItems = [], personName = "";
+  /* Only when the search really is their name: "tom hanks" -> Tom Hanks,
+     but "zombie" must not pull in Rob Zombie. */
+  const person = genre ? null : multiAll.find(i => {
+    if (i.media_type !== "person" || (i.popularity || 0) <= 1) return false;
+    const pk = titleKey({ sharky_title: i.name });
+    return pk === coreKey || (coreKey.includes(" ") && pk.includes(coreKey));
+  });
+  if (person) {
+    const cr = await fetchTMDB(`/person/${person.id}/combined_credits`);
+    if (mySeq !== searchSeq) return;
+    personName = person.name;
+    /* Real roles only: no chat shows, news, reality, or "Himself" cameos,
+       best-known (most voted) first. */
+    const credits = [...(cr?.cast || []), ...(cr?.crew || []).filter(c => c.job === "Director" || c.job === "Creator")]
+      .filter(c => !(c.genre_ids || []).some(g => g === 10767 || g === 10763 || g === 10764 || g === 99))
+      .filter(c => !/\b(self|himself|herself|themselves|host|guest)\b/i.test(c.character || ""))
+      .sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+    personItems = take(credits).slice(0, 30);
+  }
+
+  searchGrid.innerHTML = "";
+  const groups = person ? [
+    [personItems, `With ${personName}`],
+    [titles,      titles.length ? "Titles" : ""],
+  ] : [
+    [titles,      titles.length && (genreItems.length || topicItems.length || personItems.length) ? "Titles" : ""],
+    [genreItems,  genre ? `${genre[3]} ${only === "tv" ? "shows" : only === "movie" ? "films" : "films & shows"}` : ""],
+    [topicItems,  topicName ? `About "${topicName}"` : ""],
+    [personItems, personName ? `With ${personName}` : ""],
+  ];
+  let any = false;
+  groups.forEach(([items, label]) => {
+    if (!items.length) return;
+    any = true;
+    if (label) searchGrid.appendChild(searchSubhead(label));
+    items.forEach(i => searchGrid.appendChild(createCard(i)));
+  });
+  if (!any) searchGrid.innerHTML = `<p class="empty-message">Nothing found.</p>`;
 }
 searchInput.addEventListener("input", () => {
   clearTimeout(searchTimer);
