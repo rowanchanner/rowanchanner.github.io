@@ -12,8 +12,8 @@
   <meta name="theme-color" content="#e50914" />
   <!-- TV remote / D-pad navigation. Loaded early so page
        scripts can read window.SharkyTV when building URLs. -->
-  <script src="sharky-account.js?v=20261018d"></script>
-  <script src="account-web.js?v=20261016-accounts"></script>
+  <script src="sharky-account.js?v=20261023-gate"></script>
+  <script src="account-web.js?v=20261023-gate"></script>
   <script src="sharky-extras.js?v=20261018c" defer></script>
   <script src="tvnav.js?v=20261016b"></script>
   <script src="player.js" defer></script>
@@ -288,6 +288,7 @@
 
     downloadBtn?.addEventListener('click', async () => {
       if (!movieId || sharkyComingSoon) return;
+      if (window.sharkyNeedAccount && !window.sharkyNeedAccount('download this', () => downloadBtn.click())) return;
       const meta = { id: movieId, media_type: 'movie', sharky_title: (currentShow?.title || document.title.split(' — ')[0]) };
       const item = Object.assign({}, currentShow || {}, meta);
       item.sharky_title = item.title || item.sharky_title;
@@ -359,6 +360,7 @@
 
     gwBtn?.addEventListener('click', () => {
       if (room) { gwPanel.classList.toggle('on'); return; }
+      if (window.sharkyNeedAccount && !window.sharkyNeedAccount('start a Group Watch', () => gwBtn.click())) return;
       const existing = new URLSearchParams(location.search).get('room');
       const code = existing || window.GroupWatch.createCode();
       openRoom(code);
@@ -381,7 +383,11 @@
     gwInput?.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
     // Auto-join if room param in URL
     if (new URLSearchParams(location.search).get('room')) {
-      setTimeout(() => openRoom(new URLSearchParams(location.search).get('room')), 400);
+      setTimeout(() => {
+        const code = new URLSearchParams(location.search).get('room');
+        if (window.sharkyNeedAccount && !window.sharkyNeedAccount('join this Group Watch', () => { if (!room) openRoom(code); })) return;
+        openRoom(code);
+      }, 400);
     }
     window.addEventListener('beforeunload', () => { try { room?.close(); } catch {} });
 

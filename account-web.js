@@ -12,6 +12,18 @@
     linkUrl: 'https://www.sharkmovie.co.uk/link.html'
   });
 
+  /* Things that need a (free) account: My List, downloads, Group Watch.
+     sharkyNeedAccount('add this to My List', retry) -> true when signed in
+     with a profile; otherwise shows "Create a free account to ..." and
+     returns false, and runs retry() once they're signed in. */
+  window.sharkyNeedAccount = function (why, retry) {
+    var A = window.SharkyAccount;
+    if (!A || !A.gate) return true;
+    if (A.profile && A.account && A.account.verified !== false) return true;
+    A.gate(why, retry);
+    return false;
+  };
+
   function paintButton() {
     var b = document.getElementById('accountBtn');
     if (!b) return;
@@ -23,7 +35,7 @@
       b.title = 'Switch profile / account';
     } else {
       b.className = 'nav-account';
-      b.textContent = SharkyAccount.account ? 'Choose profile' : 'Sign in';
+      b.textContent = SharkyAccount.account ? 'Choose profile' : 'Sign in · Free';
       b.title = 'Sign in or create a free account';
     }
   }

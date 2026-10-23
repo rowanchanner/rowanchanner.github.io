@@ -621,6 +621,9 @@ function isInMyList(item) {
 function toggleMyList(item) {
   const list = getStorage(STORAGE_MY_LIST);
   const exists = isInMyList(item);
+  // Adding needs a free account (removing never does).
+  if (!exists && window.sharkyNeedAccount &&
+      !window.sharkyNeedAccount("add this to My List", () => { if (!isInMyList(item)) toggleMyList(item); })) return;
   const clean  = cleanStorageItem(item);
   const updated = exists
     ? list.filter(x => !(Number(x.id) === Number(item.id) && x.media_type === item.media_type))
@@ -910,6 +913,129 @@ function searchSubhead(text) {
   return h;
 }
 
+/* ── Typo-tolerant search ───────────────────────────────────
+   TMDB's own search needs the spelling right. So we keep a local list of
+   ~1500 well-known films/shows (popular + top rated + trending, cached in
+   the browser for a day, plus whatever the homepage already loaded) and
+   fuzzy-match the search against it: "intersteller", "brekaing bad",
+   "spidermn", "harry poter" all find the real title. */
+const SEARCH_INDEX_KEY = "sharky:search-index:v1";
+const SEARCH_INDEX_TTL = 24 * 3600 * 1000;
+let searchIndexPromise = null;
+
+function compactKey(v) {
+  return String(v || "").toLowerCase().replace(/&/g, "and").normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "");
+}
+
+function getSearchIndex() {
+  if (searchIndexPromise) return searchIndexPromise;
+  searchIndexPromise = (async () => {
+    try {
+      const c = JSON.parse(localStorage.getItem(SEARCH_INDEX_KEY) || "null");
+      if (c && c.t && Date.now() - c.t < SEARCH_INDEX_TTL && Array.isArray(c.items) && c.items.length > 200) return c.items;
+    } catch (_) {}
+    const lists = await Promise.all([
+      getListPages("/movie/popular", "movie", 15),
+      getListPages("/movie/top_rated", "movie", 10),
+      getListPages("/tv/popular", "tv", 8),
+      getListPages("/tv/top_rated", "tv", 8),
+      getListPages("/trending/all/week", undefined, 3),
+    ]);
+    const seen = new Set(), items = [];
+    lists.flat().forEach(i => {
+      const k = mediaKey(i);
+      if (!k || seen.has(k) || !(i.poster_path || i.backdrop_path)) return;
+      seen.add(k);
+      items.push({ id: i.id, media_type: i.media_type, sharky_title: i.sharky_title,
+                   sharky_date: i.sharky_date, poster_path: i.poster_path,
+                   backdrop_path: i.backdrop_path, vote_average: i.vote_average,
+                   popularity: i.popularity || 0, overview: i.overview || "" });
+    });
+    try { localStorage.setItem(SEARCH_INDEX_KEY, JSON.stringify({ t: Date.now(), items })); } catch (_) {}
+    return items;
+  })().catch(() => { searchIndexPromise = null; return []; });
+  return searchIndexPromise;
+}
+
+/* Damerau-Levenshtein (with transpositions: "brekaing" ~ "breaking"). */
+function editDistance(a, b) {
+  const n = a.length, m = b.length;
+  if (!n) return m; if (!m) return n;
+  let p2 = null, p1 = Array.from({ length: m + 1 }, (_, j) => j);
+  for (let i = 1; i <= n; i++) {
+    const cur = [i];
+    for (let j = 1; j <= m; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(p1[j] + 1, cur[j - 1] + 1, p1[j - 1] + cost);
+      if (p2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, p2[j - 2] + 1);
+      cur.push(v);
+    }
+    p2 = p1; p1 = cur;
+  }
+  return p1[m];
+}
+
+/* 0..1, how well what was typed matches a title. Handles typos, missing
+   spaces/dashes ("spiderman"), and typing only the start of a long title
+   ("harry poter" -> "Harry Potter and the ..."). */
+const stripArticle = s => s.replace(/^(the|a|an)(?=[a-z0-9]{3})/, "");
+function titleSimilarity(q, title) {
+  return Math.max(titleSimilarity1(compactKey(q), compactKey(title)),
+                  titleSimilarity1(stripArticle(compactKey(q)), stripArticle(compactKey(title))),
+                  wordSimilarity(q, title));
+}
+/* Word by word: "the dark nite" -> dark=dark, nite~knight. Each typed word
+   is matched to its closest word in the title (in order), weighted by length. */
+const SIM_STOP = new Set(["the", "a", "an", "of", "and"]);
+/* Rough "sounds like": knight/nite, phone/fone, back/bak, light/lite. */
+const soundKey = w => w.replace(/^kn/, "n").replace(/gh/g, "").replace(/ph/g, "f")
+  .replace(/ck/g, "k").replace(/(.)\1+/g, "$1").replace(/e$/, "");
+function wordSimilarity(q, title) {
+  const words = v => String(v || "").toLowerCase().replace(/&/g, " and ").normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter(w => w && !SIM_STOP.has(w));
+  const qa = words(q), ta = words(title);
+  if (qa.length < 2 || !ta.length || ta.length > qa.length + 3) return 0;
+  let tot = 0, got = 0, from = 0;
+  for (const w of qa) {
+    let best = 0, at = from;
+    for (let j = from; j < ta.length; j++) {
+      const t = ta[j];
+      const ws = soundKey(w), tsk = soundKey(t);
+      const sc = Math.max(1 - editDistance(w, t) / Math.max(w.length, t.length),
+                          ws && tsk ? (1 - editDistance(ws, tsk) / Math.max(ws.length, tsk.length)) * 0.97 : 0);
+      if (sc > best) { best = sc; at = j; }
+    }
+    if (best >= 0.5) from = at + 1;
+    tot += w.length; got += w.length * best;
+  }
+  return (got / tot) * 0.95;
+}
+function titleSimilarity1(a, b) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const whole = 1 - editDistance(a, b) / Math.max(a.length, b.length);
+  let start = 0;
+  if (a.length >= 4 && b.length > a.length) {
+    const head = b.slice(0, a.length + 1);
+    start = (1 - Math.min(editDistance(a, head), editDistance(a, head.slice(0, a.length))) / a.length) * 0.92;
+  }
+  return Math.max(whole, start);
+}
+
+function fuzzyTitleMatches(q, pool, limit = 8) {
+  const seen = new Set();
+  return pool
+    .filter(i => { const k = mediaKey(i); if (!k || seen.has(k)) return false; seen.add(k); return true; })
+    .map(i => ({ i, sc: titleSimilarity(q, i.sharky_title) }))
+    .filter(x => x.sc >= 0.7)
+    .sort((x, y) => (y.sc - x.sc) || ((y.i.popularity || 0) - (x.i.popularity || 0)))
+    .slice(0, limit)
+    .map(x => ({ ...x.i, title: x.i.sharky_title }));   // normalizeItem() reads .title
+}
+
+searchInput.addEventListener("focus", () => { getSearchIndex(); }, { once: true });
+
 let searchSeq = 0;
 async function runSearch() {
   const q = searchInput.value.trim();
@@ -937,6 +1063,7 @@ async function runSearch() {
     gTv:     genre && genre[2] && wantTv ? fetchTMDB(`/discover/tv?with_genres=${genre[2]}&sort_by=popularity.desc&vote_count.gte=100&first_air_date.lte=${today}`) : null,
     kw:      core.length >= 3 ? fetchTMDB(`/search/keyword?query=${enc(genre ? genre[3].toLowerCase() : core)}`) : null,
   };
+  jobs.index = Promise.race([getSearchIndex(), new Promise(r => setTimeout(() => r([]), 3000))]);
   const keys = Object.keys(jobs);
   const vals = await Promise.all(keys.map(k => jobs[k]));
   const R = Object.fromEntries(keys.map((k, i) => [k, vals[i]]));
@@ -958,6 +1085,22 @@ async function runSearch() {
     .map((i, n) => ({ i, n, exact: titleKey(i) === coreKey || titleKey(i) === titleKey({ sharky_title: q }) }))
     .sort((a, b) => (b.exact - a.exact) || (a.n - b.n))
     .map(x => x.i);
+
+  // Typos: if TMDB found nothing that really looks like what was typed,
+  // fuzzy-match against the local list of well-known titles.
+  let fuzzy = [];
+  const bestHit = titles.slice(0, 10).reduce((m, i) => Math.max(m, titleSimilarity(core, i.sharky_title)), 0);
+  if (!genre && bestHit < 0.9) {
+    const pool = [...(R.index || []), ...(homepagePools || [])];
+    fuzzy = take(fuzzyTitleMatches(core, pool, 8).filter(i => titleSimilarity(core, i.sharky_title) > bestHit));
+    // Top guess: also pull TMDB's results for the corrected title, so sequels
+    // and the TV/film versions show up too.
+    if (fuzzy.length) {
+      const fix = await fetchTMDB(`/search/multi?query=${enc(fuzzy[0].sharky_title)}&include_adult=false`);
+      if (mySeq !== searchSeq) return;
+      fuzzy = [...fuzzy, ...take((fix?.results || []).filter(i => i.media_type !== "person")).slice(0, 12)];
+    }
+  }
 
   // 2. Genre.
   let genreItems = [];
@@ -1010,11 +1153,19 @@ async function runSearch() {
   }
 
   searchGrid.innerHTML = "";
+  if (fuzzy.length) {
+    searchTitle.innerHTML = `Results for "${escapeHTML(q)}" <span style="font-weight:400;font-size:.7em;color:var(--muted,#aaa)">· did you mean <a href="#" id="searchDidYouMean" style="color:inherit;text-decoration:underline">${escapeHTML(fuzzy[0].sharky_title)}</a>?</span>`;
+    document.getElementById("searchDidYouMean")?.addEventListener("click", ev => {
+      ev.preventDefault(); searchInput.value = fuzzy[0].sharky_title; runSearch();
+    });
+  }
   const groups = person ? [
     [personItems, `With ${personName}`],
+    [fuzzy,       "Did you mean"],
     [titles,      titles.length ? "Titles" : ""],
   ] : [
-    [titles,      titles.length && (genreItems.length || topicItems.length || personItems.length) ? "Titles" : ""],
+    [fuzzy,       fuzzy.length && titles.length ? "Did you mean" : ""],
+    [titles,      titles.length && (fuzzy.length || genreItems.length || topicItems.length || personItems.length) ? (fuzzy.length ? "Other matches" : "Titles") : ""],
     [genreItems,  genre ? `${genre[3]} ${only === "tv" ? "shows" : only === "movie" ? "films" : "films & shows"}` : ""],
     [topicItems,  topicName ? `About "${topicName}"` : ""],
     [personItems, personName ? `With ${personName}` : ""],

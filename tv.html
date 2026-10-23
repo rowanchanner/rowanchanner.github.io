@@ -12,8 +12,8 @@
   <meta name="theme-color" content="#e50914" />
   <!-- TV remote / D-pad navigation. Loaded early so page
        scripts can read window.SharkyTV when building URLs. -->
-  <script src="sharky-account.js?v=20261018d"></script>
-  <script src="account-web.js?v=20261016-accounts"></script>
+  <script src="sharky-account.js?v=20261023-gate"></script>
+  <script src="account-web.js?v=20261023-gate"></script>
   <script src="sharky-extras.js?v=20261018c" defer></script>
   <script src="tvnav.js?v=20261016b"></script>
   <script src="player.js" defer></script>
@@ -504,6 +504,7 @@
     downloadBtn?.addEventListener('click', async () => {
       if (!tvId || sharkyComingSoon) return;
       if (episodeList.querySelector('.episode-item.playing.not-aired')) return;
+      if (window.sharkyNeedAccount && !window.sharkyNeedAccount('download this', () => downloadBtn.click())) return;
       const meta = {
         id: tvId, media_type: 'tv',
         season: selectedSeason, episode: selectedEpisode,
@@ -586,6 +587,7 @@
 
     gwBtn?.addEventListener('click', () => {
       if (room) { gwPanel.classList.toggle('on'); return; }
+      if (window.sharkyNeedAccount && !window.sharkyNeedAccount('start a Group Watch', () => gwBtn.click())) return;
       const existing = new URLSearchParams(location.search).get('room');
       openRoom(existing || window.GroupWatch.createCode());
     });
@@ -605,7 +607,11 @@
     gwSend?.addEventListener('click', sendChat);
     gwInput?.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
     if (new URLSearchParams(location.search).get('room')) {
-      setTimeout(() => openRoom(new URLSearchParams(location.search).get('room')), 400);
+      setTimeout(() => {
+        const code = new URLSearchParams(location.search).get('room');
+        if (window.sharkyNeedAccount && !window.sharkyNeedAccount('join this Group Watch', () => { if (!room) openRoom(code); })) return;
+        openRoom(code);
+      }, 400);
     }
     window.addEventListener('beforeunload', () => { try { room?.close(); } catch {} });
   </script>
