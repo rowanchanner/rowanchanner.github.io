@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /movie.html
+Allow: /tv.html
+
+Sitemap: https://www.sharkmovie.co.uk/sitemap.xml
+Sitemap: https://api.sharkmovie.co.uk/sitemap.xml
