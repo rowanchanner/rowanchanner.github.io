@@ -100,7 +100,7 @@ async function fetchTMDB(endpoint) {
 
 async function getList(endpoint, type) {
   const data = await fetchTMDB(endpoint);
-  return (data?.results || []).map(item => normalizeItem(item, type));
+  return (data?.results || []).map(item => normalizeItem(item, type)).filter(i => !isUpcoming(i));
 }
 
 function endpointWithPage(endpoint, page) {
@@ -131,6 +131,25 @@ function normalizeItem(item, type) {
     sharky_title: item.title || item.name || "Untitled",
     sharky_date:  item.release_date || item.first_air_date || "",
   };
+}
+
+/* ── Coming soon ────────────────────────────────────────────
+   A title with a release / first-air date after today is not out yet, so it
+   is kept out of the normal rows and shown in "Coming Soon" instead. Titles
+   with no date at all are left alone (saved items, odd TMDB entries). */
+function localISODate(d) {
+  const z = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+}
+const TODAY_ISO = localISODate(new Date());
+const releaseDateOf = i => (i && (i.sharky_date || i.release_date || i.first_air_date)) || "";
+function isUpcoming(i) { const d = releaseDateOf(i); return !!d && d > TODAY_ISO; }
+function comingDateText(i) {
+  const d = releaseDateOf(i);
+  if (!d) return "Coming soon";
+  const dt = new Date(d + "T00:00:00");
+  return isNaN(dt) ? "Coming soon"
+    : "Coming " + dt.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
 /* ── Presentational helpers ─────────────────────────────── */
@@ -203,6 +222,8 @@ function createCard(item, opts = {}) {
   const year   = getYear(item);
   const rating = getRating(item);
   const removable = opts.removable || false;   // Continue / My List cards
+  const upcoming  = isUpcoming(item);
+  if (upcoming) card.classList.add("is-upcoming");
 
   card.innerHTML = `
     ${removable ? `<button class="card-remove" title="Remove" aria-label="Remove" data-act="remove">&times;</button>` : ""}
@@ -210,7 +231,7 @@ function createCard(item, opts = {}) {
     <div class="card-overlay">
       <h3 class="card-title">${escapeHTML(item.sharky_title)}</h3>
       <div class="card-actions">
-        <button class="card-ic play"  title="Play"       data-act="play">&#9654;</button>
+        ${upcoming ? "" : `<button class="card-ic play"  title="Play"       data-act="play">&#9654;</button>`}
         <button class="card-ic"       title="My List"    data-act="list">+</button>
         <button class="card-ic"       title="More Info"  data-act="info">&#9432;</button>
       </div>
@@ -218,7 +239,7 @@ function createCard(item, opts = {}) {
         ${rating ? `<span class="card-rating">&#9733; ${rating}</span>` : ""}
         ${year   ? `<span>${year}</span>` : ""}
         <span class="card-badge">${typeLabel}</span>
-        <span class="card-badge">HD</span>
+        ${upcoming ? `<span class="card-badge card-soon">${escapeHTML(comingDateText(item))}</span>` : `<span class="card-badge">HD</span>`}
       </div>
     </div>`;
 
@@ -542,7 +563,18 @@ async function openDetails(id, type) {
     ${country ? `<div class="side-row"><b>Origin</b><span>${escapeHTML(country)}</span></div>` : ""}
   `;
 
-  detailsPlayBtn.onclick    = () => playItem(item);
+  if (!detailsPlayBtn.dataset.label) detailsPlayBtn.dataset.label = detailsPlayBtn.innerHTML;
+  if (isUpcoming(item)) {
+    detailsPlayBtn.disabled = true;
+    detailsPlayBtn.classList.add("is-upcoming");
+    detailsPlayBtn.textContent = comingDateText(item);
+    detailsPlayBtn.onclick = null;
+  } else {
+    detailsPlayBtn.disabled = false;
+    detailsPlayBtn.classList.remove("is-upcoming");
+    if (detailsPlayBtn.dataset.label) detailsPlayBtn.innerHTML = detailsPlayBtn.dataset.label;
+    detailsPlayBtn.onclick = () => playItem(item);
+  }
   detailsTrailerBtn.onclick = () => openTrailer(item);
   detailsListBtn.onclick    = () => { toggleMyList(item); updateMyListButton(detailsListBtn, item); };
   updateMyListButton(detailsListBtn, item);
@@ -561,6 +593,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeDetails
 
 /* ── Actions ────────────────────────────────────────────── */
 function playItem(item) {
+  if (isUpcoming(item)) { openDetails(item.id, item.media_type); return; }
   saveContinueWatching(item);
   if (item.media_type === "tv") {
     const s = item.season || 1, ep = item.episode || 1;
@@ -626,6 +659,37 @@ function saveContinueWatching(item) {
    What people here actually watched this week, counted by the server (a view
    = someone watching 2+ minutes). Hidden until there are a few titles, so a
    quiet week never shows a stub of a row. Never blocks the rest of the page. */
+/* ── Coming Soon (not yet out) ──────────────────────────────
+   Popular films and shows whose release date is after today. They never
+   appear in the normal rows (getList filters them out); this row is where
+   they live. Cards have no Play button, just the date it comes out. */
+async function renderComingSoon() {
+  const block = document.getElementById("comingSoonBlock");
+  const row = document.getElementById("comingSoonRow");
+  if (!block || !row) return;
+  try {
+    const t = new Date(); t.setDate(t.getDate() + 1);
+    const from = localISODate(t);
+    const [mv, tv] = await Promise.all([
+      fetchTMDB(`/discover/movie?primary_release_date.gte=${from}&sort_by=popularity.desc&include_adult=false`),
+      fetchTMDB(`/discover/tv?first_air_date.gte=${from}&sort_by=popularity.desc&include_adult=false`),
+    ]);
+    const items = [
+      ...((mv && mv.results) || []).map(x => normalizeItem(x, "movie")),
+      ...((tv && tv.results) || []).map(x => normalizeItem(x, "tv")),
+    ].filter(i => isUpcoming(i) && i.poster_path && (i.backdrop_path || i.overview))
+     .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+     .slice(0, 24);
+    if (items.length < 4) { block.classList.add("hidden"); return; }
+    row.innerHTML = "";
+    items.forEach(i => row.appendChild(createCard(i)));
+    block.classList.remove("hidden");
+  } catch (e) {
+    console.error("[shark] coming soon", e);
+    block.classList.add("hidden");
+  }
+}
+
 async function renderSharkyTop() {
   const block = document.getElementById("sharkyTopBlock");
   const row = document.getElementById("sharkyTopRow");
@@ -925,6 +989,7 @@ async function init() {
 
   renderContinueWatching();
   renderSharkyTop();
+  renderComingSoon();
   const movieRecentRows = [];
   const tvRecentRows = [];
   const allPlayable = [...movieFallback, ...tvFallback];
@@ -1057,7 +1122,7 @@ async function topUpRow(src) {
         (d.results || []).forEach(raw => {
           const i = normalizeItem(raw, src.type);
           const k = mediaKey(i);
-          if (!k || src.keys.has(k) || (!i.poster_path && !i.backdrop_path)) return;
+          if (!k || src.keys.has(k) || (!i.poster_path && !i.backdrop_path) || isUpcoming(i)) return;
           src.keys.add(k);
           fresh.push(i);
         });

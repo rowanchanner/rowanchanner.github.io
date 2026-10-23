@@ -140,8 +140,22 @@
     const currentPlayUrl = movieId
       ? `${SHARKY_API}/embed/movie/${movieId}` + (window.SharkyTV && window.SharkyTV.active ? '?tv=1' : '')
       : '';
+
+    /* Not out yet: release / air date after today. Shared by Play, Download
+       and Group Watch so nothing tries to scrape a title that doesn't exist yet. */
+    const SHARKY_TODAY = (d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)(new Date());
+    const sharkyNotOut = d => !!d && String(d).slice(0,10) > SHARKY_TODAY;
+    const sharkySoonText = d => { const t = new Date(String(d).slice(0,10) + 'T00:00:00'); return isNaN(t) ? 'Coming soon' : 'Coming ' + t.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' }); };
+    let sharkyComingSoon = false;
+    function sharkyMarkComingSoon(date) {
+      sharkyComingSoon = true;
+      const pb = document.getElementById('playBtn');
+      if (pb) { pb.disabled = true; pb.style.opacity = '.75'; pb.style.cursor = 'default'; pb.innerHTML = '<span class="ic">&#128197;</span> ' + sharkySoonText(date); }
+      ['downloadBtn','gwBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
+    }
     const playBtn = document.getElementById('playBtn');
     if (playBtn) playBtn.addEventListener('click', () => {
+      if (sharkyComingSoon) return;
       if (currentPlayUrl && window.SharkyPlayer) window.SharkyPlayer.open(currentPlayUrl);
     });
     if (!movieId && sharkyLoading) {
@@ -168,6 +182,7 @@
         const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&append_to_response=credits,recommendations&language=en-US`);
         const m = await res.json();
         currentShow = m;
+        if (sharkyNotOut(m.release_date)) sharkyMarkComingSoon(m.release_date);
 
         const year    = m.release_date ? m.release_date.slice(0,4) : '';
         const rating  = m.vote_average ? Number(m.vote_average).toFixed(1) : '';
@@ -272,7 +287,7 @@
     refreshDownloadBtn();
 
     downloadBtn?.addEventListener('click', async () => {
-      if (!movieId) return;
+      if (!movieId || sharkyComingSoon) return;
       const meta = { id: movieId, media_type: 'movie', sharky_title: (currentShow?.title || document.title.split(' — ')[0]) };
       const item = Object.assign({}, currentShow || {}, meta);
       item.sharky_title = item.title || item.sharky_title;

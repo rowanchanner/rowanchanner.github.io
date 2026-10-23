@@ -257,8 +257,22 @@
     /* Play on a series means "which episode?", not "start something" - so it
        takes you to the list and puts the highlight on where you're up to.
        Choosing an episode is what opens the fullscreen player. */
+
+    /* Not out yet: release / air date after today. Shared by Play, Download
+       and Group Watch so nothing tries to scrape a title that doesn't exist yet. */
+    const SHARKY_TODAY = (d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)(new Date());
+    const sharkyNotOut = d => !!d && String(d).slice(0,10) > SHARKY_TODAY;
+    const sharkySoonText = d => { const t = new Date(String(d).slice(0,10) + 'T00:00:00'); return isNaN(t) ? 'Coming soon' : 'Coming ' + t.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' }); };
+    let sharkyComingSoon = false;
+    function sharkyMarkComingSoon(date) {
+      sharkyComingSoon = true;
+      const pb = document.getElementById('playBtn');
+      if (pb) { pb.disabled = true; pb.style.opacity = '.75'; pb.style.cursor = 'default'; pb.innerHTML = '<span class="ic">&#128197;</span> ' + sharkySoonText(date); }
+      ['downloadBtn','gwBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
+    }
     const playBtn = document.getElementById('playBtn');
     if (playBtn) playBtn.addEventListener('click', () => {
+      if (sharkyComingSoon) return;
       const row = episodeList.querySelector('.episode-item.playing')
                || episodeList.querySelector('.episode-item');
       if (!row) return;
@@ -338,6 +352,8 @@
           const isWatched = !!w;
           const pct = w && w.pct ? Math.max(2, Math.min(100, w.pct)) : 0;
           if (isWatched) li.classList.add('watched');
+          const notAired = sharkyNotOut(ep.air_date);
+          if (notAired) { li.classList.add('not-aired'); li.style.opacity = '.55'; li.title = 'Not out yet'; }
 
           const runtime = ep.runtime ? `${ep.runtime}m` : '';
           li.innerHTML = `
@@ -350,13 +366,14 @@
             <div class="ep-info">
               <div class="ep-title">
                 <span>${esc(ep.name || 'Untitled')}</span>
-                ${runtime ? `<span class="ep-runtime">${runtime}</span>` : ''}
+                ${notAired ? `<span class="ep-runtime">${esc(sharkySoonText(ep.air_date).replace('Coming','Airs'))}</span>` : (runtime ? `<span class="ep-runtime">${runtime}</span>` : '')}
               </div>
               <div class="ep-desc">${esc(ep.overview || '')}</div>
             </div>
             <div class="ep-chevron">&#10095;</div>
           `;
           li.addEventListener('click', () => {
+            if (notAired || sharkyComingSoon) return;   // not out yet: nothing to play
             userPickedEpisode = true;
             selectedEpisode = Number(ep.episode_number);
             document.querySelectorAll('.episode-item').forEach(x => x.classList.remove('playing'));
@@ -420,6 +437,7 @@
         const res  = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${API_KEY}&append_to_response=credits&language=en-US`);
         const show = await res.json();
         currentShow = show;
+        if (sharkyNotOut(show.first_air_date)) sharkyMarkComingSoon(show.first_air_date);
         /* Episodes may have rendered before this resolved, in which case any
            still-less rows fell back to the plain gradient. Upgrade them to the
            show backdrop now that we have it. */
@@ -484,7 +502,8 @@
     }
 
     downloadBtn?.addEventListener('click', async () => {
-      if (!tvId) return;
+      if (!tvId || sharkyComingSoon) return;
+      if (episodeList.querySelector('.episode-item.playing.not-aired')) return;
       const meta = {
         id: tvId, media_type: 'tv',
         season: selectedSeason, episode: selectedEpisode,

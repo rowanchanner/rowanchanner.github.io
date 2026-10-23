@@ -24,6 +24,10 @@
 
   <link rel="stylesheet" href="style.css" />
   <style>
+    /* Coming soon (not yet out) */
+    .card-badge.card-soon { background:#e50914; color:#fff; border-color:transparent; }
+    .btn.btn-play.is-upcoming, .btn.btn-play:disabled { opacity:.75; cursor:default; filter:grayscale(.3); }
+
     .nav-account{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:999px;
       border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06);color:#fff;font:inherit;font-weight:700;
       font-size:.88rem;cursor:pointer;white-space:nowrap}
@@ -247,6 +251,15 @@
         <div class="row-viewport">
           <button class="row-arrow left"  aria-label="Scroll left">&#10094;</button>
           <div class="movie-row" id="sharkyTopRow"></div>
+          <button class="row-arrow right" aria-label="Scroll right">&#10095;</button>
+        </div>
+      </div>
+
+      <div class="movie-row-block hidden" id="comingSoonBlock" data-cat="coming soon">
+        <div class="section-header"><h2>Coming Soon <span style="color:var(--muted);font-weight:400;font-size:.8em">(not yet out)</span></h2></div>
+        <div class="row-viewport">
+          <button class="row-arrow left"  aria-label="Scroll left">&#10094;</button>
+          <div class="movie-row" id="comingSoonRow"></div>
           <button class="row-arrow right" aria-label="Scroll right">&#10095;</button>
         </div>
       </div>
