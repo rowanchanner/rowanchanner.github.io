@@ -40,7 +40,7 @@
   .bg.kb { animation: kb 9s ease-out forwards; }
   @keyframes kb { from { transform: scale(1.18); } to { transform: scale(1); } }
   .shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.15) 35%, rgba(0,0,0,.85) 100%); }
-  .yt { position: absolute; left: 50%; top: 50%; width: 177.78vh; height: 100vh; transform: translate(-50%, -50%); z-index: -1; border: 0; pointer-events: none;
+  .yt { position: absolute; left: 50%; top: 50%; width: 240vh; height: 135vh; transform: translate(-50%, -50%); z-index: -1; border: 0; pointer-events: none;
         opacity: 0; animation: ytin 1s ease 2.5s forwards; }   /* the backdrop shows while the trailer loads */
   @keyframes ytin { to { opacity: 1; } }
   h1 { font-size: clamp(34px, 9vw, 58px); line-height: .98; font-weight: 900; letter-spacing: -1.5px; }
@@ -448,9 +448,22 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
     var all = host.children;
     for (var k = 0; k < all.length; k++) {
       all[k].classList.toggle('on', k === i);
-      /* Restart the animations, and only keep the trailer running on screen. */
-      if (k === i) { var el = all[k]; el.innerHTML = slides[k].html; wire(el, slides[k]); }
-      else if (all[k].querySelector('iframe')) all[k].innerHTML = '';
+      /* Restart the animations, and only keep a trailer running on screen -
+         or on the NEXT slide: that one starts loading now, hidden, so by the
+         time it's shown it's already playing (no YouTube spinner / title). */
+      var el = all[k];
+      if (k === i) {
+        if (el.__pre && el.querySelector('iframe')) {
+          [].forEach.call([].slice.call(el.children), function (c) {
+            if (c.tagName !== 'IFRAME') el.replaceChild(c.cloneNode(true), c);   // re-runs the animations
+          });
+        } else el.innerHTML = slides[k].html;
+        el.__pre = 0;
+        wire(el, slides[k]);
+      } else if (k === i + 1 && slides[k].html.indexOf('class="yt"') >= 0) {
+        if (!el.querySelector('iframe')) el.innerHTML = slides[k].html;
+        el.__pre = 1;
+      } else if (el.querySelector('iframe')) { el.innerHTML = ''; el.__pre = 0; }
     }
     var bars = $('bars').children;
     for (var b = 0; b < bars.length; b++) {
