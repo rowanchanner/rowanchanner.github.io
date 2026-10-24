@@ -13,7 +13,7 @@
   <!-- TV remote / D-pad navigation. Loaded early so page
        scripts can read window.SharkyTV when building URLs. -->
   <script src="sharky-account.js?v=20261023-gate"></script>
-  <script src="account-web.js?v=20261023-gate"></script>
+  <script src="account-web.js?v=20261024-share"></script>
   <script src="sharky-extras.js?v=20261018c" defer></script>
   <script src="tvnav.js?v=20261016b"></script>
   <script src="player.js" defer></script>
@@ -63,6 +63,7 @@
           <button class="watch-action-btn primary" id="playBtn"><span class="ic">&#9654;</span> Play</button>
           <button class="watch-action-btn" id="downloadBtn"><span class="ic">&#x2913;</span> <span id="downloadLabel">Download</span></button>
           <button class="watch-action-btn" id="gwBtn"><span class="ic">&#9749;</span> Group Watch</button>
+          <button class="watch-action-btn" id="shareBtn"><span class="ic">&#8599;</span> Share</button>
           <span class="download-status" id="downloadStatus">
             <span id="downloadStatusText">Downloading…</span>
             <span class="download-bar"><span class="download-bar-fill" id="downloadBarFill"></span></span>
@@ -269,6 +270,10 @@
     }
 
     loadMovieDetails();
+
+    document.getElementById('shareBtn')?.addEventListener('click', () => {
+      if (window.sharkyShare) window.sharkyShare('movie', movieId, '', '', currentShow && currentShow.title);
+    });
 
     // ── Download ──────────────────────────────────────────
     const downloadBtn   = document.getElementById('downloadBtn');

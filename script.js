@@ -576,6 +576,9 @@ async function openDetails(id, type) {
     detailsPlayBtn.onclick = () => playItem(item);
   }
   detailsTrailerBtn.onclick = () => openTrailer(item);
+  const detailsShareBtn = document.getElementById("detailsShareBtn");
+  if (detailsShareBtn) detailsShareBtn.onclick = () =>
+    window.sharkyShare && window.sharkyShare(type, id, "", "", item.sharky_title);
   detailsListBtn.onclick    = () => { toggleMyList(item); updateMyListButton(detailsListBtn, item); };
   updateMyListButton(detailsListBtn, item);
 

@@ -24,6 +24,39 @@
     return false;
   };
 
+  /* Share a title. The link goes through api.sharkmovie.co.uk/s/... which
+     carries the poster/title/rating preview for WhatsApp, Discord, iMessage
+     and X, then sends people on to the title here. Phones get the native
+     share sheet; computers get the link copied. */
+  window.sharkyShare = function (kind, id, s, e, title) {
+    var url = 'https://api.sharkmovie.co.uk/s/' + (kind === 'tv' ? 'tv' : 'movie') + '/' + encodeURIComponent(id) +
+              (kind === 'tv' && s && e ? '/' + s + '/' + e : '');
+    var text = title ? 'Watch ' + title + ' on Sharky' : 'Watch this on Sharky';
+    function toast(msg) {
+      var t = document.createElement('div');
+      t.textContent = msg;
+      t.style.cssText = 'position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:99999;' +
+        'background:#fff;color:#111;font:600 14px/1.2 system-ui,sans-serif;padding:12px 18px;border-radius:999px;' +
+        'box-shadow:0 8px 30px rgba(0,0,0,.45)';
+      document.body.appendChild(t);
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2200);
+    }
+    function copy() {
+      var done = function () { toast('Link copied - paste it anywhere'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done, function () { prompt('Copy this link:', url); });
+      } else { prompt('Copy this link:', url); }
+    }
+    var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (navigator.share && touch) {
+      navigator.share({ title: title || 'Sharky', text: text, url: url }).catch(function (err) {
+        if (!err || err.name !== 'AbortError') copy();
+      });
+    } else {
+      copy();
+    }
+  };
+
   function paintButton() {
     var b = document.getElementById('accountBtn');
     if (!b) return;
