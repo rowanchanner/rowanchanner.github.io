@@ -427,12 +427,12 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
       /* The ask. Their share of running Sharky this year (incl. the £2). */
       s.push({ html: bg('g5') +
         '<p class="kick up">The honest bit</p>' +
-        '<p class="lead up d1">Keeping Sharky running for you this year cost us about</p><div class="big pop d2">' + money(cost) + '</div>' +
-        '<p class="lead up d3">That\'s servers, streams and the website - all paid out of our own pockets.</p>' +
-        '<h1 class="up d4" style="margin-top:22px">And we didn\'t charge you a penny. You\'re worth it &#129416;</h1>', ms: 9000 });
+        '<p class="lead up d1">' + esc(profileName('You')) + ', just <b>YOUR</b> watching this year cost us</p><div class="big pop d2">' + money(cost) + '</div>' +
+        '<p class="lead up d3">Not everyone\'s - only you. That\'s your share of the servers, streams and website, paid out of our own pockets.</p>' +
+        '<h1 class="up d4" style="margin-top:22px">And we didn\'t charge you a penny. You\'re worth it &#129416;</h1>', ms: 10000 });
       s.push({ html: bg('g2') +
         '<h1 class="pop">Yes, really. ' + money(cost) + '.</h1>' +
-        '<p class="lead up d1">That\'s roughly what the streaming itself costs for a WHOLE year of films and shows - for us, and for the big streaming services too.</p>' +
+        '<p class="lead up d1">That\'s roughly what it costs to stream everything <b>YOU</b> watched this year - a WHOLE year of your films and shows. Same for us, and for the big streaming services.</p>' +
         '<p class="lead up d2">Netflix still charges up to \u00a318.99 a month. Really shows how much they SCAM people!</p>' +
         '<h2 class="up d3" style="margin-top:22px">You paid \u00a30.</h2>', ms: 8000 });
       s.push({ html: bg('g5') +
