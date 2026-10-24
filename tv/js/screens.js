@@ -539,6 +539,11 @@
       after = block;
     });
   }
+  /* Switching profile (or the account arriving after Home drew): redo the picks. */
+  document.addEventListener('sharky:account', function () {
+    fySig = '';
+    if (currentName === 'home') renderForYou();
+  });
   /* What was looked at counts as a (weak) "shown"; opening it counts more. */
   document.addEventListener('nav:focus', function (e) {
     var el = e.detail && e.detail.el;

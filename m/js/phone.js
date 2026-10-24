@@ -545,19 +545,34 @@
   }
   function fyTeaser() {
     var t = el('section', 'row');
-    t.innerHTML = '<div style="margin:0 14px;padding:16px;border-radius:14px;border:1px solid rgba(229,9,20,.4);' +
-      'background:linear-gradient(90deg,rgba(229,9,20,.2),rgba(229,9,20,.05))">' +
-      '<div style="font-weight:800;font-size:16px;margin-bottom:4px">Picks made just for you</div>' +
-      '<div style="color:var(--mute,#aaa);font-size:14px;line-height:1.4;margin-bottom:12px">Make a free account and Sharky learns what you like - ' +
-      'your home fills up with films and shows picked for you, and every profile gets its own. <b style="color:#fff">It\'s free.</b></div>' +
-      '<button class="btn btn-white" data-fy="signup">Create a free account</button> ' +
-      '<button class="btn btn-grey" data-fy="signin">Sign in</button></div>';
+    t.innerHTML =
+      '<div style="margin:0 14px;padding:14px;border-radius:12px;background:#141414;border:1px solid rgba(255,255,255,.08);' +
+      'display:flex;gap:12px;align-items:center">' +
+        '<div style="flex:none;width:42px;height:42px;border-radius:10px;background:#e50914;display:flex;align-items:center;' +
+        'justify-content:center;font-size:22px">&#10024;</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:700;font-size:15px;line-height:1.2">Picks made for you</div>' +
+          '<div style="color:var(--mute,#999);font-size:12.5px;line-height:1.35;margin-top:2px">Sign in free and your home fills up with stuff you\'ll like.</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin:8px 14px 0">' +
+        '<button class="btn btn-white" data-fy="signup" style="height:40px;font-size:14px">Create free account</button>' +
+        '<button class="btn btn-grey" data-fy="signin" style="height:40px;font-size:14px">Sign in</button>' +
+      '</div>';
     t.addEventListener('click', function (e) {
       var b = e.target.closest('[data-fy]');
       if (b && window.SharkyAccount) SharkyAccount.open(b.getAttribute('data-fy'));
     });
     return t;
   }
+
+  /* The account loads just after the first draw of Home: redo the picks
+     once it's there (and whenever the profile changes). */
+  document.addEventListener('sharky:account', function () {
+    fySig = '';
+    var host = $('rows');
+    if (host && tab === 'home') forYouRows(host);
+  });
 
   /* ── Coming Soon (not yet out) ── */
   function comingSoonRow(host, token) {
