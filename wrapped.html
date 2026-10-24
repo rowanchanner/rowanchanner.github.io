@@ -473,9 +473,9 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
           ? '<div class="donate up d2">' +
               (QR_SHOW ? '<div class="qr" id="qr"></div>' : '') +
               '<div><p class="lead" style="margin-top:0">Chip in your <span class="gold">' + money(cost) + '</span>?</p>' +
-              (QR_SHOW ? '<p class="small">Scan with your phone camera.</p>' : '') +
-              (TV ? '' : '<div class="btns"><button class="btn w" id="donate" type="button">Donate</button></div>') +
-              '<p class="small">You pick the amount. Totally optional - Sharky stays free.</p></div></div>'
+              (QR_SHOW ? '<p class="small">Scan with phone to donate crypto.</p>' : '') +
+              (TV ? '' : '<div class="btns"><button class="btn w" id="donate" type="button">Donate Crypto</button></div>') +
+              '<p class="small" style="line-height:1.45;margin-top:8px">To stay anonymous, we only take crypto directly.<br>Want to donate by card? <a href="https://discord.gg/F7PP27VXnh" target="_blank" rel="noopener" style="color:#ffd84d;text-decoration:underline">Message us on Discord</a>.</p></div></div>'
           : '<p class="lead up d2">Donations open soon - thanks for watching with us.</p>'),
         ms: DONATE_URL ? 25000 : 7000, donate: !!DONATE_URL });
 
