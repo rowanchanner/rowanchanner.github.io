@@ -273,15 +273,32 @@
      {key: [seconds, pct]}), or for a show an episode past 10 percent.
      Things watched before this check existed (no data for them) still count. */
   var REAL_SINCE = 1792862213780;
-  function reallyWatched(h, it) {
-    var k = mediaKey(it), w = (h.sig.w || {})[k];
-    if (w && (w[0] >= 180 || w[1] >= 10)) return true;
+  /* Like Netflix: how much of it did they actually watch?
+       2 = finished: 85 percent+ of a film, or a WHOLE episode (95 percent+ -
+           the player rarely reports exactly 100 because the next episode
+           takes over during the credits) - a real
+           "Because You Watched" seed, and it counts for "Up Next".
+       1 = gave it a proper go (3+ minutes or 10 percent) - a weak hint only.
+       0 = opened it for a few seconds - ignored completely.
+     Old history from before this check (no data) counts as a hint. */
+  function watchLevel(h, it) {
+    var k = mediaKey(it), w = (h.sig.w || {})[k], best = w ? w[1] : 0, secs = w ? w[0] : 0;
+    var moved = 0;
     if (it.media_type === 'tv') {
       var show = h.eps[String(it.id)] || {};
-      if (Object.keys(show).some(function (e) { return (show[e].pct || 0) >= 10; })) return true;
+      Object.keys(show).forEach(function (e) {
+        best = Math.max(best, show[e].pct || 0);
+        if ((show[e].pct || 0) >= 10) moved++;
+      });
     }
-    return (it.lastWatched || 0) < REAL_SINCE && !w;
+    if (best >= (it.media_type === 'tv' ? 95 : 85)) return 2;
+    /* Went on to another episode = the one before was finished, even if
+       they skipped the last bit of its credits. */
+    if (moved >= 2) return 2;
+    if (secs >= 180 || best >= 10) return 1;
+    return (it.lastWatched || 0) < REAL_SINCE && !w ? 1 : 0;
   }
+  function reallyWatched(h, it) { return watchLevel(h, it) > 0; }
 
   function seedsOf(h) {
     var seeds = [], seen = {}, no = h.sig.no;
@@ -291,7 +308,8 @@
       seen[k] = 1;
       var ageDays = (Date.now() - (it.lastWatched || Date.now())) / 86400000;
       var recency = Math.max(0.3, Math.exp(-ageDays / 45));
-      seeds.push({ item: it, w: (1 / (1 + n * 0.3)) * recency * depth(h, it), watched: true });
+      var full = watchLevel(h, it) === 2;
+      seeds.push({ item: it, w: (1 / (1 + n * 0.3)) * recency * depth(h, it) * (full ? 1 : 0.35), watched: full });
     });
     h.list.slice(0, 4).forEach(function (it) {
       var k = mediaKey(it);
@@ -346,7 +364,8 @@
     /* Only what was watched / listed. Clicks and "not for me" don't rebuild
        the rows under someone's nose - they count from the next visit
        (a "not for me" clears the cache so that's straight away). */
-    return pid + '|' + h.cont.filter(function (i) { return reallyWatched(h, i); }).slice(0, 10).map(mediaKey).join(',') +
+    return pid + '|' + h.cont.filter(function (i) { return reallyWatched(h, i); }).slice(0, 10)
+      .map(function (i) { return mediaKey(i) + '/' + watchLevel(h, i); }).join(',') +
       '|' + h.list.slice(0, 4).map(mediaKey).join(',') +
       '|' + (s.v || 1);
   }

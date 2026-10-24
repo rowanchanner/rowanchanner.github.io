@@ -108,7 +108,8 @@
       seen[k] = 1;
       var age = (new Date().getTime() - (it.at || new Date().getTime())) / 86400000;
       var recency = Math.max(0.3, Math.exp(-age / 45));
-      seeds.push({ id: it.id, kind: it.kind, w: (1 / (1 + n * 0.3)) * recency * (it.depth || 1), watched: true });
+      var full = it.full !== false;
+      seeds.push({ id: it.id, kind: it.kind, w: (1 / (1 + n * 0.3)) * recency * (it.depth || 1) * (full ? 1 : 0.35), watched: full });
     });
     list.slice(0, 4).forEach(function (it) {
       var k = (it.kind === 'tv' ? 'tv' : 'movie') + ':' + it.id;
@@ -345,8 +346,9 @@
     var titles = {};
     function add(kind, id, at, isEp, pct) {
       var k = kind + ':' + id;
-      var t = titles[k] || (titles[k] = { id: id, kind: kind, at: 0, eps: 0 });
+      var t = titles[k] || (titles[k] = { id: id, kind: kind, at: 0, eps: 0, best: 0 });
       if ((at || 0) > t.at) t.at = at || 0;
+      if ((pct || 0) > t.best) t.best = pct || 0;
       if (isEp && (pct == null || pct >= 20)) t.eps++;
     }
     /* Only what was REALLY watched: 3+ minutes in, or 10 percent. Opening
@@ -357,16 +359,21 @@
       var p = k.split(':');
       if (!real(prog[k])) return;
       if (p[0] === 'tv') add('tv', p[1], prog[k].at, true, prog[k].pct);
-      else if (p[0] === 'movie') add('movie', p[1], prog[k].at, false);
+      else if (p[0] === 'movie') add('movie', p[1], prog[k].at, false, prog[k].pct);
     });
     (read('sharkytv_continue', []) || []).forEach(function (r) {
-      if (real(r)) add(r.kind === 'tv' ? 'tv' : 'movie', r.id, r.at, false);
+      if (real(r)) add(r.kind === 'tv' ? 'tv' : 'movie', r.id, r.at, false, r.pct);
     });
     var now = new Date().getTime();
     var watched = Object.keys(titles).map(function (k) {
       var t = titles[k];
       var days = (now - (t.at || now)) / 86400000;
       t.depth = t.kind !== 'tv' ? 1 : (t.eps <= 1 && days > 14 ? 0.5 : 1 + Math.min(1, t.eps / 6));
+      /* Like Netflix: finished - 85 percent+ of a film, or a whole episode
+         (95 percent+; the next episode takes over in the credits, so 100 is
+         rarely reported) - is a real "Because You Watched" seed; anything
+         less is only a weak hint. */
+      t.full = t.best >= (t.kind === 'tv' ? 95 : 85) || (t.kind === 'tv' && t.eps >= 2);   // moved on to the next episode = finished one
       return t;
     }).sort(function (a, b) { return b.at - a.at; });
     var list = (read('sharkytv_mylist', []) || []).map(function (r) { return { id: r.id, kind: r.kind === 'tv' ? 'tv' : 'movie' }; });
