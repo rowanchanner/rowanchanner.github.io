@@ -36,11 +36,11 @@
   .brand { font-family: var(--disp); font-weight: 900; letter-spacing: -.3px; font-size: clamp(15px, 1.6 * var(--u) + 8px, 30px); color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.45); display: flex; align-items: center; gap: .4em; }
   .brand .pill { background: var(--red); color: #fff; padding: .18em .55em .22em; border-radius: .45em; text-shadow: none; box-shadow: 0 4px 18px rgba(229,9,20,.45); }
   .ic { background: rgba(0,0,0,.35); border: 0; color: #fff; width: clamp(36px, 4 * var(--u), 64px); height: clamp(36px, 4 * var(--u), 64px); border-radius: 50%; font-size: clamp(17px, 1.9 * var(--u), 30px); cursor: pointer; margin-left: 6px; }
-  .slide { position: absolute; inset: 0; z-index: 1; isolation: isolate; display: flex; flex-direction: column; justify-content: center; padding: max(76px, 9vh) max(28px, 8vw) max(56px, 8vh);
+  .slide { position: absolute; inset: 0; z-index: 25; isolation: isolate; display: flex; flex-direction: column; justify-content: center; padding: max(76px, 9vh) max(28px, 8vw) max(56px, 8vh);
            opacity: 0; transform: scale(1.04); transition: opacity .5s ease, transform .6s ease; pointer-events: none; }
   .slide.on { opacity: 1; transform: none; pointer-events: auto; }
   /* Content keeps a readable width on big screens; backgrounds stay full screen. */
-  .slide > :not(.bg):not(.shade):not(iframe):not(.grain) { width: 100%; max-width: 1100px; }
+  .slide > :not(.bg):not(.shade):not(iframe):not(.grain) { width: 100%; max-width: 1100px; position: relative; z-index: 26; }
   .grain { position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .18; mix-blend-mode: overlay;
            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
   .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55; mix-blend-mode: screen; animation: drift 12s ease-in-out infinite alternate; }
@@ -113,8 +113,9 @@
   .card .v { font-family: var(--disp); font-size: clamp(18px, 2 * var(--u) + 6px, 38px); font-weight: 900; letter-spacing: -.01em; }
   .tapzone { position: absolute; top: max(60px, 8vh); bottom: 0; width: 34%; z-index: 20; }
   .tapzone.l { left: 0; } .tapzone.r { right: 0; width: 66%; }
-  .slide .btns, .slide .amt, .slide .card, .donate { position: relative; z-index: 25; }
-  .donate .btn { cursor: pointer; pointer-events: auto; }
+  .slide .btns, .slide .amt, .slide .card, .donate { position: relative; z-index: 30; pointer-events: auto; }
+  .donate * { pointer-events: auto; }
+  .donate .btn, .donate a { cursor: pointer; pointer-events: auto; }
   #start { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; isolation: isolate; overflow: hidden; }
   #start h1 { margin-top: 14px; }  #start .btns { margin-left: auto; margin-right: auto; }
   .shark { font-size: clamp(72px, 10 * var(--u), 170px); animation: bob 2.2s ease-in-out infinite; }
@@ -475,7 +476,7 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
               '<div><p class="lead" style="margin-top:0">Chip in your <span class="gold">' + money(cost) + '</span>?</p>' +
               (QR_SHOW ? '<p class="small">Scan with phone to donate crypto.</p>' : '') +
               (TV ? '' : '<div class="btns"><button class="btn w" id="donate" type="button">Donate Crypto</button></div>') +
-              '<p class="small" style="line-height:1.45;margin-top:8px">To stay anonymous, we only take crypto directly.<br>Want to donate by card? <a href="https://discord.gg/F7PP27VXnh" target="_blank" rel="noopener" style="color:#ffd84d;text-decoration:underline">Message us on Discord</a>.</p></div></div>'
+              '<p class="small" style="line-height:1.45;margin-top:8px">To stay anonymous, we only take crypto directly.<br>Want to donate by card? <a id="discord-card-link" href="https://discord.gg/F7PP27VXnh" target="_blank" rel="noopener" style="color:#ffd84d;text-decoration:underline;cursor:pointer;position:relative;z-index:35">Message us on Discord</a>.</p></div></div>'
           : '<p class="lead up d2">Donations open soon - thanks for watching with us.</p>'),
         ms: DONATE_URL ? 25000 : 7000, donate: !!DONATE_URL });
 
@@ -562,6 +563,15 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
         e.stopPropagation();
         clearTimeout(timer);
         window.open(DONATE_URL, '_blank', 'noopener');
+      };
+    }
+    var disc = el.querySelector('#discord-card-link');
+    if (disc) {
+      disc.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        clearTimeout(timer);
+        window.open('https://discord.gg/F7PP27VXnh', '_blank', 'noopener');
       };
     }
     var qr = el.querySelector('#qr');
