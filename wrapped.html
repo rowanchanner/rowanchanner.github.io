@@ -116,6 +116,12 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
   var Q = location.search;
   var TV = /[?&]tv=1/.test(Q);
   var PREVIEW = /[?&]preview=1/.test(Q);
+  /* Admin test (api.py /admin/wrapped): the admin page frames this with
+     ?inject=1 and posts in one account profile's synced data. Read-only -
+     nothing is saved or counted in this mode. */
+  var INJECT = /[?&]inject=1/.test(Q);
+  if (INJECT) PREVIEW = true;
+  var INJECTED = null;          // { name, data: { key: { v: '<json>' } } }
   if (TV) document.body.classList.add('tv');
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -153,13 +159,72 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
   };
 
   /* ── This profile's year ──────────────────────────────────────────────── */
+  /* One synced key, parsed. Normally this browser's storage (the account
+     sync keeps it per profile); in admin test mode the injected profile. */
+  function getKey(k) {
+    try {
+      if (INJECTED) { var x = INJECTED.data && INJECTED.data[k]; return x && x.v != null ? JSON.parse(x.v) : null; }
+      return JSON.parse(localStorage.getItem(k) || 'null');
+    } catch (e) { return null; }
+  }
+  function profileName(dflt) {
+    if (INJECTED) return INJECTED.name || dflt;
+    return (window.SharkyAccount && SharkyAccount.profile && SharkyAccount.profile.name) || dflt;
+  }
+  function dayKey(d) { return ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2); }
+
+  /* Everything watched this year BEFORE Wrapped's own counter started, rebuilt
+     from the history every profile already syncs:
+       - sharkytv_progress (apps + website player): where each film / episode
+         got to, its length and when -> the real time watched, per item.
+       - sharky_movies_2_watched_eps (website): episodes with how far (%) and
+         when -> % of a 45 minute episode (no runtime is stored there).
+       - sharky_fy_signals.w (website): furthest point reached in each film.
+     Only things REALLY watched count (3+ minutes or 10%). Per title, the
+     bigger of this and the live counter wins, so nothing is counted twice. */
+  function pastWatching(y) {
+    var bf = { t: {}, day: {}, h: [] }, eps = {};
+    for (var i = 0; i < 24; i++) bf.h.push(0);
+    function add(title, item, secs, pct, at) {
+      if (!(secs > 0)) return;
+      if (at) { var d = new Date(at); if (d.getFullYear() !== y) return; }
+      if (item) { if (eps[item] && eps[item] >= secs) return; secs -= eps[item] || 0; eps[item] = (eps[item] || 0) + secs; }
+      var x = bf.t[title] || (bf.t[title] = [0, 0]);
+      x[0] += secs; x[1] = Math.max(x[1], pct || 0);
+      if (at) { var dd = new Date(at), dk = dayKey(dd); bf.day[dk] = (bf.day[dk] || 0) + secs; bf.h[dd.getHours()] += secs; }
+    }
+    var prog = getKey('sharkytv_progress') || {};
+    Object.keys(prog).forEach(function (k) {
+      var r = prog[k] || {}, p = k.split(':'), t = Number(r.t) || 0, dur = Number(r.d) || 0, pct = Number(r.pct) || 0;
+      if (!(t >= 180 || pct >= 10)) return;
+      var secs = Math.max(t, dur && pct ? dur * pct / 100 : 0);
+      if (dur) secs = Math.min(secs, dur);
+      if (p[0] === 'movie') add('movie:' + p[1], 'movie:' + p[1], secs, pct, r.at);
+      else if (p[0] === 'tv') add('tv:' + p[1], 'tv:' + p[1] + ':' + (p[2] || 1) + ':' + (p[3] || 1), secs, pct, r.at);
+    });
+    var we = getKey('sharky_movies_2_watched_eps') || {};
+    Object.keys(we).forEach(function (id) {
+      var show = we[id] || {};
+      Object.keys(show).forEach(function (ek) {
+        var m = /^s(\d+)e(\d+)$/.exec(ek), r = show[ek] || {}, pct = Number(r.pct) || 0;
+        if (!m || pct < 10) return;
+        add('tv:' + id, 'tv:' + id + ':' + m[1] + ':' + m[2], 2700 * Math.min(100, pct) / 100, pct, r.at);
+      });
+    });
+    var sig = getKey('sharky_fy_signals') || {}, w = sig.w || {};
+    Object.keys(w).forEach(function (k) {
+      var v = w[k] || [], t = Number(v[0]) || 0, pct = Number(v[1]) || 0;
+      if (k.indexOf('movie:') !== 0 || !(t >= 180 || pct >= 10)) return;
+      add(k, k, t, pct, 0);     // no date stored: those only exist since this autumn
+    });
+    return bf;
+  }
+
   function myYear() {
-    var all = null;
-    try { all = JSON.parse(localStorage.getItem('sharky_wrapped') || 'null'); } catch (e) {}
+    var all = getKey('sharky_wrapped');
     var out = { secs: 0, t: {}, day: {}, h: [], y: new Date().getFullYear() };
     for (var i = 0; i < 24; i++) out.h.push(0);
-    if (!all || all.y !== out.y || !all.d) return out;
-    Object.keys(all.d).forEach(function (dev) {
+    if (all && all.y === out.y && all.d) Object.keys(all.d).forEach(function (dev) {
       var me = all.d[dev] || {};
       out.secs += me.s || 0;
       Object.keys(me.t || {}).forEach(function (k) {
@@ -169,6 +234,14 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
       Object.keys(me.day || {}).forEach(function (d) { out.day[d] = (out.day[d] || 0) + me.day[d]; });
       (me.h || []).forEach(function (v, i) { out.h[i] += v || 0; });
     });
+    var bf = pastWatching(out.y);
+    Object.keys(bf.t).forEach(function (k) {
+      var x = out.t[k] || (out.t[k] = [0, 0]), extra = bf.t[k][0] - x[0];
+      if (extra > 0) { x[0] = bf.t[k][0]; out.secs += extra; }
+      x[1] = Math.max(x[1], bf.t[k][1]);
+    });
+    Object.keys(bf.day).forEach(function (d) { out.day[d] = Math.max(out.day[d] || 0, bf.day[d]); });
+    bf.h.forEach(function (v, i) { out.h[i] = Math.max(out.h[i], v); });
     return out;
   }
 
@@ -260,7 +333,7 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
       s.push({ html: bg('g1') +
         '<div class="up"><div class="small" style="font-weight:800;letter-spacing:3px;text-transform:uppercase">' + y + '</div>' +
         '<h1 style="margin-top:8px">Your year<br>on Sharky</h1></div>' +
-        '<p class="lead up d2">' + esc((SharkyAccount.profile && SharkyAccount.profile.name) || 'You') + ', you\'ve been busy. Let\'s look back.</p>' });
+        '<p class="lead up d2">' + esc(profileName('You')) + ', you\'ve been busy. Let\'s look back.</p>' });
 
       s.push({ html: bg('g2') +
         '<h2 class="up">You watched</h2><div class="big pop d1" id="cnt" data-to="' + Math.round(data.secs / 60) + '">0</div>' +
@@ -352,7 +425,7 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
       var shareTxt = 'My ' + y + ' on Sharky: ' + Math.round(data.secs / 60).toLocaleString() + ' minutes' +
         (top[0] ? ', #1 was ' + (top[0].d.title || top[0].d.name) : '') + (fav && PERSONA[fav] ? ' - ' + PERSONA[fav][0] : '') + ' 🦈 sharkmovie.co.uk';
       s.push({ html: bg('g1') +
-        '<h2 class="up">That\'s a wrap, ' + esc((SharkyAccount.profile && SharkyAccount.profile.name) || 'legend') + '</h2>' +
+        '<h2 class="up">That\'s a wrap, ' + esc(profileName('legend')) + '</h2>' +
         '<div class="card up d1"><div class="brand" style="color:#fff">SHARKY WRAPPED ' + y + '</div>' +
           '<div class="k">Minutes watched</div><div class="v">' + Math.round(data.secs / 60).toLocaleString() + '</div>' +
           (top[0] ? '<div class="k">Number one</div><div class="v">' + esc(top[0].d.title || top[0].d.name) + '</div>' : '') +
@@ -450,6 +523,19 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
     }
   }
 
+  if (INJECT) {
+    startScreen('<h1 style="margin-top:14px">Admin test</h1><p class="lead">Waiting for the account\'s data...</p>', null);
+    window.addEventListener('message', function (ev) {
+      if (ev.origin !== API || !ev.data || ev.data.type !== 'sharky:wrapped-inject' || INJECTED) return;
+      INJECTED = { name: String(ev.data.name || ''), data: ev.data.data || {} };
+      boot();
+    });
+    try { window.parent.postMessage({ type: 'sharky:wrapped-ready' }, API); } catch (e) {}
+    return;
+  }
+  boot();
+
+  function boot() {
   var now = new Date();
   var A = window.SharkyAccount;
   if (!PREVIEW && now.getMonth() !== 11) {
@@ -457,7 +543,7 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
       '<div class="btns" style="width:100%;max-width:340px"><button class="btn w" type="button">Back to Sharky</button></div>', close);
     return;
   }
-  if (!A || !A.profile) {
+  if (!INJECTED && (!A || !A.profile)) {
     startScreen('<h1 style="margin-top:14px">Sign in to see<br>your Wrapped</h1><p class="lead">Wrapped is made from your profile\'s watching. It\'s free.</p>' +
       '<div class="btns" style="width:100%;max-width:340px"><button class="btn w" type="button">Sign in</button></div>',
       function () { A && A.open('signin'); });
@@ -489,6 +575,7 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
     b.disabled = false;
     if (TV) b.focus();
   });
+  }
 })();
 </script>
 </body>

@@ -26,9 +26,25 @@
       return s / 60;
     } catch (e) { return 0; }
   }
+  /* Watched things this year before Wrapped's own counter existed: the
+     synced progress history counts too (wrapped.html rebuilds the year
+     from it). */
+  function pastWatching() {
+    var y = new Date().getFullYear(), yes = false;
+    function inYear(at) { return at && new Date(at).getFullYear() === y; }
+    try {
+      var prog = JSON.parse(localStorage.getItem('sharkytv_progress') || '{}') || {};
+      Object.keys(prog).forEach(function (k) { var r = prog[k] || {}; if (inYear(r.at) && ((r.t || 0) >= 180 || (r.pct || 0) >= 10)) yes = true; });
+      var we = JSON.parse(localStorage.getItem('sharky_movies_2_watched_eps') || '{}') || {};
+      Object.keys(we).forEach(function (id) {
+        Object.keys(we[id] || {}).forEach(function (e) { var r = we[id][e] || {}; if (inYear(r.at) && (r.pct || 0) >= 10) yes = true; });
+      });
+    } catch (e) {}
+    return yes;
+  }
   function wanted() {
     var A = w.SharkyAccount;
-    return (PREVIEW || new Date().getMonth() === 11) && A && A.profile && minutes() >= 10;
+    return (PREVIEW || new Date().getMonth() === 11) && A && A.profile && (minutes() >= 10 || pastWatching());
   }
 
   function closeFrame() {
