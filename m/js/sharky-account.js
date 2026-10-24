@@ -21,7 +21,8 @@
 
   var WEB_KEYS = ['sharky_movies_2_my_list', 'sharky_movies_2_continue_watching',
                   'sharky_movies_2_tv_progress', 'sharky_movies_2_watched_eps',
-                  'sharky_fy_signals'];   // foryou.js: what each profile skipped / opened / searched
+                  'sharky_fy_signals',    // foryou.js: what each profile skipped / opened / searched
+                  'sharky_wrapped'];      // wrapped.html: this year's watch time, per device
   var APP_KEYS = ['sharkytv_continue', 'sharkytv_mylist', 'sharkytv_progress'];
   var KEYS = WEB_KEYS.concat(APP_KEYS);
   var S_ACCT = 'sharky_acct';
@@ -146,6 +147,17 @@
       }
       KEYS.forEach(function (k) {
         var s = server[k], lm = mod[k] || 0, lv = lsGet(k);
+        /* Wrapped counters only ever grow, one sub-total per device: merge
+           (bigger wins per device) instead of last-write-wins, or two
+           devices watching at once would wipe each other's minutes. */
+        if (k === 'sharky_wrapped' && s && lv != null && lv !== s.v) {
+          try {
+            var m = wrapMerge(JSON.parse(s.v), JSON.parse(lv)), mv = JSON.stringify(m);
+            if (mv !== lv) { apply(k, mv); changed = true; }
+            mod[k] = Math.max(s.at || 0, Date.now());
+            return;
+          } catch (e) {}
+        }
         if (s && (s.at || 0) > lm) {
           if (lv !== s.v) { apply(k, s.v); changed = true; }
           mod[k] = s.at;
@@ -177,6 +189,18 @@
     if (!x || typeof x !== 'object') return JSON.stringify(x);
     return x.key || ((x.kind || x.media_type || 'movie') + ':' + x.id);
   }
+  function wrapMerge(a, b) {
+    if (!a || typeof a !== 'object') return b;
+    if (!b || typeof b !== 'object') return a;
+    if (a.y !== b.y) return (a.y || 0) > (b.y || 0) ? a : b;
+    var out = { y: a.y, d: {} }, da = a.d || {}, db = b.d || {};
+    Object.keys(da).concat(Object.keys(db)).forEach(function (dev) {
+      var x = da[dev], z = db[dev];
+      out.d[dev] = !x ? z : !z ? x : ((z.s || 0) > (x.s || 0) ? z : x);
+    });
+    return out;
+  }
+
   function mergeVal(a, b) {
     if (Array.isArray(a) && Array.isArray(b)) {
       var byId = {}, order = [];
@@ -1122,6 +1146,62 @@
       }, true);
     }, 0);
   }
+
+  /* ── Sharky Wrapped: how much this profile really watched this year ──────
+     Counted from the player's own progress messages (every ~5s while it
+     plays): only time that actually moved forward is added, so seeking or
+     leaving it paused adds nothing. Kept per device inside the profile's
+     synced bundle ({ d: { <device>: {...} } }) so two devices never
+     overwrite each other's numbers; wrapped.html adds them up. Small on
+     purpose: top 150 titles, one number per day, 24 hour-of-day buckets. */
+  var wrapLast = null;
+  function wrapDevice() {
+    var id = lsGet('sharky_wrap_dev');
+    if (!id) { id = 'd' + new Date().getTime().toString(36) + Math.random().toString(36).slice(2, 6); lsSet('sharky_wrap_dev', id); }
+    return id;
+  }
+  function wrapTrack(d) {
+    if (!acct || !acct.pid || !d || !d.id) return;
+    var key = (d.kind === 'tv' ? 'tv' : 'movie') + ':' + d.id;
+    var now = new Date().getTime(), t = Number(d.t) || 0;
+    var prev = wrapLast;
+    wrapLast = { key: key, t: t, at: now };
+    if (!prev || prev.key !== key || now - prev.at > 15000) return;
+    var add = t - prev.t;
+    if (!(add > 0 && add <= 15)) return;                 // a seek or a stall: not watching time
+    var dt = new Date(), y = dt.getFullYear();
+    var all = jget('sharky_wrapped', {});
+    if (!all || typeof all !== 'object') all = {};
+    if (all.y !== y) all = { y: y, d: {} };              // new year, new Wrapped
+    all.d = all.d || {};
+    var dev = wrapDevice();
+    var me = all.d[dev] || (all.d[dev] = { s: 0, t: {}, day: {}, h: [] });
+    me.s = (me.s || 0) + add;
+    var tk = me.t[key] || (me.t[key] = [0, 0]);
+    tk[0] += add; tk[1] = Math.max(tk[1], Number(d.pct) || 0);
+    var md = ('0' + (dt.getMonth() + 1)).slice(-2) + ('0' + dt.getDate()).slice(-2);
+    me.day[md] = (me.day[md] || 0) + add;
+    if (!me.h || me.h.length !== 24) me.h = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+    me.h[dt.getHours()] += add;
+    var ks = Object.keys(me.t);
+    if (ks.length > 150) {
+      ks.sort(function (a, b) { return me.t[a][0] - me.t[b][0]; });
+      delete me.t[ks[0]];
+    }
+    var devs = Object.keys(all.d);
+    if (devs.length > 4) {
+      devs.sort(function (a, b) { return (all.d[a].s || 0) - (all.d[b].s || 0); });
+      if (devs[0] !== dev) delete all.d[devs[0]];
+    }
+    jset('sharky_wrapped', all);
+  }
+  w.addEventListener('message', function (ev) {
+    var d = ev.data;
+    if (!d || typeof d !== 'object' || d.type !== 'sharky:progress') return;
+    if (!/^https:\/\/api\.sharkmovie\.co\.uk$/.test(ev.origin || '') &&
+        !(opt.api && ev.origin === String(opt.api).replace(/\/+$/, ''))) return;
+    try { wrapTrack(d); } catch (e) {}
+  });
 
   w.SharkyAccount = {
     init: init,

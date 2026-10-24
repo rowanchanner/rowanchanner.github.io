@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sharky Wrapped</title>
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+<!--
+  Sharky Wrapped - the yearly "your year on Sharky" story, Spotify style.
+
+  Data: the signed-in profile's "sharky_wrapped" store (sharky-account.js
+  counts real playing time from the player, per device, synced with the
+  account). Cost: GET api.sharkmovie.co.uk/wrapped/rate gives the server's
+  real "£ per hour watched" this year; we multiply by this profile's hours.
+
+  Open in December. Anyone can preview it any time with ?preview=1.
+  Music: drop MP3s you have the rights to into /music as 1.mp3, 2.mp3 ...
+  (up to 8). One is picked at random. No files = no music, nothing breaks.
+  TV / Fire Stick: ?tv=1 (left/right/OK/Back on the remote).
+-->
+<style>
+  :root { --red: #e50914; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: #000; color: #fff; font-family: Outfit, system-ui, sans-serif; overflow: hidden; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .story { position: relative; width: min(100vw, calc(100vh * 9 / 16)); height: 100vh; height: 100dvh; overflow: hidden; background: #000; }
+  body.tv .story { width: min(100vw, calc(100vh * 9 / 16 * 1.35)); }
+  .bars { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: 4px; z-index: 30; }
+  .bars i { flex: 1; height: 3px; border-radius: 3px; background: rgba(255,255,255,.28); overflow: hidden; }
+  .bars i b { display: block; height: 100%; width: 0; background: #fff; }
+  .top { position: absolute; top: 24px; left: 14px; right: 14px; display: flex; justify-content: space-between; align-items: center; z-index: 30; }
+  .brand { font-weight: 900; letter-spacing: -.5px; font-size: 18px; color: var(--red); text-shadow: 0 2px 10px rgba(0,0,0,.5); }
+  .ic { background: rgba(0,0,0,.35); border: 0; color: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 17px; cursor: pointer; margin-left: 6px; }
+  .slide { position: absolute; inset: 0; z-index: 1; isolation: isolate; display: flex; flex-direction: column; justify-content: center; padding: 70px 28px 60px;
+           opacity: 0; transform: scale(1.04); transition: opacity .5s ease, transform .6s ease; pointer-events: none; }
+  .slide.on { opacity: 1; transform: none; pointer-events: auto; }
+  .bg { position: absolute; inset: 0; z-index: -1; background-size: cover; background-position: center; }
+  .bg.kb { animation: kb 9s ease-out forwards; }
+  @keyframes kb { from { transform: scale(1.18); } to { transform: scale(1); } }
+  .shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.15) 35%, rgba(0,0,0,.85) 100%); }
+  .yt { position: absolute; left: 50%; top: 50%; width: 177.78vh; height: 100vh; transform: translate(-50%, -50%); z-index: -1; border: 0; pointer-events: none;
+        opacity: 0; animation: ytin 1s ease 2.5s forwards; }   /* the backdrop shows while the trailer loads */
+  @keyframes ytin { to { opacity: 1; } }
+  h1 { font-size: clamp(34px, 9vw, 58px); line-height: .98; font-weight: 900; letter-spacing: -1.5px; }
+  h2 { font-size: clamp(22px, 6vw, 34px); line-height: 1.1; font-weight: 800; letter-spacing: -.5px; }
+  p.lead { font-size: clamp(16px, 4.4vw, 21px); line-height: 1.35; margin-top: 14px; color: rgba(255,255,255,.88); font-weight: 600; }
+  .big { font-size: clamp(64px, 21vw, 120px); font-weight: 900; line-height: 1; letter-spacing: -4px; margin: 4px 0 6px; }
+  .small { font-size: 14px; color: rgba(255,255,255,.7); margin-top: 10px; }
+  .pop { animation: pop .7s cubic-bezier(.2,1.6,.4,1) both; }
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+  .up { animation: up .6s ease both; }
+  @keyframes up { from { transform: translateY(26px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .d1 { animation-delay: .25s; } .d2 { animation-delay: .5s; } .d3 { animation-delay: .75s; } .d4 { animation-delay: 1s; } .d5 { animation-delay: 1.25s; }
+  .g1 { background: radial-gradient(120% 80% at 20% 10%, #ff3d6e 0%, #7a00ff 45%, #0b0020 100%); }
+  .g2 { background: radial-gradient(120% 80% at 80% 0%, #00e0ff 0%, #0050ff 40%, #000a2a 100%); }
+  .g3 { background: radial-gradient(120% 90% at 10% 100%, #ffb800 0%, #ff4d00 40%, #2a0600 100%); }
+  .g4 { background: radial-gradient(120% 80% at 50% 0%, #1ed760 0%, #087a3a 45%, #001a0c 100%); }
+  .g5 { background: radial-gradient(120% 80% at 50% 0%, #e50914 0%, #6e0008 50%, #120002 100%); }
+  .g6 { background: radial-gradient(130% 90% at 0% 0%, #ff7ad9 0%, #a100ff 50%, #14002a 100%); }
+  .list { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,.35); border-radius: 12px; padding: 8px; backdrop-filter: blur(6px); }
+  .row .n { font-size: 26px; font-weight: 900; width: 26px; text-align: center; }
+  .row img { width: 46px; height: 68px; object-fit: cover; border-radius: 6px; flex: none; background: #222; }
+  .row b { display: block; font-size: 16px; line-height: 1.15; }
+  .row span { font-size: 13px; color: rgba(255,255,255,.7); }
+  .btns { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+  .btn { display: block; width: 100%; padding: 15px 18px; border-radius: 999px; border: 0; font: 800 17px Outfit, sans-serif; cursor: pointer; text-align: center; text-decoration: none; }
+  .btn.w { background: #fff; color: #000; } .btn.r { background: var(--red); color: #fff; } .btn.g { background: rgba(255,255,255,.16); color: #fff; }
+  .btn:focus, .ic:focus { outline: 3px solid #fff; outline-offset: 2px; }
+  .amt { display: flex; gap: 8px; margin-top: 10px; }
+  .amt button { flex: 1; padding: 12px 0; border-radius: 12px; border: 2px solid rgba(255,255,255,.3); background: transparent; color: #fff; font: 800 16px Outfit, sans-serif; cursor: pointer; }
+  .amt button.on { background: #fff; color: #000; border-color: #fff; }
+  .card { margin-top: 18px; border-radius: 18px; padding: 18px; background: linear-gradient(160deg, #e50914, #4a0010); box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .card .k { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,.7); margin-top: 10px; }
+  .card .v { font-size: 20px; font-weight: 800; }
+  .tapzone { position: absolute; top: 60px; bottom: 0; width: 34%; z-index: 20; }
+  .tapzone.l { left: 0; } .tapzone.r { right: 0; width: 66%; }
+  .slide .btns, .slide .amt, .slide .card { position: relative; z-index: 25; }
+  #start { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; }
+  .shark { font-size: 80px; animation: bob 2.2s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-12px) rotate(-6deg); } }
+  .eq { display: inline-flex; gap: 3px; height: 14px; align-items: flex-end; margin-left: 6px; }
+  .eq i { width: 3px; background: #fff; animation: eq .9s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: .2s; } .eq i:nth-child(3) { animation-delay: .4s; }
+  @keyframes eq { 0%,100% { height: 3px; } 50% { height: 14px; } }
+</style>
+</head>
+<body>
+<div id="stage"><div class="story" id="story">
+  <div class="bars" id="bars"></div>
+  <div class="top"><div class="brand">SHARKY <span style="color:#fff">WRAPPED</span></div>
+    <div><button class="ic" id="mute" aria-label="Music on/off">&#9835;</button><button class="ic" id="close" aria-label="Close">&times;</button></div></div>
+  <div id="slides"></div>
+  <div class="tapzone l" id="tapL"></div><div class="tapzone r" id="tapR"></div>
+  <div id="start" class="g1"></div>
+</div></div>
+
+<script src="sharky-account.js?v=20261024-wrap"></script>
+<script>
+/* Same account set-up as the website (optional sign-in, no pop-ups here). */
+SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required: false, linkUrl: 'https://www.sharkmovie.co.uk/link.html' });
+</script>
+<script>
+(function () {
+  'use strict';
+
+  /* ── Settings ─────────────────────────────────────────────────────────── */
+  var DONATE_URL = '';          // e.g. your Stripe payment link. Empty = the donate buttons don't show.
+  var API = 'https://api.sharkmovie.co.uk';
+  var TMDB = 'https://api.themoviedb.org/3', KEY = '47745852f22c21e3362f4907231538e1';
+  var IMG = 'https://image.tmdb.org/t/p/';
+  var SLIDE_MS = 7000;
+
+  var Q = location.search;
+  var TV = /[?&]tv=1/.test(Q);
+  var PREVIEW = /[?&]preview=1/.test(Q);
+  if (TV) document.body.classList.add('tv');
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function tmdb(p) {
+    return fetch(TMDB + p + (p.indexOf('?') >= 0 ? '&' : '?') + 'api_key=' + KEY + '&language=en-GB')
+      .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  }
+  function close() {
+    /* Opened over the TV / phone app in a frame: ask the app to close it. */
+    if (window.parent !== window) { try { window.parent.postMessage({ type: 'sharky:wrapped-close' }, location.origin); } catch (e) {} return; }
+    if (history.length > 1) history.back(); else location.href = '/';
+  }
+  $('close').onclick = close;
+
+  /* ── Music ────────────────────────────────────────────────────────────── */
+  var audio = null, muted = false;
+  function findMusic() {
+    var tries = [1, 2, 3, 4, 5, 6, 7, 8].map(function (n) {
+      return fetch('music/' + n + '.mp3', { method: 'HEAD' }).then(function (r) { return r.ok ? n : 0; }).catch(function () { return 0; });
+    });
+    return Promise.all(tries).then(function (ns) {
+      ns = ns.filter(Boolean);
+      if (!ns.length) return null;
+      var a = new Audio('music/' + ns[Math.floor(Math.random() * ns.length)] + '.mp3');
+      a.loop = true; a.volume = 0.55;
+      return a;
+    });
+  }
+  var musicP = findMusic();
+  $('mute').onclick = function (e) {
+    e.stopPropagation();
+    muted = !muted;
+    if (audio) { if (muted) audio.pause(); else audio.play().catch(function () {}); }
+    $('mute').style.opacity = muted ? .45 : 1;
+  };
+
+  /* ── This profile's year ──────────────────────────────────────────────── */
+  function myYear() {
+    var all = null;
+    try { all = JSON.parse(localStorage.getItem('sharky_wrapped') || 'null'); } catch (e) {}
+    var out = { secs: 0, t: {}, day: {}, h: [], y: new Date().getFullYear() };
+    for (var i = 0; i < 24; i++) out.h.push(0);
+    if (!all || all.y !== out.y || !all.d) return out;
+    Object.keys(all.d).forEach(function (dev) {
+      var me = all.d[dev] || {};
+      out.secs += me.s || 0;
+      Object.keys(me.t || {}).forEach(function (k) {
+        var x = out.t[k] || (out.t[k] = [0, 0]);
+        x[0] += me.t[k][0] || 0; x[1] = Math.max(x[1], me.t[k][1] || 0);
+      });
+      Object.keys(me.day || {}).forEach(function (d) { out.day[d] = (out.day[d] || 0) + me.day[d]; });
+      (me.h || []).forEach(function (v, i) { out.h[i] += v || 0; });
+    });
+    return out;
+  }
+
+  var PERSONA = {
+    28: ['The Adrenaline Junkie', 'Explosions, chases, zero chill.'],
+    12: ['The Explorer', 'Always somewhere new.'],
+    16: ['The Toon Legend', 'Animation is art and you know it.'],
+    35: ['The Comedy Connoisseur', 'You came here to laugh.'],
+    80: ['The Mastermind', 'Heists, cartels and a lot of bad decisions.'],
+    99: ['The Truth Seeker', 'Documentaries? Respect.'],
+    18: ['The Feeler', 'You like a story that hits.'],
+    10751: ['The Family Favourite', 'Wholesome viewing all year.'],
+    14: ['The Dreamer', 'Dragons > reality.'],
+    27: ['The Fearless One', 'You watched horror with the lights off. Probably.'],
+    9648: ['The Detective', 'You guessed the twist. Didn\'t you.'],
+    10749: ['The Romantic', 'Love stories, all year round.'],
+    878: ['The Space Cadet', 'Your head is in another galaxy.'],
+    53: ['The Edge-Of-Seat Expert', 'Thrillers are your cardio.'],
+    10752: ['The Strategist', 'War stories and big battles.'],
+    37: ['The Cowboy', 'Yeehaw, partner.'],
+    10759: ['The Adrenaline Junkie', 'Explosions, chases, zero chill.'],
+    10765: ['The Space Cadet', 'Your head is in another galaxy.'],
+    10762: ['The Family Favourite', 'Wholesome viewing all year.']
+  };
+  var GENRE = { 28: 'Action', 12: 'Adventure', 16: 'Animation', 35: 'Comedy', 80: 'Crime', 99: 'Documentary', 18: 'Drama',
+                10751: 'Family', 14: 'Fantasy', 27: 'Horror', 9648: 'Mystery', 10749: 'Romance', 878: 'Sci-Fi', 53: 'Thriller',
+                10752: 'War', 37: 'Western', 10759: 'Action', 10765: 'Sci-Fi', 10762: 'Kids' };
+
+  function fmtHours(secs) {
+    var h = secs / 3600;
+    return h >= 10 ? Math.round(h).toLocaleString() : (Math.round(h * 10) / 10).toString();
+  }
+  function money(x) { return '£' + (Math.round(x * 100) / 100).toFixed(2); }
+
+  /* ── Build the story ──────────────────────────────────────────────────── */
+  var slides = [], idx = -1, timer = null, startAt = 0, paused = false;
+
+  function bg(cls, img, yt) {
+    return (img ? '<div class="bg kb" style="background-image:url(\'' + img + '\')"></div>' : '<div class="bg ' + cls + '"></div>') +
+      (yt ? '<iframe class="yt" src="https://www.youtube-nocookie.com/embed/' + yt + '?autoplay=1&mute=1&controls=0&loop=1&playlist=' + yt +
+            '&start=25&modestbranding=1&playsinline=1&rel=0" allow="autoplay; encrypted-media"></iframe>' : '') +
+      (img || yt ? '<div class="shade"></div>' : '');
+  }
+
+  function render(data) {
+    var y = data.y, hours = data.secs / 3600;
+    var tops = Object.keys(data.t).sort(function (a, b) { return data.t[b][0] - data.t[a][0]; });
+    var topKeys = tops.slice(0, 5);
+
+    return Promise.all([
+      Promise.all(tops.slice(0, 25).map(function (k) {
+        var p = k.split(':');
+        return tmdb('/' + p[0] + '/' + p[1] + (k === tops[0] ? '?append_to_response=videos' : '')).then(function (d) {
+          return d ? { key: k, kind: p[0], d: d, secs: data.t[k][0] } : null;
+        });
+      })),
+      fetch(API + '/wrapped/rate?year=' + y).then(function (r) { return r.json(); }).catch(function () { return null; })
+    ]).then(function (res) {
+      var info = res[0].filter(Boolean), rate = res[1];
+      var byKey = {};
+      info.forEach(function (x) { byKey[x.key] = x; });
+      var top = topKeys.map(function (k) { return byKey[k]; }).filter(Boolean);
+
+      /* Favourite genre: weighted by time watched. */
+      var gw = {};
+      info.forEach(function (x) { (x.d.genres || []).forEach(function (g) { if (GENRE[g.id]) gw[g.id] = (gw[g.id] || 0) + x.secs; }); });
+      var gOrder = Object.keys(gw).sort(function (a, b) { return gw[b] - gw[a]; });
+      var fav = gOrder[0];
+      if ((fav === '18' || fav === '35') && gOrder[1] && gw[gOrder[1]] > gw[fav] * 0.6) fav = gOrder[1];
+
+      var biggestDay = Object.keys(data.day).sort(function (a, b) { return data.day[b] - data.day[a]; })[0];
+      var peak = 0;
+      data.h.forEach(function (v, i) { if (v > data.h[peak]) peak = i; });
+      var showsN = Object.keys(data.t).filter(function (k) { return k.indexOf('tv:') === 0; }).length;
+      var filmsN = Object.keys(data.t).length - showsN;
+
+      /* What their watching cost to serve: this year's real "£ per hour"
+         from the server, times their hours. Before there's enough data,
+         assume £9.50 a month (£7 server + £30 a year domain) over 400 hours.
+         Never shows less than 50p. */
+      var perHour = rate && rate.gbp_per_hour ? rate.gbp_per_hour : 9.5 / 400;
+      /* Their share of running Sharky this year: server use + a flat £2 each
+         towards keeping the lights on (Rowan's call). Shown as one total,
+         labelled "your share" rather than "you used". */
+      var cost = Math.max(0.5, hours * perHour) + 2;
+      var round = Math.max(1, Math.ceil(cost));
+
+      var s = [];
+      s.push({ html: bg('g1') +
+        '<div class="up"><div class="small" style="font-weight:800;letter-spacing:3px;text-transform:uppercase">' + y + '</div>' +
+        '<h1 style="margin-top:8px">Your year<br>on Sharky</h1></div>' +
+        '<p class="lead up d2">' + esc((SharkyAccount.profile && SharkyAccount.profile.name) || 'You') + ', you\'ve been busy. Let\'s look back.</p>' });
+
+      s.push({ html: bg('g2') +
+        '<h2 class="up">You watched</h2><div class="big pop d1" id="cnt" data-to="' + Math.round(data.secs / 60) + '">0</div>' +
+        '<h2 class="up d2">minutes</h2>' +
+        '<p class="lead up d3">That\'s ' + fmtHours(data.secs) + ' hours' + (hours >= 24 ? ' - or ' + (Math.round(hours / 24 * 10) / 10) + ' full days' : '') + ' of pure Sharky.</p>' +
+        '<p class="small up d4">' + filmsN + ' film' + (filmsN === 1 ? '' : 's') + ' &middot; ' + showsN + ' show' + (showsN === 1 ? '' : 's') + '</p>' });
+
+      if (top[0]) {
+        var t0 = top[0], vids = (t0.d.videos && t0.d.videos.results) || [];
+        var tr = vids.filter(function (v) { return v.site === 'YouTube' && v.type === 'Trailer'; })[0] || vids.filter(function (v) { return v.site === 'YouTube'; })[0];
+        s.push({ html: bg('', t0.d.backdrop_path ? IMG + 'w1280' + t0.d.backdrop_path : '', tr && !TV ? tr.key : '') +
+          '<div style="margin-top:auto"><p class="small up" style="font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#fff">Your #1</p>' +
+          '<h1 class="up d1">' + esc(t0.d.title || t0.d.name) + '</h1>' +
+          '<p class="lead up d2">' + fmtHours(t0.secs) + ' hours together. A proper relationship.</p></div>' });
+      }
+      if (top.length >= 3) {
+        s.push({ html: bg('g3') + '<h2 class="up">Your top ' + top.length + '</h2><div class="list">' +
+          top.map(function (x, i) {
+            return '<div class="row up d' + (i + 1) + '"><div class="n">' + (i + 1) + '</div>' +
+              (x.d.poster_path ? '<img src="' + IMG + 'w185' + x.d.poster_path + '" alt="">' : '<img alt="">') +
+              '<div><b>' + esc(x.d.title || x.d.name) + '</b><span>' + fmtHours(x.secs) + ' hours</span></div></div>';
+          }).join('') + '</div>' });
+      }
+      if (fav && PERSONA[fav]) {
+        var gimg = info.filter(function (x) { return (x.d.genres || []).some(function (g) { return String(g.id) === String(fav); }) && x.d.backdrop_path; })[0];
+        s.push({ html: bg('g6', gimg ? IMG + 'w1280' + gimg.d.backdrop_path : '') +
+          '<p class="small up" style="font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#fff">Your Sharky personality</p>' +
+          '<h1 class="pop d1" style="margin-top:8px">' + esc(PERSONA[fav][0]) + '</h1>' +
+          '<p class="lead up d2">' + esc(PERSONA[fav][1]) + '</p>' +
+          '<p class="small up d3">Top genre: ' + esc(GENRE[fav]) + '</p>' });
+      }
+      if (biggestDay && data.day[biggestDay] > 1800) {
+        var bd = new Date(y, Number(biggestDay.slice(0, 2)) - 1, Number(biggestDay.slice(2)));
+        var tod = peak >= 22 || peak < 4 ? ['Night Owl', 'Your favourite time to watch? ' + (peak === 0 ? 'midnight' : peak > 12 ? (peak - 12) + 'pm' : peak + 'am') + '. Go to bed.'] :
+                  peak < 9 ? ['Early Bird', 'Watching before most people are awake. Respect.'] :
+                  peak < 17 ? ['Daytime Watcher', 'Prime daytime viewing. Living the dream.'] :
+                  ['Evening Regular', 'Dinner, sofa, Sharky. Every night.'];
+        s.push({ html: bg('g4') +
+          '<h2 class="up">Biggest binge</h2><h1 class="pop d1" style="margin-top:6px">' +
+          bd.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + '</h1>' +
+          '<p class="lead up d2">' + fmtHours(data.day[biggestDay]) + ' hours in one day. No notes.</p>' +
+          '<h2 class="up d3" style="margin-top:28px">' + tod[0] + '</h2><p class="lead up d4">' + esc(tod[1]) + '</p>' });
+      }
+
+      /* Sharky's own year, from the server's counters (api.py _year_bump). */
+      var sh = (rate && rate.sharky) || {};
+      var stat = function (n, label, d) {
+        return '<div class="up d' + d + '" style="background:rgba(0,0,0,.3);border-radius:14px;padding:12px 14px">' +
+          '<div style="font-size:clamp(26px,8vw,40px);font-weight:900;letter-spacing:-1px;line-height:1">' + Number(n).toLocaleString() + '</div>' +
+          '<div style="font-size:13px;color:rgba(255,255,255,.8);margin-top:4px">' + label + '</div></div>';
+      };
+      var cells = [];
+      if (sh.hours) cells.push([sh.hours, 'hours watched by everyone']);
+      if (sh.streams) cells.push([sh.streams, 'streams found (every source, every title)']);
+      if (sh.titles) cells.push([sh.titles, 'different films and shows played']);
+      if (sh.plays) cells.push([sh.plays, 'times someone pressed play']);
+      if (sh.sources_asked) cells.push([sh.sources_asked, 'sources searched for you']);
+      if (sh.sources_asked && sh.sources_found) cells.push([Math.round(100 * sh.sources_found / sh.sources_asked), 'percent of searches found a stream']);
+      if (cells.length >= 2) {
+        s.push({ html: bg('g4') +
+          '<p class="small up" style="font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#fff">Sharky\'s ' + y + '</p>' +
+          '<h1 class="up d1" style="margin:6px 0 16px">You weren\'t alone</h1>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+          cells.slice(0, 6).map(function (c, i) { return stat(c[0], c[1], Math.min(5, i + 1)); }).join('') + '</div>', ms: 9000 });
+      }
+
+      /* The ask. Their share of running Sharky this year (incl. the £2). */
+      s.push({ html: bg('g5') +
+        '<p class="lead up">Your share of running Sharky this year</p><div class="big pop d1">' + money(cost) + '</div>' +
+        '<h1 class="up d3" style="margin-top:22px">And we didn\'t charge you a thing.</h1>', ms: 8000 });
+      s.push({ html: bg('g2') +
+        '<h1 class="pop">Yes, really. ' + money(cost) + '.</h1>' +
+        '<p class="lead up d1">That\'s roughly what the streaming itself costs for a WHOLE year of films and shows - for us, and for the big streaming services too.</p>' +
+        '<p class="lead up d2">Netflix still charges up to \u00a318.99 a month.</p>' +
+        '<h2 class="up d3" style="margin-top:22px">You paid \u00a30.</h2>', ms: 8000 });
+      s.push({ html: bg('g5') +
+        '<h1 class="pop">We can tell you love us &#10084;&#65039;</h1>' +
+        '<p class="lead up d1">We only ask this once a year, because it\'s what keeps us alive.</p>' +
+        '<p class="lead up d2">We don\'t make money from Sharky - it\'s self-funded, by us.</p>' +
+        (DONATE_URL
+          ? '<p class="lead up d3" style="color:#fff">Fancy chipping in your ' + money(cost) + '?</p>' +
+            '<div class="amt up d4" id="amts">' + [round, round * 2, round * 5].map(function (a, i) {
+              return '<button type="button" class="' + (i === 0 ? 'on' : '') + '" data-a="' + a + '">£' + a + '</button>'; }).join('') + '</div>' +
+            '<div class="btns up d5"><button class="btn w" id="donate" type="button">Donate £' + round + '</button>' +
+            '<button class="btn g" id="custom" type="button">Choose my own amount</button></div>' +
+            '<p class="small up d5">Totally optional. Sharky stays free either way.</p>'
+          : '<p class="lead up d3" style="color:#fff">Donations open soon - thank you for watching with us.</p>'), ms: 20000, stay: true });
+
+      var shareTxt = 'My ' + y + ' on Sharky: ' + Math.round(data.secs / 60).toLocaleString() + ' minutes' +
+        (top[0] ? ', #1 was ' + (top[0].d.title || top[0].d.name) : '') + (fav && PERSONA[fav] ? ' - ' + PERSONA[fav][0] : '') + ' 🦈 sharkmovie.co.uk';
+      s.push({ html: bg('g1') +
+        '<h2 class="up">That\'s a wrap, ' + esc((SharkyAccount.profile && SharkyAccount.profile.name) || 'legend') + '</h2>' +
+        '<div class="card up d1"><div class="brand" style="color:#fff">SHARKY WRAPPED ' + y + '</div>' +
+          '<div class="k">Minutes watched</div><div class="v">' + Math.round(data.secs / 60).toLocaleString() + '</div>' +
+          (top[0] ? '<div class="k">Number one</div><div class="v">' + esc(top[0].d.title || top[0].d.name) + '</div>' : '') +
+          (fav && PERSONA[fav] ? '<div class="k">Personality</div><div class="v">' + esc(PERSONA[fav][0]) + '</div>' : '') +
+        '</div>' +
+        '<div class="btns up d2">' + (TV ? '' : '<button class="btn w" id="share" type="button">Share my Wrapped</button>') +
+        '<button class="btn g" id="again" type="button">Watch again</button>' +
+        '<button class="btn g" id="done" type="button">Back to Sharky</button></div>', stay: true, share: shareTxt });
+      return s;
+    });
+  }
+
+  /* ── Player ───────────────────────────────────────────────────────────── */
+  function show(i) {
+    if (i < 0) i = 0;
+    if (i >= slides.length) { i = slides.length - 1; }
+    idx = i;
+    clearTimeout(timer);
+    var host = $('slides');
+    var all = host.children;
+    for (var k = 0; k < all.length; k++) {
+      all[k].classList.toggle('on', k === i);
+      /* Restart the animations, and only keep the trailer running on screen. */
+      if (k === i) { var el = all[k]; el.innerHTML = slides[k].html; wire(el, slides[k]); }
+      else if (all[k].querySelector('iframe')) all[k].innerHTML = '';
+    }
+    var bars = $('bars').children;
+    for (var b = 0; b < bars.length; b++) {
+      var bar = bars[b].firstChild;
+      bar.style.transition = 'none';
+      bar.style.width = b < i ? '100%' : '0';
+    }
+    var ms = slides[i].ms || SLIDE_MS;
+    var cur = bars[i] && bars[i].firstChild;
+    if (cur) { void cur.offsetWidth; cur.style.transition = 'width ' + ms + 'ms linear'; cur.style.width = '100%'; }
+    if (!slides[i].stay) timer = setTimeout(function () { show(idx + 1); }, ms);
+    var f = host.children[i].querySelector('.btn, .amt button');
+    if (TV && f) setTimeout(function () { try { f.focus(); } catch (e) {} }, 400);
+  }
+
+  function countUp(el) {
+    var to = Number(el.getAttribute('data-to')) || 0, t0 = Date.now(), dur = 1600;
+    (function step() {
+      var p = Math.min(1, (Date.now() - t0) / dur);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString();
+      if (p < 1) requestAnimationFrame(step);
+    })();
+  }
+
+  function wire(el, sl) {
+    var c = el.querySelector('#cnt');
+    if (c) setTimeout(function () { countUp(c); }, 300);
+    var amts = el.querySelectorAll('#amts button'), don = el.querySelector('#donate');
+    [].forEach.call(amts, function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        [].forEach.call(amts, function (x) { x.classList.toggle('on', x === b); });
+        if (don) don.textContent = 'Donate £' + b.getAttribute('data-a');
+      });
+    });
+    if (don) don.addEventListener('click', function (e) { e.stopPropagation(); window.open(DONATE_URL, '_blank', 'noopener'); });
+    var cus = el.querySelector('#custom');
+    if (cus) cus.addEventListener('click', function (e) { e.stopPropagation(); window.open(DONATE_URL, '_blank', 'noopener'); });
+    var sh = el.querySelector('#share');
+    if (sh) sh.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (navigator.share) navigator.share({ title: 'My Sharky Wrapped', text: sl.share, url: 'https://www.sharkmovie.co.uk' }).catch(function () {});
+      else if (navigator.clipboard) navigator.clipboard.writeText(sl.share).then(function () { sh.textContent = 'Copied!'; });
+    });
+    var ag = el.querySelector('#again');
+    if (ag) ag.addEventListener('click', function (e) { e.stopPropagation(); show(0); });
+    var dn = el.querySelector('#done');
+    if (dn) dn.addEventListener('click', function (e) { e.stopPropagation(); close(); });
+  }
+
+  function next() { if (idx < slides.length - 1) show(idx + 1); }
+  function prev() { show(idx - 1); }
+  $('tapR').onclick = next;
+  $('tapL').onclick = prev;
+  document.addEventListener('keydown', function (e) {
+    var k = e.key, c = e.keyCode;
+    if (k === 'ArrowRight' || c === 39) { e.preventDefault(); next(); }
+    else if (k === 'ArrowLeft' || c === 37) { e.preventDefault(); prev(); }
+    else if (k === 'Escape' || k === 'GoBack' || k === 'Backspace' || c === 27 || c === 4 || c === 461 || c === 10009) { e.preventDefault(); close(); }
+    else if ((k === 'Enter' || c === 13 || c === 23) && document.activeElement === document.body) { e.preventDefault(); next(); }
+  });
+
+  /* ── Start screen ─────────────────────────────────────────────────────── */
+  function startScreen(html, go) {
+    $('start').innerHTML = '<div class="shark">&#129416;</div>' + html;
+    var b = $('start').querySelector('button');
+    if (b) {
+      b.onclick = go;
+      if (TV) setTimeout(function () { b.focus(); }, 200);
+    }
+  }
+
+  var now = new Date();
+  var A = window.SharkyAccount;
+  if (!PREVIEW && now.getMonth() !== 11) {
+    startScreen('<h1 style="margin-top:14px">Wrapped lands<br>1 December</h1><p class="lead">We\'re keeping count all year. Keep watching!</p>' +
+      '<div class="btns" style="width:100%;max-width:340px"><button class="btn w" type="button">Back to Sharky</button></div>', close);
+    return;
+  }
+  if (!A || !A.profile) {
+    startScreen('<h1 style="margin-top:14px">Sign in to see<br>your Wrapped</h1><p class="lead">Wrapped is made from your profile\'s watching. It\'s free.</p>' +
+      '<div class="btns" style="width:100%;max-width:340px"><button class="btn w" type="button">Sign in</button></div>',
+      function () { A && A.open('signin'); });
+    document.addEventListener('sharky:account', function () { if (A.profile) location.reload(); });
+    return;
+  }
+  var data = myYear();
+  if (data.secs < 600) {
+    startScreen('<h1 style="margin-top:14px">Not enough<br>watching yet</h1><p class="lead">Watch a few things this year and your Wrapped builds itself.</p>' +
+      '<div class="btns" style="width:100%;max-width:340px"><button class="btn w" type="button">Back to Sharky</button></div>', close);
+    return;
+  }
+  startScreen('<h1 style="margin-top:14px">Your ' + data.y + '<br>Wrapped is here</h1><p class="lead" id="ready">Getting it ready...</p>' +
+    '<div class="btns" style="width:100%;max-width:340px"><button class="btn w" type="button" disabled>Let\'s go <span class="eq"><i></i><i></i><i></i></span></button></div>',
+    function () {
+      $('start').style.display = 'none';
+      musicP.then(function (a) { audio = a; if (a && !muted) a.play().catch(function () {}); });
+      show(0);
+    });
+  render(data).then(function (s) {
+    slides = s;
+    var host = $('slides'), bars = $('bars');
+    s.forEach(function () {
+      var d = document.createElement('div'); d.className = 'slide'; host.appendChild(d);
+      var i = document.createElement('i'); i.appendChild(document.createElement('b')); bars.appendChild(i);
+    });
+    $('ready').textContent = 'Tap to play - sound on!';
+    var b = $('start').querySelector('button');
+    b.disabled = false;
+    if (TV) b.focus();
+  });
+})();
+</script>
+</body>
+</html>
