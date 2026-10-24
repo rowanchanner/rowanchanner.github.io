@@ -274,9 +274,8 @@
      Things watched before this check existed (no data for them) still count. */
   var REAL_SINCE = 1792862213780;
   /* Like Netflix: how much of it did they actually watch?
-       2 = finished: 85 percent+ of a film, or a WHOLE episode (95 percent+ -
-           the player rarely reports exactly 100 because the next episode
-           takes over during the credits) - a real
+       2 = finished: 85 percent+ of a film, or 80 percent+ of an episode
+           (Rowan's call) - a real
            "Because You Watched" seed, and it counts for "Up Next".
        1 = gave it a proper go (3+ minutes or 10 percent) - a weak hint only.
        0 = opened it for a few seconds - ignored completely.
@@ -291,7 +290,7 @@
         if ((show[e].pct || 0) >= 10) moved++;
       });
     }
-    if (best >= (it.media_type === 'tv' ? 95 : 85)) return 2;
+    if (best >= (it.media_type === 'tv' ? 80 : 85)) return 2;
     /* Went on to another episode = the one before was finished, even if
        they skipped the last bit of its credits. */
     if (moved >= 2) return 2;

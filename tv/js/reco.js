@@ -369,11 +369,10 @@
       var t = titles[k];
       var days = (now - (t.at || now)) / 86400000;
       t.depth = t.kind !== 'tv' ? 1 : (t.eps <= 1 && days > 14 ? 0.5 : 1 + Math.min(1, t.eps / 6));
-      /* Like Netflix: finished - 85 percent+ of a film, or a whole episode
-         (95 percent+; the next episode takes over in the credits, so 100 is
-         rarely reported) - is a real "Because You Watched" seed; anything
-         less is only a weak hint. */
-      t.full = t.best >= (t.kind === 'tv' ? 95 : 85) || (t.kind === 'tv' && t.eps >= 2);   // moved on to the next episode = finished one
+      /* Like Netflix: finished - 85 percent+ of a film, or 80 percent+ of
+         an episode - is a real "Because You Watched" seed; anything less is
+         only a weak hint. */
+      t.full = t.best >= (t.kind === 'tv' ? 80 : 85) || (t.kind === 'tv' && t.eps >= 2);   // moved on to the next episode = finished one
       return t;
     }).sort(function (a, b) { return b.at - a.at; });
     var list = (read('sharkytv_mylist', []) || []).map(function (r) { return { id: r.id, kind: r.kind === 'tv' ? 'tv' : 'movie' }; });
