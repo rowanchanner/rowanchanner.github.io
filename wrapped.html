@@ -64,6 +64,17 @@
          background: linear-gradient(180deg, #fff 30%, rgba(255,255,255,.72)); -webkit-background-clip: text; background-clip: text; color: transparent;
          filter: drop-shadow(0 8px 30px rgba(0,0,0,.35)); }
   .small { font-size: clamp(13px, 1.1 * var(--u) + 5px, 22px); color: rgba(255,255,255,.75); margin-top: 10px; }
+  /* Accent colours for the words that matter. */
+  .gold { color: #ffd84d; }
+  .mint { color: #7dffcf; }
+  .tag { display: inline-block; background: #fff; color: #d0021b; padding: .02em .38em .08em; border-radius: .35em; font-weight: 800; transform: rotate(-1.5deg); }
+  .strike { position: relative; color: #ffb3b8; white-space: nowrap; }
+  .strike::after { content: ''; position: absolute; left: -2px; right: -2px; top: 52%; height: .12em; background: #ff3b47; border-radius: 1em; transform: rotate(-4deg); }
+  .big.goldtxt { background: linear-gradient(180deg, #fff6c2 0%, #ffd84d 45%, #ff9f1c 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+                 filter: drop-shadow(0 10px 34px rgba(255,170,0,.35)); }
+  .donate { display: flex; align-items: center; gap: clamp(16px, 2.4 * var(--u), 40px); margin-top: 22px; }
+  .qr { flex: none; width: clamp(130px, 17 * var(--u), 300px); aspect-ratio: 1; background: #fff; border-radius: 16px; padding: clamp(10px, 1.2 * var(--u), 18px); }
+  .qr svg { display: block; width: 100%; height: 100%; }
   .kick { font-family: var(--body); font-weight: 800; letter-spacing: .28em; text-transform: uppercase; color: #fff;
           font-size: clamp(12px, 1 * var(--u) + 6px, 22px); opacity: .9; }
   .stats { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(8px, 1.2 * var(--u), 18px); }
@@ -124,6 +135,7 @@
 </div></div>
 
 <script src="sharky-account.js?v=20261024-wrap"></script>
+<script src="tv/js/qrcode.js"></script>
 <script>
 /* Same account set-up as the website (optional sign-in, no pop-ups here). */
 SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required: false, linkUrl: 'https://www.sharkmovie.co.uk/link.html' });
@@ -147,6 +159,8 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
      nothing is saved or counted in this mode. */
   var INJECT = /[?&]inject=1/.test(Q);
   if (INJECT) PREVIEW = true;
+  /* A QR code to scan with your phone: on TV and computers, not on phones. */
+  var QR_SHOW = TV || window.matchMedia('(min-width: 800px) and (min-aspect-ratio: 1/1)').matches;
   var INJECTED = null;          // { name, data: { key: { v: '<json>' } } }
   if (TV) document.body.classList.add('tv');
   var $ = function (id) { return document.getElementById(id); };
@@ -194,8 +208,9 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
     } catch (e) { return null; }
   }
   function profileName(dflt) {
-    if (INJECTED) return INJECTED.name || dflt;
-    return (window.SharkyAccount && SharkyAccount.profile && SharkyAccount.profile.name) || dflt;
+    var n = INJECTED ? INJECTED.name : (window.SharkyAccount && SharkyAccount.profile && SharkyAccount.profile.name);
+    n = String(n || '').trim();
+    return n ? n.charAt(0).toUpperCase() + n.slice(1) : dflt;
   }
   function dayKey(d) { return ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2); }
 
@@ -427,26 +442,28 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
       /* The ask. Their share of running Sharky this year (incl. the £2). */
       s.push({ html: bg('g5') +
         '<p class="kick up">The honest bit</p>' +
-        '<p class="lead up d1">' + esc(profileName('You')) + ', just <b>YOUR</b> watching this year cost us</p><div class="big pop d2">' + money(cost) + '</div>' +
-        '<p class="lead up d3">Not everyone\'s - only you. That\'s your share of the servers, streams and website, paid out of our own pockets.</p>' +
-        '<h1 class="up d4" style="margin-top:22px">And we didn\'t charge you a penny. You\'re worth it &#129416;</h1>', ms: 10000 });
+        '<p class="lead up d1">' + esc(profileName('You')) + ', <span class="tag">just you</span> cost us</p>' +
+        '<div class="big goldtxt pop d2">' + money(cost) + '</div>' +
+        '<p class="lead up d3">this year. Paid out of our own pockets.</p>' +
+        '<h1 class="up d4" style="margin-top:22px">We charged you <span class="gold">&pound;0</span>.</h1>' +
+        '<h2 class="up d5" style="margin-top:10px">You\'re worth it &#129416;</h2>', ms: 8000 });
       s.push({ html: bg('g2') +
-        '<h1 class="pop">Yes, really. ' + money(cost) + '.</h1>' +
-        '<p class="lead up d1">That\'s roughly what it costs to stream everything <b>YOU</b> watched this year - a WHOLE year of your films and shows. Same for us, and for the big streaming services.</p>' +
-        '<p class="lead up d2">Netflix still charges up to \u00a318.99 a month. Really shows how much they SCAM people!</p>' +
-        '<h2 class="up d3" style="margin-top:22px">You paid \u00a30.</h2>', ms: 8000 });
+        '<h1 class="pop">Yes, really. <span class="gold">' + money(cost) + '</span>.</h1>' +
+        '<p class="lead up d1">For a <span class="mint">WHOLE year</span> of <span class="mint">your</span> films and shows.</p>' +
+        '<p class="lead up d2">Netflix? <span class="strike">\u00a318.99 a month</span>. SCAM.</p>' +
+        '<h2 class="up d3" style="margin-top:22px">You paid <span class="gold">\u00a30</span>.</h2>', ms: 7000 });
       s.push({ html: bg('g5') +
         '<h1 class="pop">We can tell you love us &#10084;&#65039;</h1>' +
-        '<p class="lead up d1">We only ask this once a year, because it\'s what keeps us alive.</p>' +
-        '<p class="lead up d2">We don\'t make money from Sharky - it\'s self-funded, by us.</p>' +
+        '<p class="lead up d1">We ask once a year. No ads, no fees - <span class="gold">we pay for it ourselves</span>.</p>' +
         (DONATE_URL
-          ? '<p class="lead up d3" style="color:#fff">Fancy chipping in your ' + money(cost) + '?</p>' +
-            '<div class="amt up d4" id="amts">' + [round, round * 2, round * 5].map(function (a, i) {
-              return '<button type="button" class="' + (i === 0 ? 'on' : '') + '" data-a="' + a + '">£' + a + '</button>'; }).join('') + '</div>' +
-            '<div class="btns up d5"><button class="btn w" id="donate" type="button">Donate £' + round + '</button>' +
-            '<button class="btn g" id="custom" type="button">Choose my own amount</button></div>' +
-            '<p class="small up d5">Totally optional. Sharky stays free either way.</p>'
-          : '<p class="lead up d3" style="color:#fff">Donations open soon - thank you for watching with us.</p>'), ms: 20000, stay: true });
+          ? '<div class="donate up d2">' +
+              (QR_SHOW ? '<div class="qr" id="qr"></div>' : '') +
+              '<div><p class="lead" style="margin-top:0">Chip in your <span class="gold">' + money(cost) + '</span>?</p>' +
+              (QR_SHOW ? '<p class="small">Scan with your phone camera.</p>' : '') +
+              (TV ? '' : '<div class="btns"><button class="btn w" id="donate" type="button">Donate</button></div>') +
+              '<p class="small">You pick the amount. Totally optional - Sharky stays free.</p></div></div>'
+          : '<p class="lead up d2">Donations open soon - thanks for watching with us.</p>'),
+        ms: DONATE_URL ? 25000 : 7000, donate: !!DONATE_URL });
 
       var shareTxt = 'My ' + y + ' on Sharky: ' + Math.round(data.secs / 60).toLocaleString() + ' minutes' +
         (top[0] ? ', #1 was ' + (top[0].d.title || top[0].d.name) : '') + (fav && PERSONA[fav] ? ' - ' + PERSONA[fav][0] : '') + ' 🦈 sharkmovie.co.uk';
@@ -525,9 +542,12 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
         if (don) don.textContent = 'Donate £' + b.getAttribute('data-a');
       });
     });
-    if (don) don.addEventListener('click', function (e) { e.stopPropagation(); window.open(DONATE_URL, '_blank', 'noopener'); });
-    var cus = el.querySelector('#custom');
-    if (cus) cus.addEventListener('click', function (e) { e.stopPropagation(); window.open(DONATE_URL, '_blank', 'noopener'); });
+    if (don) don.addEventListener('click', function (e) { e.stopPropagation(); clearTimeout(timer); window.open(DONATE_URL, '_blank', 'noopener'); });
+    var qr = el.querySelector('#qr');
+    if (qr) {
+      try { var q = window.qrcode(0, 'M'); q.addData(DONATE_URL); q.make(); qr.innerHTML = q.createSvgTag({ cellSize: 6, margin: 0, scalable: true }); }
+      catch (e2) { qr.parentNode.removeChild(qr); }
+    }
     var sh = el.querySelector('#share');
     if (sh) sh.addEventListener('click', function (e) {
       e.stopPropagation();
