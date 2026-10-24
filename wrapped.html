@@ -185,8 +185,21 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
     return Promise.all(tries).then(function (ns) {
       ns = ns.filter(Boolean);
       if (!ns.length) return null;
-      var a = new Audio('music/' + ns[Math.floor(Math.random() * ns.length)] + '.mp3');
-      a.loop = true; a.volume = 0.55;
+      /* Shuffle: a random song, then another random one (never the same
+         song twice in a row). */
+      function pick(not) {
+        var left = ns.filter(function (n) { return n !== not; });
+        return left[Math.floor(Math.random() * left.length)] || ns[0];
+      }
+      var at = pick(0);
+      var a = new Audio('music/' + at + '.mp3');
+      a.volume = 0.55;
+      a.loop = ns.length === 1;
+      a.addEventListener('ended', function () {
+        at = pick(at);
+        a.src = 'music/' + at + '.mp3';
+        if (!muted) a.play().catch(function () {});
+      });
       return a;
     });
   }
