@@ -27,7 +27,7 @@
   #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
   .story { position: relative; width: min(100vw, calc(100vh * 9 / 16)); height: 100vh; height: 100dvh; overflow: hidden; background: #000; }
   body.tv .story { width: min(100vw, calc(100vh * 9 / 16 * 1.35)); }
-  .bars { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: 4px; z-index: 30; }
+  .bars { position: absolute; top: 2px; left: 12px; right: 12px; display: flex; gap: 4px; z-index: 30; padding: 10px 0 9px; cursor: pointer; }
   .bars i { flex: 1; height: 3px; border-radius: 3px; background: rgba(255,255,255,.28); overflow: hidden; }
   .bars i b { display: block; height: 100%; width: 0; background: #fff; }
   .top { position: absolute; top: 24px; left: 14px; right: 14px; display: flex; justify-content: space-between; align-items: center; z-index: 30; }
@@ -503,8 +503,37 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
 
   function next() { if (idx < slides.length - 1) show(idx + 1); }
   function prev() { show(idx - 1); }
-  $('tapR').onclick = next;
-  $('tapL').onclick = prev;
+  /* A swipe also fires a click on the tap zone underneath - ignore that one. */
+  var swiped = 0;
+  $('tapR').onclick = function () { if (Date.now() - swiped > 400) next(); };
+  $('tapL').onclick = function () { if (Date.now() - swiped > 400) prev(); };
+
+  /* Click (or tap) a progress bar to jump to that slide. */
+  $('bars').addEventListener('click', function (e) {
+    e.stopPropagation();
+    var bars = $('bars').children;
+    if (!bars.length || !slides.length) return;
+    for (var i = 0; i < bars.length; i++) {
+      var r = bars[i].getBoundingClientRect();
+      if (e.clientX <= r.right + 2) { show(i); return; }
+    }
+    show(bars.length - 1);
+  });
+
+  /* Swipe left = next slide, swipe right = back (phones). */
+  var tx = null, ty = 0;
+  var story = document.querySelector('.story');
+  story.addEventListener('touchstart', function (e) {
+    var t = e.touches[0]; tx = t.clientX; ty = t.clientY;
+  }, { passive: true });
+  story.addEventListener('touchend', function (e) {
+    if (tx == null || !slides.length || $('start').style.display !== 'none') { tx = null; return; }
+    var t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty;
+    tx = null;
+    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    swiped = Date.now();
+    if (dx < 0) next(); else prev();
+  }, { passive: true });
   document.addEventListener('keydown', function (e) {
     var k = e.key, c = e.keyCode;
     if (k === 'ArrowRight' || c === 39) { e.preventDefault(); next(); }
