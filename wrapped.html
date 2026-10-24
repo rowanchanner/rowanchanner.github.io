@@ -407,7 +407,7 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
       /* Sharky's own year, from the server's counters (api.py _year_bump). */
       var sh = (rate && rate.sharky) || {};
       var stat = function (n, label, d) {
-        return '<div class="stat up d' + d + '"><b>' + Number(n).toLocaleString() + '</b><span>' + label + '</span></div>';
+        return '<div class="stat up d' + d + '"><b>' + (typeof n === 'number' ? n.toLocaleString() : esc(n)) + '</b><span>' + label + '</span></div>';
       };
       var cells = [];
       if (sh.hours) cells.push([sh.hours, 'hours watched on Sharky, by everyone']);
@@ -415,7 +415,7 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
       if (sh.titles) cells.push([sh.titles, 'different films and shows played']);
       if (sh.plays) cells.push([sh.plays, 'times someone pressed play']);
       if (sh.sources_asked) cells.push([sh.sources_asked, 'sources searched for you']);
-      if (sh.sources_asked && sh.sources_found) cells.push([Math.round(100 * sh.sources_found / sh.sources_asked), 'percent of searches found a stream']);
+      if (sh.sources_asked && sh.sources_found) cells.push([(Math.round(1000 * sh.sources_found / sh.sources_asked) / 10) + '%', 'of searches found a stream']);
       if (cells.length >= 2) {
         s.push({ html: bg('g4') +
           '<p class="kick up">Sharky\'s ' + y + '</p>' +
