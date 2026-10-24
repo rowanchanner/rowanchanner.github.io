@@ -57,6 +57,31 @@
     }
   };
 
+  /* How long each title was REALLY watched, from the player's progress
+     messages (every ~5s). foryou.js only counts something as "watched" once
+     it's played for 3+ minutes (or 10%) - opening a film for two seconds to
+     test it mustn't give you "Because You Watched ...". Kept per profile in
+     the synced signals store; only while signed in. */
+  window.addEventListener('message', function (ev) {
+    var d = ev.data;
+    if (!d || d.type !== 'sharky:progress' || !d.id) return;
+    if (!/^https:\/\/api\.sharkmovie\.co\.uk$/.test(ev.origin || '')) return;
+    var A = window.SharkyAccount;
+    if (!A || !A.profile) return;
+    try {
+      var s = JSON.parse(localStorage.getItem('sharky_fy_signals') || 'null') || { v: 1, imp: {}, clk: {}, no: {}, q: [] };
+      s.w = s.w || {};
+      var k = (d.kind === 'tv' ? 'tv' : 'movie') + ':' + d.id;
+      var prev = s.w[k] || [0, 0];
+      var t = Math.max(0, Math.floor(d.t || 0)), pct = Math.max(0, Math.floor(d.pct || 0));
+      if (t <= prev[0] && pct <= prev[1]) return;          // nothing new - don't rewrite
+      s.w[k] = [Math.max(prev[0], t), Math.max(prev[1], pct)];
+      var ks = Object.keys(s.w);
+      if (ks.length > 200) delete s.w[ks[0]];
+      localStorage.setItem('sharky_fy_signals', JSON.stringify(s));
+    } catch (e) {}
+  });
+
   function paintButton() {
     var b = document.getElementById('accountBtn');
     if (!b) return;

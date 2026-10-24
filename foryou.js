@@ -268,9 +268,24 @@
     return 1 + Math.min(1, n / 6);                // up to x2 for a proper binge
   }
 
+  /* Really watched, not just opened to test: 3+ minutes (or 10 percent)
+     according to the player (account-web.js keeps signals.w =
+     {key: [seconds, pct]}), or for a show an episode past 10 percent.
+     Things watched before this check existed (no data for them) still count. */
+  var REAL_SINCE = 1792862213780;
+  function reallyWatched(h, it) {
+    var k = mediaKey(it), w = (h.sig.w || {})[k];
+    if (w && (w[0] >= 180 || w[1] >= 10)) return true;
+    if (it.media_type === 'tv') {
+      var show = h.eps[String(it.id)] || {};
+      if (Object.keys(show).some(function (e) { return (show[e].pct || 0) >= 10; })) return true;
+    }
+    return (it.lastWatched || 0) < REAL_SINCE && !w;
+  }
+
   function seedsOf(h) {
     var seeds = [], seen = {}, no = h.sig.no;
-    h.cont.slice(0, 10).forEach(function (it, n) {
+    h.cont.filter(function (it) { return reallyWatched(h, it); }).slice(0, 10).forEach(function (it, n) {
       var k = mediaKey(it);
       if (!k || seen[k] || no[k]) return;
       seen[k] = 1;
@@ -331,7 +346,8 @@
     /* Only what was watched / listed. Clicks and "not for me" don't rebuild
        the rows under someone's nose - they count from the next visit
        (a "not for me" clears the cache so that's straight away). */
-    return pid + '|' + h.cont.slice(0, 10).map(mediaKey).join(',') + '|' + h.list.slice(0, 4).map(mediaKey).join(',') +
+    return pid + '|' + h.cont.filter(function (i) { return reallyWatched(h, i); }).slice(0, 10).map(mediaKey).join(',') +
+      '|' + h.list.slice(0, 4).map(mediaKey).join(',') +
       '|' + (s.v || 1);
   }
 
@@ -339,7 +355,8 @@
   function build(h, name) {
     var seeds = seedsOf(h);
     var exclude = {};
-    h.cont.concat(h.list).forEach(function (i) { exclude[mediaKey(i)] = 1; });
+    h.cont.filter(function (i) { return reallyWatched(h, i); }).concat(h.list)
+      .forEach(function (i) { exclude[mediaKey(i)] = 1; });
     Object.keys(h.sig.no).forEach(function (k) { exclude[k] = 1; });
 
     return Promise.all(seeds.map(fetchSeed)).then(function (info) {
@@ -435,8 +452,9 @@
       /* Top Picks: best first, but keep it varied - not too much from one
          seed or one genre in a row. */
       var perSeed = {}, top = [], used = {}, gCount = {}, tCount = { movie: 0, tv: 0 };
-      var tvShare = h.cont.slice(0, 10).filter(function (i) { return i.media_type === 'tv'; }).length /
-                    Math.max(1, Math.min(10, h.cont.length));
+      var realCont = h.cont.filter(function (i) { return reallyWatched(h, i); });
+      var tvShare = realCont.slice(0, 10).filter(function (i) { return i.media_type === 'tv'; }).length /
+                    Math.max(1, Math.min(10, realCont.length));
       var left = ranked.slice();
       while (top.length < 20 && left.length) {
         var bi = -1, bs = -1e9;
@@ -497,7 +515,7 @@
       /* 3. A theme they keep coming back to (keyword in 2+ seeds). */
       var kwTop = Object.keys(kwT).filter(function (k) { return Object.keys(kwSeeds[k]).length >= 2; })
         .sort(function (a, b) { return kwT[b] - kwT[a]; })[0];
-      var tvCount = h.cont.slice(0, 8).filter(function (i) { return i.media_type === 'tv'; }).length;
+      var tvCount = h.cont.filter(function (i) { return reallyWatched(h, i); }).slice(0, 8).filter(function (i) { return i.media_type === 'tv'; }).length;
       var useTv = tvCount > 4;
       jobs.push(kwTop ? fetchTMDB('/discover/' + (useTv ? 'tv' : 'movie') + '?with_keywords=' + kwTop +
         '&sort_by=popularity.desc&vote_count.gte=' + (useTv ? 80 : 200)).then(function (d) {

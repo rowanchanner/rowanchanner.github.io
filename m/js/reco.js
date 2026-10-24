@@ -349,13 +349,19 @@
       if ((at || 0) > t.at) t.at = at || 0;
       if (isEp && (pct == null || pct >= 20)) t.eps++;
     }
+    /* Only what was REALLY watched: 3+ minutes in, or 10 percent. Opening
+       something for two seconds to test it must not count. */
+    var real = function (x) { return x && ((x.t || 0) >= 180 || (x.pct || 0) >= 10); };
     var prog = read('sharkytv_progress', {}) || {};
     Object.keys(prog).forEach(function (k) {
       var p = k.split(':');
+      if (!real(prog[k])) return;
       if (p[0] === 'tv') add('tv', p[1], prog[k].at, true, prog[k].pct);
-      else if (p[0] === 'movie' && (prog[k].pct || 0) >= 10) add('movie', p[1], prog[k].at, false);
+      else if (p[0] === 'movie') add('movie', p[1], prog[k].at, false);
     });
-    (read('sharkytv_continue', []) || []).forEach(function (r) { add(r.kind === 'tv' ? 'tv' : 'movie', r.id, r.at, false); });
+    (read('sharkytv_continue', []) || []).forEach(function (r) {
+      if (real(r)) add(r.kind === 'tv' ? 'tv' : 'movie', r.id, r.at, false);
+    });
     var now = new Date().getTime();
     var watched = Object.keys(titles).map(function (k) {
       var t = titles[k];
