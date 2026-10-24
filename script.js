@@ -751,6 +751,12 @@ function refreshBecauseWatched() {
 }
 function renderBecauseWatched(pools, keep, avoidTitles = new Set()) {
   if (!becauseBlock || !rowMap.because) return [];
+  /* Personalised rows (foryou.js) took over: accounts only, per profile. */
+  if (window.SharkyForYou) {
+    becauseBlock.classList.add("hidden");
+    window.SharkyForYou.render();
+    return [];
+  }
   const watched = getStorage(STORAGE_CONTINUE);
   if (!watched.length) {
     becauseBlock.classList.add("hidden");

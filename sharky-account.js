@@ -20,7 +20,8 @@
   'use strict';
 
   var WEB_KEYS = ['sharky_movies_2_my_list', 'sharky_movies_2_continue_watching',
-                  'sharky_movies_2_tv_progress', 'sharky_movies_2_watched_eps'];
+                  'sharky_movies_2_tv_progress', 'sharky_movies_2_watched_eps',
+                  'sharky_fy_signals'];   // foryou.js: what each profile skipped / opened / searched
   var APP_KEYS = ['sharkytv_continue', 'sharkytv_mylist', 'sharkytv_progress'];
   var KEYS = WEB_KEYS.concat(APP_KEYS);
   var S_ACCT = 'sharky_acct';
