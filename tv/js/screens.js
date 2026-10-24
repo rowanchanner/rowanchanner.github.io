@@ -345,6 +345,10 @@
     }).then(function (res) {
       var lists = res.lists, keep = res.keep;
 
+      /* Not out yet -> only in Coming Soon, never in the normal rows. */
+      if (w.SharkyReco) lists = lists.map(function (l) {
+        return l.filter(function (i) { return !SharkyReco.isNotOut(i.date); });
+      });
       pools.movie = [];
       pools.tv = [];
       lists.forEach(function (list, i) {
@@ -358,12 +362,14 @@
 
       host.innerHTML = '';
       renderPersonalRows(host);
+      renderForYou(host);
 
       /* Recently Added comes in on its own schedule — it needs a TMDB search
          per title — so it is slotted in when it arrives rather than holding
          up the rest of the page. */
       renderRecentlyAdded(host);
       renderMostWatched(host);
+      renderComingSoon(host);
 
       /* The charts go straight under Continue Watching, where Netflix puts
          them: they are the most "today" thing on the screen. */
@@ -452,7 +458,95 @@
 
   function refreshPersonalRows() {
     renderPersonalRows();
+    renderForYou();
   }
+
+  /* Search: typos, genres ("horror"), actors, topics - js/reco.js. Falls back
+     to the plain TMDB search if anything goes wrong. */
+  function smartSearch(term) {
+    if (!w.SharkyReco) return API.search(term);
+    return SharkyReco.search(term, API.tmdb).then(function (r) {
+      if (term.length >= 3) setTimeout(function () { if (term === searchTerm) SharkyReco.record('q', term); }, 2500);
+      return r.items.map(function (raw) {
+        var it = API.normalise(raw, raw.media_type);
+        if (it) it.__date = raw.release_date || raw.first_air_date || '';
+        return it;
+      }).filter(function (it) { return it && (it.card || it.poster); });
+    }).catch(function () { return API.search(term); });
+  }
+
+  /* ── Made for you ─────────────────────────────────────────────────────────
+     The same picks as the website (js/reco.js), from THIS profile's history:
+     Up Next in Your Series, Top Picks for <name>, Because You Watched...,
+     a theme / a person / a genre they keep coming back to. Each profile gets
+     its own; what it learns (Not for me, what was opened) syncs with the
+     website and phone. Hold OK on a pick -> "Not for me". Kept 30 minutes
+     per profile so going Home again doesn't re-ask TMDB every time. */
+  var fyBusy = false, fySig = '';
+  function fySignedIn() {
+    var a = w.SharkyAccount;
+    return !!(a && a.profile && a.account && a.account.verified !== false);
+  }
+  function renderForYou(host) {
+    host = host || document.getElementById('homeRows');
+    if (!host || !w.SharkyReco || fyBusy) return;
+    if (!fySignedIn()) { clearForYou(host); return; }
+    var prof = w.SharkyAccount.profile;
+    var h = SharkyReco.appHistory();
+    var sig = prof.id + '|' + h.watched.slice(0, 10).map(function (t) { return t.kind + t.id; }).join(',') +
+              '|' + h.list.slice(0, 4).map(function (t) { return t.kind + t.id; }).join(',');
+    if (!h.watched.length && !h.list.length) { clearForYou(host); return; }
+    if (sig === fySig && host.querySelector('[id^="block-fy-"]')) return;
+    var ck = 'sharky:foryou:tv:' + prof.id, cached = null;
+    try { cached = JSON.parse(sessionStorage.getItem(ck) || 'null'); } catch (e) {}
+    if (cached && cached.sig === sig && Date.now() - cached.t < 30 * 60 * 1000) {
+      fySig = sig; drawForYou(host, cached.rows); return;
+    }
+    fyBusy = true;
+    SharkyReco.build({
+      tmdb: function (p) { return API.tmdb(p); },
+      watched: h.watched, list: h.list, name: prof.name || 'You'
+    }).then(function (rows) {
+      try { sessionStorage.setItem(ck, JSON.stringify({ sig: sig, t: Date.now(), rows: rows })); } catch (e) {}
+      fySig = sig;
+      if (fySignedIn() && w.SharkyAccount.profile.id === prof.id) drawForYou(host, rows);
+    }).catch(function () {}).then(function () { fyBusy = false; });
+  }
+  function clearForYou(host) {
+    Array.prototype.slice.call(host.querySelectorAll('[id^="block-fy-"]')).forEach(function (b) {
+      b.parentNode.removeChild(b);
+    });
+  }
+  function drawForYou(host, rows) {
+    /* Don't pull the rows out from under the highlight. */
+    var cur = w.Nav && Nav.current;
+    for (var p = cur; p && p !== host; p = p.parentNode) {
+      if (p.id && p.id.indexOf('block-fy-') === 0) return;
+    }
+    clearForYou(host);
+    var after = host.querySelector('#block-mylist') || host.querySelector('#block-continue');
+    rows.forEach(function (r) {
+      var items = (r.items || []).map(function (raw) {
+        var it = API.normalise(raw, raw.media_type);
+        if (it) it.__fy = true;
+        return it;
+      }).filter(function (it) { return it && (it.card || it.poster); }).slice(0, CFG.ROW_MAX);
+      if (items.length < (r.id === 'fy-next' ? 1 : 5)) return;
+      var block = UI.row(r.id, r.title, items);
+      if (after && after.nextSibling) host.insertBefore(block, after.nextSibling);
+      else if (after) host.appendChild(block);
+      else host.insertBefore(block, host.firstChild);
+      after = block;
+    });
+  }
+  /* What was looked at counts as a (weak) "shown"; opening it counts more. */
+  document.addEventListener('nav:focus', function (e) {
+    var el = e.detail && e.detail.el;
+    if (el && el.__item && el.__item.__fy && w.SharkyReco && !el.__fySeen) {
+      el.__fySeen = true;
+      SharkyReco.record('imp', el.__item.key);
+    }
+  });
 
   /* ── Most watched on Sharky ───────────────────────────────────────────────
      Always ten: what people here watched most (the server tops up from the
@@ -499,6 +593,25 @@
       else if (after) host.appendChild(block);
       else host.insertBefore(block, host.firstChild);
     });
+  }
+
+  /* ── Coming Soon (not yet out) ── its own row, with the date on each card. */
+  function renderComingSoon(host) {
+    host = host || document.getElementById('homeRows');
+    if (!w.SharkyReco) return;
+    SharkyReco.comingSoon(API.tmdb).then(function (raws) {
+      if (document.getElementById('block-comingsoon')) return;
+      var items = raws.map(function (r) { return API.normalise(r, r.media_type); })
+        .filter(function (i) { return i && (i.card || i.poster); });
+      if (items.length < 4) return;
+      var block = UI.row('comingsoon', 'Coming Soon (not yet out)', items, {
+        cardOpts: function (i) { return { subtitle: SharkyReco.comingText(i.date) }; }
+      });
+      /* Under Most Watched / the charts, above the genre rows. */
+      var after = host.querySelector('#block-topTvRegion') || host.querySelector('#block-mostwatched');
+      if (after && after.nextSibling) host.insertBefore(block, after.nextSibling);
+      else host.appendChild(block);
+    }).catch(function () {});
   }
 
   /* ── Recently Added ───────────────────────────────────────────────────────
@@ -627,7 +740,7 @@
     if (!searchTerm.trim()) { host.innerHTML = ''; return; }
     searchTimer = setTimeout(function () {
       var term = searchTerm;
-      API.search(term).then(function (items) {
+      smartSearch(term).then(function (items) {
         if (term !== searchTerm) return null;
         items = items.slice(0, 40);
         if (!items.length) return { items: items, keep: null };
@@ -747,10 +860,13 @@
       playLabel = 'Resume  ·  ' + UI.timeText(prog.t) + ' in';
     }
 
+    var notOut = w.SharkyReco && SharkyReco.isNotOut(d.release_date || d.first_air_date);
+    if (notOut) playLabel = SharkyReco.comingText(d.release_date || d.first_air_date);
     var play = UI.el('button', 'f btn btn-primary autofocus', playLabel);
     play.type = 'button';
     play.setAttribute('data-key', 'det-play');
     play.addEventListener('click', function () {
+      if (notOut) { SharkyReco.toast('Not out yet - ' + playLabel); return; }
       if (item.kind === 'tv') {
         var r = Store.resumePoint(item.id);
         Player.play(item, r ? r.season : detail.season, r ? r.episode : 1, '');
@@ -1091,6 +1207,9 @@
   };
 
   function go(name, params, replace) {
+    if (name === 'details' && params && params.item && w.SharkyReco) {
+      try { SharkyReco.record('clk', params.item.kind + ':' + params.item.id); } catch (e) {}
+    }
     var def = SCREENS[name];
     if (!def) return;
 

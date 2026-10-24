@@ -169,6 +169,69 @@
     window.addEventListener('keydown', p.onKey, true);
   }
 
+  /* ── Built-in "what's new" pop-up: personalised picks ──
+     Shown once per browser, website only (the TV app makes you sign in
+     anyway). Signed out: explains it and offers Create account / Sign in.
+     Signed in: just tells them it's switched on. Then the normal
+     announcement / survey carry on as before. */
+  var FKEY = 'sharky_feat_seen', FEAT = 'foryou-2026-10';
+  function featSeen() {
+    try { return (',' + (localStorage.getItem(FKEY) || '') + ',').indexOf(',' + FEAT + ',') >= 0; } catch (e) { return true; }
+  }
+  function markFeat() {
+    try {
+      var v = (localStorage.getItem(FKEY) || '').split(',').filter(function (x) { return x; });
+      if (v.indexOf(FEAT) < 0) v.push(FEAT);
+      localStorage.setItem(FKEY, v.slice(-20).join(','));
+    } catch (e) {}
+  }
+  function feature(after) {
+    var A = window.SharkyAccount;
+    /* Any home screen: website (rowsSection), TV / Fire Stick app (homeRows),
+       phone app (rows). */
+    var home = document.getElementById('rowsSection') || document.getElementById('homeRows') || document.getElementById('rows');
+    var inAcct = !!(A && A.account && A.profile);
+    if (featSeen() || !A || !home || (isTV() && !inAcct) ||
+        document.getElementById('sharkyAnnouncement')) { if (after) after(); return; }
+    var html =
+      '<button class="sa-close" type="button" aria-label="Close">&times;</button>' +
+      '<span class="sa-tag">New</span>' +
+      '<h2>Sharky now picks films and shows for you</h2>' +
+      '<p>Sharky looks at what you\'ve been watching and suggests things you\'ll probably like, the same way Netflix does.</p>' +
+      '<p>You\'ll see new rows on the home page like <b>Top Picks for You</b>, <b>Because You Watched...</b> and ' +
+      '<b>picks from your favourite genre</b>. The more you watch, the better the picks get.</p>' +
+      '<p>Every profile gets its own picks, so someone else\'s cartoons won\'t mess up your suggestions.</p>' +
+      (inAcct
+        ? '<p><b style="color:#fff">You\'re signed in, so it\'s already switched on.</b></p>' +
+          '<button class="sa-go" type="button" data-f="ok">Got it</button>'
+        : '<p>It needs a <b style="color:#fff">free account</b> - it\'s 100% free, no card, takes 20 seconds.</p>' +
+          '<button class="sa-go" type="button" data-f="signup" style="margin-right:10px">Create a free account</button>' +
+          '<button class="sa-go" type="button" data-f="signin" style="background:#2a2a38">Sign in</button>') +
+      '<p class="sa-hint">' + (isTV() ? 'Press OK or Back to close.' : 'Click the &times; in the corner to close this.') + '</p>';
+    var p = popup(html, function () { markFeat(); if (after) setTimeout(after, 700); });
+    var btns = [].slice.call(p.wrap.querySelectorAll('[data-f]'));
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var f = b.getAttribute('data-f');
+        p.close();
+        if (f !== 'ok' && window.SharkyAccount) setTimeout(function () { window.SharkyAccount.open(f); }, 280);
+      });
+    });
+    var closeBtn = p.wrap.querySelector('.sa-close');
+    var order = [closeBtn].concat(btns);
+    p.onKey = function (e) {
+      var k = keyKind(e);
+      if (!k) return;
+      swallow(e);
+      if (k === 'back') { p.close(); return; }
+      if (k === 'ok') { (document.activeElement && order.indexOf(document.activeElement) >= 0 ? document.activeElement : closeBtn).click(); return; }
+      var i = order.indexOf(document.activeElement);
+      i = (i + (k === 'next' ? 1 : order.length - 1)) % order.length;
+      order[i].focus();
+    };
+    window.addEventListener('keydown', p.onKey, true);
+  }
+
   /* ── Survey ── */
   function buildSurvey(s) {
     if (surveyShown || surveyDone(s.id) || document.getElementById('sharkyAnnouncement')) return;
@@ -306,8 +369,12 @@
     });
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fetchIt);
-  else fetchIt();
+  function start() {
+    if (featSeen()) { fetchIt(); return; }
+    whenClear(function () { feature(fetchIt); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
   /* Apps that stay open for hours (the TV) look again every 15 minutes, so a
      scheduled announcement or survey still appears without a restart. */
   setInterval(function () { if (!shown) fetchIt(); else survey(); }, 15 * 60 * 1000);

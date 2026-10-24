@@ -20,7 +20,8 @@
   'use strict';
 
   var WEB_KEYS = ['sharky_movies_2_my_list', 'sharky_movies_2_continue_watching',
-                  'sharky_movies_2_tv_progress', 'sharky_movies_2_watched_eps'];
+                  'sharky_movies_2_tv_progress', 'sharky_movies_2_watched_eps',
+                  'sharky_fy_signals'];   // foryou.js: what each profile skipped / opened / searched
   var APP_KEYS = ['sharkytv_continue', 'sharkytv_mylist', 'sharkytv_progress'];
   var KEYS = WEB_KEYS.concat(APP_KEYS);
   var S_ACCT = 'sharky_acct';
@@ -44,6 +45,7 @@
   var kbTarget = null, kbShift = false, focusEl = null, pending = null;
   var mustPick = false;          // TV/APK start-up: a profile has to be chosen
   var mergeOnce = false;         // first pick after browsing signed out: merge, never overwrite
+  var afterPick = null;          // gate(): the action to finish once signed in + profile picked
 
   /* ── Small helpers ───────────────────────────────────────────────────── */
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -330,10 +332,29 @@
     if (!prev) mergeOnce = KEYS.some(function (k) { var v = lsGet(k); return v && v !== '[]' && v !== '{}'; });
     if (prev && prev !== pid) clearLocal();       // never mix two profiles' history
     acct.pid = pid; save();
+    var ap = afterPick; afterPick = null;
     close();
     fire(); fireChange();
     setTimeout(maybeAskDevices, 600);
-    return sync().then(function () { fire(); });
+    return sync().then(function () {
+      fire();
+      if (ap) { try { ap(); } catch (e) {} }      // finish what they were doing (e.g. add to My List)
+    });
+  }
+
+  /* ── Account needed for this (website) ───────────────────────────────────
+     SharkyAccount.gate('add this to My List', function () { ...do it... })
+     Signed in with a profile: runs the action now and returns true.
+     Otherwise shows "Create a free account to ..." and returns false; the
+     action runs by itself once they've signed up / in and picked a profile. */
+  function gate(reason, then) {
+    if (acct && acct.pid && acct.verified !== false) { if (then) then(); return true; }
+    afterPick = then || null;
+    if (acct && acct.verified === false) { open('verify'); afterPick = then || null; return false; }
+    if (acct) { open('profiles'); afterPick = then || null; return false; }
+    open('gate', { reason: reason });
+    afterPick = then || null;
+    return false;
   }
 
   function signedIn(d) {
@@ -443,7 +464,7 @@
     document.head.appendChild(st);
   }
 
-  function open(name) {
+  function open(name, data) {
     css();
     if (!root) {
       root = document.createElement('div');
@@ -458,10 +479,11 @@
     }
     root.className = (!opt.required && opt.mode === 'web' && name !== 'link') ? 'sa-modal' : '';
     stack = [];
-    show(name);
+    show(name, data);
   }
 
   function close() {
+    afterPick = null;
     stopPairPoll(); stopVerifyPoll();
     if (root && root.parentNode) root.parentNode.removeChild(root);
     root = null; screen = ''; stack = []; kbTarget = null; focusEl = null;
@@ -531,6 +553,13 @@
           '<button class="sa-btn sa-pri sa-f" data-a="go:signin">Sign in</button>' +
           '<button class="sa-btn sa-f" data-a="go:signup">Create an account</button></div>';
       }
+    } else if (name === 'gate') {
+      h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div>' +
+        '<div class="sa-h">Create a free account to ' + esc((data && data.reason) || 'do that') + '</div>' +
+        '<p class="sa-p"><b style="color:#fff">It\'s 100% free</b> - no card, no catch, takes 20 seconds.<br>' +
+        'Your list, Continue Watching and downloads stay in step on your phone, PC and TV, with up to 5 profiles.</p>' +
+        '<button class="sa-btn sa-pri sa-f" data-a="go:signup">Create a free account</button>' +
+        '<button class="sa-btn sa-f" data-a="go:signin">I already have one - sign in</button></div>';
     } else if (name === 'signin') {
       h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div><div class="sa-h">Sign in</div><form>' +
         field('email', 'email', 'Email', lastEmail) + field('pw', 'password', 'Password') +
@@ -540,7 +569,8 @@
         '<button class="sa-link sa-f" data-a="go:signup">New here? Create an account</button>' +
         (stack.length ? '<button class="sa-link sa-f" data-a="back">← Back</button>' : '') + '</div>';
     } else if (name === 'signup') {
-      h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div><div class="sa-h">Create an account</div><form>' +
+      h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div><div class="sa-h">Create a free account</div>' +
+        '<p class="sa-p" style="margin-bottom:12px">It\'s free - always. No card needed.</p><form>' +
         field('email', 'email', 'Email') + field('pw', 'password', 'Password (6+ characters)') +
         field('pw2', 'password', 'Password again') +
         (tv ? '<div class="sa-kb" id="sa-kb"></div>' : '') + devPicker() +
@@ -1096,6 +1126,7 @@
   w.SharkyAccount = {
     init: init,
     open: open,
+    gate: gate,
     menu: menu,
     signOut: signOut,
     back: backKey,

@@ -187,9 +187,12 @@
   }
   function feature(after) {
     var A = window.SharkyAccount;
-    if (isTV() || featSeen() || !A || !document.getElementById('rowsSection') ||
+    /* Any home screen: website (rowsSection), TV / Fire Stick app (homeRows),
+       phone app (rows). */
+    var home = document.getElementById('rowsSection') || document.getElementById('homeRows') || document.getElementById('rows');
+    var inAcct = !!(A && A.account && A.profile);
+    if (featSeen() || !A || !home || (isTV() && !inAcct) ||
         document.getElementById('sharkyAnnouncement')) { if (after) after(); return; }
-    var inAcct = !!(A.account && A.profile);
     var html =
       '<button class="sa-close" type="button" aria-label="Close">&times;</button>' +
       '<span class="sa-tag">New</span>' +
@@ -204,7 +207,7 @@
         : '<p>It needs a <b style="color:#fff">free account</b> - it\'s 100% free, no card, takes 20 seconds.</p>' +
           '<button class="sa-go" type="button" data-f="signup" style="margin-right:10px">Create a free account</button>' +
           '<button class="sa-go" type="button" data-f="signin" style="background:#2a2a38">Sign in</button>') +
-      '<p class="sa-hint">' + 'Click the &times; in the corner to close this.</p>';
+      '<p class="sa-hint">' + (isTV() ? 'Press OK or Back to close.' : 'Click the &times; in the corner to close this.') + '</p>';
     var p = popup(html, function () { markFeat(); if (after) setTimeout(after, 700); });
     var btns = [].slice.call(p.wrap.querySelectorAll('[data-f]'));
     btns.forEach(function (b) {
@@ -367,7 +370,7 @@
   }
 
   function start() {
-    if (featSeen() || isTV()) { fetchIt(); return; }
+    if (featSeen()) { fetchIt(); return; }
     whenClear(function () { feature(fetchIt); });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

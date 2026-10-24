@@ -56,6 +56,7 @@
       card: raw.backdrop_path ? CFG.IMG_CARD + raw.backdrop_path : (raw.poster_path ? CFG.IMG_POSTER + raw.poster_path : ''),
       backdrop: raw.backdrop_path ? CFG.IMG_BACKDROP + raw.backdrop_path : '',
       rating: raw.vote_average ? Number(raw.vote_average).toFixed(1) : '',
+      date: raw.release_date || raw.first_air_date || '',
       key: kind + ':' + id
     };
   }

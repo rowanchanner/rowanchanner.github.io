@@ -180,7 +180,8 @@
       var out = [];
       ((d && d.results) || []).forEach(function (raw) {
         var it = API.normalise(raw, def.kind || undefined);
-        if (it && it.poster) out.push(it);
+        /* Not out yet -> only in Coming Soon, never in the normal rows. */
+        if (it && it.poster && !(window.SharkyReco && SharkyReco.isNotOut(it.date))) out.push(it);
       });
       return { items: out, last: !d || page >= (d.total_pages || 1) };
     }).catch(function () { return { items: [], last: true }; });
@@ -342,7 +343,9 @@
     host.innerHTML = '';
     if (rowObserver) rowObserver.disconnect();
     personalRows(host);
+    forYouRows(host);
     if (mode === 'all') mostWatchedRow(host, token);
+    if (mode === 'all') comingSoonRow(host, token);
     if (mode !== 'tv') top10Row(host, 'movie', token);
     if (mode !== 'movie') top10Row(host, 'tv', token);
     recentRow(host, token);
@@ -387,6 +390,11 @@
       pb.addEventListener('click', function () { playItem(item); });
       var lb = el('button', 'btn btn-grey', (Store.inList(item) ? ICON.tick : ICON.plus) + 'My List');
       lb.addEventListener('click', function () {
+        if (!Store.inList(item) && window.SharkyAccount && SharkyAccount.gate &&
+            !(SharkyAccount.profile && SharkyAccount.account && SharkyAccount.account.verified !== false)) {
+          SharkyAccount.gate('add this to My List', function () { if (!Store.inList(item)) { Store.toggleList(item); toast('Added to My List'); } });
+          return;
+        }
         var on = Store.toggleList(item);
         lb.innerHTML = (on ? ICON.tick : ICON.plus) + 'My List';
         toast(on ? 'Added to My List' : 'Removed from My List');
@@ -444,6 +452,137 @@
     personalRows(box);
     while (box.firstChild) tmp.appendChild(box.firstChild);
     host.insertBefore(tmp, host.firstChild);
+    forYouRows(host);
+  }
+
+  /* ── Made for you ─────────────────────────────────────────────────────
+     Same picks as the website (js/reco.js), from THIS profile's history.
+     Signed in only, different per profile; signed out gets a "make a free
+     account" box instead. The x on a pick = "Not for me". */
+  var fySig = '', fyBusy = false, fyIO = null;
+  function fySignedIn() {
+    var a = window.SharkyAccount;
+    return !!(a && a.profile && a.account && a.account.verified !== false);
+  }
+  function forYouRows(host) {
+    var box = $('fyRows');
+    if (!box) {
+      box = el('div');
+      box.id = 'fyRows';
+      var after = null;
+      Array.prototype.slice.call(host.querySelectorAll('.row')).forEach(function (r) {
+        var h = r.querySelector('.row-title');
+        if (r.classList.contains('row-cw') || (h && h.textContent === 'My List')) after = r;
+      });
+      if (after && after.nextSibling) host.insertBefore(box, after.nextSibling);
+      else if (after) host.appendChild(box);
+      else host.insertBefore(box, host.firstChild);
+    }
+    if (mode !== 'all' || !window.SharkyReco) { box.innerHTML = ''; fySig = ''; return; }
+    if (!fySignedIn()) { fySig = 'out'; box.innerHTML = ''; box.appendChild(fyTeaser()); return; }
+    var prof = SharkyAccount.profile;
+    var h = SharkyReco.appHistory();
+    var sig = prof.id + '|' + h.watched.slice(0, 10).map(function (t) { return t.kind + t.id; }).join(',') +
+              '|' + h.list.slice(0, 4).map(function (t) { return t.kind + t.id; }).join(',');
+    if (!h.watched.length && !h.list.length) { box.innerHTML = ''; fySig = sig; return; }
+    if (sig === fySig && box.firstChild) return;
+    var ck = 'sharky:foryou:m:' + prof.id, c = null;
+    try { c = JSON.parse(sessionStorage.getItem(ck) || 'null'); } catch (e) {}
+    if (c && c.sig === sig && Date.now() - c.t < 30 * 60 * 1000) { fySig = sig; fyDraw(box, c.rows); return; }
+    if (fyBusy) return;
+    fyBusy = true;
+    SharkyReco.build({ tmdb: API.tmdb, watched: h.watched, list: h.list, name: prof.name || 'You' }).then(function (rows) {
+      try { sessionStorage.setItem(ck, JSON.stringify({ sig: sig, t: Date.now(), rows: rows })); } catch (e) {}
+      fySig = sig;
+      if (fySignedIn() && SharkyAccount.profile.id === prof.id) fyDraw(box, rows);
+    }).catch(function () {}).then(function () { fyBusy = false; });
+  }
+  function fyDraw(box, rows) {
+    box.innerHTML = '';
+    if (!fyIO && 'IntersectionObserver' in window) {
+      fyIO = new IntersectionObserver(function (ents) {
+        ents.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          fyIO.unobserve(en.target);
+          if (en.target.__fyKey) SharkyReco.record('imp', en.target.__fyKey);
+        });
+      }, { threshold: 0.7 });
+    }
+    rows.forEach(function (r) {
+      var items = (r.items || []).map(function (raw) { return API.normalise(raw, raw.media_type); })
+        .filter(function (i) { return i && i.poster; });
+      if (items.length < (r.id === 'fy-next' ? 1 : 5)) return;
+      var row = el('section', 'row row-fy');
+      row.appendChild(el('h2', 'row-title', esc(r.title) + (r.sub ? ' <small>' + esc(r.sub) + '</small>' : '')));
+      var track = el('div', 'track');
+      items.forEach(function (it) { track.appendChild(fyCard(it)); });
+      row.appendChild(track);
+      box.appendChild(row);
+    });
+  }
+  function fyCard(it) {
+    var c = posterCard(it);
+    c.style.position = 'relative';
+    c.__fyKey = it.kind + ':' + it.id;
+    var x = el('span', null, '&times;');
+    x.setAttribute('role', 'button');
+    x.setAttribute('aria-label', 'Not for me');
+    x.style.cssText = 'position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.65);' +
+      'color:#fff;font-size:18px;line-height:26px;text-align:center;z-index:2';
+    x.addEventListener('click', function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      SharkyReco.record('no', c.__fyKey);
+      try { sessionStorage.removeItem('sharky:foryou:m:' + SharkyAccount.profile.id); } catch (er) {}
+      c.style.transition = 'opacity .25s';
+      c.style.opacity = '0';
+      setTimeout(function () { c.remove(); }, 260);
+      toast('Got it - fewer picks like that');
+    });
+    c.appendChild(x);
+    if (fyIO) fyIO.observe(c);
+    return c;
+  }
+  function fyTeaser() {
+    var t = el('section', 'row');
+    t.innerHTML = '<div style="margin:0 14px;padding:16px;border-radius:14px;border:1px solid rgba(229,9,20,.4);' +
+      'background:linear-gradient(90deg,rgba(229,9,20,.2),rgba(229,9,20,.05))">' +
+      '<div style="font-weight:800;font-size:16px;margin-bottom:4px">Picks made just for you</div>' +
+      '<div style="color:var(--mute,#aaa);font-size:14px;line-height:1.4;margin-bottom:12px">Make a free account and Sharky learns what you like - ' +
+      'your home fills up with films and shows picked for you, and every profile gets its own. <b style="color:#fff">It\'s free.</b></div>' +
+      '<button class="btn btn-white" data-fy="signup">Create a free account</button> ' +
+      '<button class="btn btn-grey" data-fy="signin">Sign in</button></div>';
+    t.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-fy]');
+      if (b && window.SharkyAccount) SharkyAccount.open(b.getAttribute('data-fy'));
+    });
+    return t;
+  }
+
+  /* ── Coming Soon (not yet out) ── */
+  function comingSoonRow(host, token) {
+    if (!window.SharkyReco) return;
+    var row = el('section', 'row');
+    row.appendChild(el('h2', 'row-title', 'Coming Soon <small>not yet out</small>'));
+    var track = el('div', 'track');
+    row.appendChild(track);
+    skeletons(track, 4);
+    host.appendChild(row);
+    SharkyReco.comingSoon(API.tmdb).then(function (raws) {
+      if (token !== homeToken) return;
+      var items = raws.map(function (r) { return API.normalise(r, r.media_type); }).filter(function (i) { return i && i.poster; });
+      if (items.length < 4) { row.remove(); return; }
+      track.innerHTML = '';
+      items.forEach(function (it) {
+        var c = posterCard(it);
+        c.style.position = 'relative';
+        var b = el('span', null, esc(SharkyReco.comingText(it.date).replace('Coming ', '')));
+        b.style.cssText = 'position:absolute;left:4px;bottom:4px;background:#e50914;color:#fff;font-size:11px;font-weight:800;' +
+          'padding:3px 6px;border-radius:5px';
+        c.appendChild(b);
+        track.appendChild(c);
+      });
+    }).catch(function () { row.remove(); });
   }
 
   /* ── Search ─────────────────────────────────────────────────────────── */
@@ -464,6 +603,17 @@
     runSearch('');
   }
 
+  /* Search: typos, genres ("horror"), actors, topics - js/reco.js. Falls back
+     to the plain TMDB search if anything goes wrong. */
+  function smartSearch(q) {
+    if (!window.SharkyReco) return API.search(q);
+    return SharkyReco.search(q, API.tmdb).then(function (r) {
+      if (q.length >= 3) setTimeout(function () { if ($('searchInput').value === q) SharkyReco.record('q', q); }, 2500);
+      return r.items.map(function (raw) { return API.normalise(raw, raw.media_type); })
+        .filter(function (it) { return it && (it.card || it.poster); });
+    }).catch(function () { return API.search(q); });
+  }
+
   function runSearch(q) {
     var seq = ++searchSeq;
     var host = $('searchResults');
@@ -482,7 +632,7 @@
     }
     hint.textContent = 'Results';
     host.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-    API.search(q).then(function (items) {
+    smartSearch(q).then(function (items) {
       items = items.filter(function (i) { return i.poster; });
       if (!items.length) return { items: [], keep: null };
       return API.libraryAvailable(items, null, true).catch(function () { return null; })
@@ -527,6 +677,7 @@
   var detailStack = [];   // "More like this" → details → back walks this
 
   function openDetails(item, fromStack) {
+    if (window.SharkyReco && item) SharkyReco.record('clk', item.kind + ':' + item.id);
     if (window.SharkyExtras) window.SharkyExtras.stop();
     if (detail && !fromStack) detailStack.push(detail.item);
     detail = { item: item, season: 1 };
@@ -605,7 +756,9 @@
       var p = Store.progress(item);
       if (p && p.pct > 2 && p.pct < 92) { resume = p; label = 'Resume'; }
     }
-    playBtn.innerHTML = ICON.play + esc(label);
+    var soonDate = (window.SharkyReco && SharkyReco.isNotOut(d.release_date || d.first_air_date)) ? (d.release_date || d.first_air_date) : '';
+    if (soonDate) { label = SharkyReco.comingText(soonDate); item.date = soonDate; playBtn.disabled = true; playBtn.style.opacity = '.7'; }
+    playBtn.innerHTML = (soonDate ? '' : ICON.play) + esc(label);
     playBtn.addEventListener('click', function () { playItem(item); });
     btns.appendChild(playBtn);
     body.appendChild(btns);
@@ -629,6 +782,11 @@
     var acts = el('div', 'd-actions');
     var la = el('button', 'd-act', (Store.inList(item) ? ICON.tick : ICON.plus) + '<span>My List</span>');
     la.addEventListener('click', function () {
+      if (!Store.inList(item) && window.SharkyAccount && SharkyAccount.gate &&
+          !(SharkyAccount.profile && SharkyAccount.account && SharkyAccount.account.verified !== false)) {
+        SharkyAccount.gate('add this to My List', function () { if (!Store.inList(item)) { Store.toggleList(item); toast('Added to My List'); } });
+        return;
+      }
       var on = Store.toggleList(item);
       la.innerHTML = (on ? ICON.tick : ICON.plus) + '<span>My List</span>';
       toast(on ? 'Added to My List' : 'Removed from My List');
@@ -636,7 +794,8 @@
     acts.appendChild(la);
     var sh = el('button', 'd-act', ICON.share + '<span>Share</span>');
     sh.addEventListener('click', function () {
-      var url = 'https://www.sharkmovie.co.uk/' + (item.kind === 'tv' ? 'tv.html?id=' : 'movie.html?id=') + item.id;
+      /* Goes through the server so WhatsApp / Discord show the poster card. */
+      var url = 'https://api.sharkmovie.co.uk/s/' + (item.kind === 'tv' ? 'tv' : 'movie') + '/' + item.id;
       if (N && N.share) N.share(item.title + ' on Sharky Movies', url);
       else if (navigator.share) navigator.share({ title: item.title, url: url }).catch(function () {});
       else toast(url, 4000);
@@ -753,6 +912,10 @@
   }
 
   function play(item, season, episode, epName) {
+    if (item && item.date && window.SharkyReco && SharkyReco.isNotOut(item.date)) {
+      toast(SharkyReco.comingText(item.date) + ' - not out yet');
+      return;
+    }
     ctx = { item: item, season: Number(season) || 0, episode: Number(episode) || 0, epName: epName || '' };
     if (window.SharkyExtras) window.SharkyExtras.pause();
     var p = $('player');

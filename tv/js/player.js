@@ -34,6 +34,11 @@
   }
 
   function show(item, season, episode, epName) {
+    /* Not out yet: nothing to play, so don't go looking. */
+    if (item && item.date && w.SharkyReco && SharkyReco.isNotOut(item.date)) {
+      SharkyReco.toast(SharkyReco.comingText(item.date) + ' - not out yet');
+      return;
+    }
     build();
     ctx = {
       item: item,

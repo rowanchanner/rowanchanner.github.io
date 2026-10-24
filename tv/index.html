@@ -185,7 +185,7 @@
   var bust = (location.search.match(/[?&]v=([^&]+)/) || [])[1] || '';
   var q = bust ? '?v=' + encodeURIComponent(bust) : '';
   var files = ['compat', 'config', 'qrcode', 'sharky-account', 'store', 'api', 'trailer', 'nav', 'ui',
-               'keyboard', 'region', 'intro', 'player', 'screens', 'options',
+               'keyboard', 'region', 'intro', 'player', 'reco', 'screens', 'options',
                'sidebar', 'app', 'account-tv', 'announcement'];
   window.SHARKY_BUILD = bust || 'bundled';
   for (var i = 0; i < files.length; i++) {

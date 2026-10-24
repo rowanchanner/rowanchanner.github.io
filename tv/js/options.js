@@ -76,6 +76,18 @@
       }, 'danger');
     }
 
+    /* Picks made for you: tell it to show fewer like this one. */
+    if (item.__fy && w.SharkyReco) {
+      add('Not for me', function () {
+        SharkyReco.record('no', item.kind + ':' + item.id);
+        var next = target && (target.nextElementSibling || target.previousElementSibling);
+        if (target && target.parentNode) target.parentNode.removeChild(target);
+        opener = next && next.classList && next.classList.contains('card') ? next : null;
+        try { sessionStorage.removeItem('sharky:foryou:tv:' + w.SharkyAccount.profile.id); } catch (e) {}
+        close();
+      }, 'danger');
+    }
+
     box.classList.remove('off');
     handler = Nav.push(function (action) {
       if (action === 'back' || action === 'menu') { close(); return true; }
