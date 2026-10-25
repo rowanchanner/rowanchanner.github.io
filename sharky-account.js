@@ -584,6 +584,16 @@
         'Your list, Continue Watching and downloads stay in step on your phone, PC and TV, with up to 5 profiles.</p>' +
         '<button class="sa-btn sa-pri sa-f" data-a="go:signup">Create a free account</button>' +
         '<button class="sa-btn sa-f" data-a="go:signin">I already have one - sign in</button></div>';
+    } else if (name === 'fan') {
+      h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div>' +
+        '<div class="sa-h">' + (data && data.title
+          ? 'We see you really love <span style="color:#e50914">' + esc(data.title) + '</span> &#128064;'
+          : 'We see you\'ve been watching a LOT &#128064;') + '</div>' +
+        '<p class="sa-p">You\'ve been with us for ages - please make a free account to support Sharky. ' +
+        '<b style="color:#fff">100% free</b>, no card, takes 20 seconds. Your history, My List and your yearly Wrapped follow you to every device.</p>' +
+        '<button class="sa-btn sa-pri sa-f" data-a="go:signup">Create my free account</button>' +
+        '<button class="sa-btn sa-f" data-a="go:signin">I already have one - sign in</button>' +
+        '<button class="sa-link sa-f" data-a="close">Not now</button></div>';
     } else if (name === 'signin') {
       h = '<div class="sa-box">' + x + '<div class="sa-logo">SHARKY</div><div class="sa-h">Sign in</div><form>' +
         field('email', 'email', 'Email', lastEmail) + field('pw', 'password', 'Password') +
@@ -1202,6 +1212,69 @@
         !(opt.api && ev.origin === String(opt.api).replace(/\/+$/, ''))) return;
     try { wrapTrack(d); } catch (e) {}
   });
+
+  /* ── "We see you really love <show>" ─────────────────────────────────
+     Signed-out regulars on the website / mobile site (accounts aren't
+     optional on the TV and phone apps): once someone has clearly been
+     watching for ages, ask them - kindly - to make a free account.
+     "For ages" = 6+ episodes of one show, or 5+ hours in total, spread over
+     3+ different days. Only on the home page, never over the player.
+     "Not now" = asked again in 5 days; gives up after 4 "not now"s. */
+  var FAN_KEY = 'sharky_fan_nudge';
+  function fanPick() {
+    var shows = {}, days = {}, secs = 0;
+    function day(at) { if (at) days[new Date(at).toDateString()] = 1; }
+    function show(id) { return shows[id] || (shows[id] = { eps: {}, secs: 0 }); }
+    var we = jget('sharky_movies_2_watched_eps', {}) || {};
+    Object.keys(we).forEach(function (id) {
+      Object.keys(we[id] || {}).forEach(function (e) {
+        var r = we[id][e] || {};
+        if ((r.pct || 0) < 50) return;
+        show(id).eps[e] = 1; show(id).secs += 2700 * Math.min(100, r.pct) / 100; secs += 2700 * Math.min(100, r.pct) / 100; day(r.at);
+      });
+    });
+    var pr = jget('sharkytv_progress', {}) || {};
+    Object.keys(pr).forEach(function (k) {
+      var r = pr[k] || {}, p = k.split(':'), t = Number(r.t) || 0;
+      if (t < 180 && (r.pct || 0) < 10) return;
+      secs += t; day(r.at);
+      if (p[0] === 'tv') { var sh = show(p[1]); sh.secs += t; if ((r.pct || 0) >= 50) sh.eps['s' + p[2] + 'e' + p[3]] = 1; }
+    });
+    var best = null;
+    Object.keys(shows).forEach(function (id) {
+      var n = Object.keys(shows[id].eps).length;
+      if (!best || n > best.n || (n === best.n && shows[id].secs > best.secs)) best = { id: id, n: n, secs: shows[id].secs };
+    });
+    var nDays = Object.keys(days).length;
+    if (nDays < 3 || !((best && best.n >= 6) || secs >= 5 * 3600)) return null;
+    /* The show's name, from either Continue Watching list. */
+    var title = '';
+    if (best && best.n >= 3) {
+      (jget('sharky_movies_2_continue_watching', []) || []).forEach(function (x) {
+        if (!title && x && String(x.id) === String(best.id) && x.media_type === 'tv') title = x.sharky_title || x.name || '';
+      });
+      (jget('sharkytv_continue', []) || []).forEach(function (r) {
+        if (!title && r && String(r.id) === String(best.id) && r.kind === 'tv') title = r.title || '';
+      });
+    }
+    return { title: title };
+  }
+  function fanCheck() {
+    try {
+      if (opt.required || acct || root) return;
+      var path = location.pathname;
+      if (!/^\/(index\.html)?$|^\/m\/(index\.html)?$/.test(path)) return;           // home pages only
+      if (document.querySelector('iframe[src*="api.sharkmovie.co.uk"], video')) return; // never over the player
+      var st = jget(FAN_KEY, {}) || {};
+      if ((st.n || 0) >= 4 || (st.at && Date.now() - st.at < 5 * 86400000)) return;
+      var f = fanPick();
+      if (!f) return;
+      st.n = (st.n || 0) + 1; st.at = Date.now();
+      jset(FAN_KEY, st);
+      open('fan', f);
+    } catch (e) {}
+  }
+  setTimeout(function () { if (opt && opt.api) fanCheck(); }, 25000);   // let them settle in first
 
   w.SharkyAccount = {
     init: init,
