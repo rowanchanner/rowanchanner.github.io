@@ -36,11 +36,11 @@
   .brand { font-family: var(--disp); font-weight: 900; letter-spacing: -.3px; font-size: clamp(15px, 1.6 * var(--u) + 8px, 30px); color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.45); display: flex; align-items: center; gap: .4em; }
   .brand .pill { background: var(--red); color: #fff; padding: .18em .55em .22em; border-radius: .45em; text-shadow: none; box-shadow: 0 4px 18px rgba(229,9,20,.45); }
   .ic { background: rgba(0,0,0,.35); border: 0; color: #fff; width: clamp(36px, 4 * var(--u), 64px); height: clamp(36px, 4 * var(--u), 64px); border-radius: 50%; font-size: clamp(17px, 1.9 * var(--u), 30px); cursor: pointer; margin-left: 6px; }
-  .slide { position: absolute; inset: 0; z-index: 25; isolation: isolate; display: flex; flex-direction: column; justify-content: center; padding: max(76px, 9vh) max(28px, 8vw) max(56px, 8vh);
+  .slide { position: absolute; inset: 0; z-index: 1; isolation: isolate; display: flex; flex-direction: column; justify-content: center; padding: max(76px, 9vh) max(28px, 8vw) max(56px, 8vh);
            opacity: 0; transform: scale(1.04); transition: opacity .5s ease, transform .6s ease; pointer-events: none; }
   .slide.on { opacity: 1; transform: none; pointer-events: auto; }
   /* Content keeps a readable width on big screens; backgrounds stay full screen. */
-  .slide > :not(.bg):not(.shade):not(iframe):not(.grain) { width: 100%; max-width: 1100px; position: relative; z-index: 26; }
+  .slide > :not(.bg):not(.shade):not(iframe):not(.grain) { width: 100%; max-width: 1100px; }
   .grain { position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .18; mix-blend-mode: overlay;
            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
   .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55; mix-blend-mode: screen; animation: drift 12s ease-in-out infinite alternate; }
@@ -111,11 +111,9 @@
   .card { margin-top: 18px; border-radius: clamp(18px, 2 * var(--u), 30px); padding: clamp(18px, 2.2 * var(--u), 36px); max-width: 560px; background: linear-gradient(160deg, #e50914, #4a0010); box-shadow: 0 20px 60px rgba(0,0,0,.6); }
   .card .k { font-size: clamp(11px, .9 * var(--u) + 5px, 18px); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,.7); margin-top: 10px; }
   .card .v { font-family: var(--disp); font-size: clamp(18px, 2 * var(--u) + 6px, 38px); font-weight: 900; letter-spacing: -.01em; }
-  .tapzone { position: absolute; top: max(60px, 8vh); bottom: 0; width: 34%; z-index: 20; }
-  .tapzone.l { left: 0; } .tapzone.r { right: 0; width: 66%; }
-  .slide .btns, .slide .amt, .slide .card, .donate { position: relative; z-index: 30; pointer-events: auto; }
-  .donate * { pointer-events: auto; }
-  .donate .btn, .donate a { cursor: pointer; pointer-events: auto; }
+
+  .slide a { color: inherit; }
+  .slide.on a, .slide.on button { cursor: pointer; }
   #start { position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; isolation: isolate; overflow: hidden; }
   #start h1 { margin-top: 14px; }  #start .btns { margin-left: auto; margin-right: auto; }
   .shark { font-size: clamp(72px, 10 * var(--u), 170px); animation: bob 2.2s ease-in-out infinite; }
@@ -132,7 +130,6 @@
   <div class="top"><div class="brand">SHARKY <span class="pill">WRAPPED</span></div>
     <div><button class="ic" id="mute" aria-label="Music on/off">&#9835;</button><button class="ic" id="close" aria-label="Close">&times;</button></div></div>
   <div id="slides"></div>
-  <div class="tapzone l" id="tapL"></div><div class="tapzone r" id="tapR"></div>
   <div id="start" class="g1"></div>
 </div></div>
 
@@ -595,8 +592,15 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
   function prev() { show(idx - 1); }
   /* A swipe also fires a click on the tap zone underneath - ignore that one. */
   var swiped = 0;
-  $('tapR').onclick = function () { if (Date.now() - swiped > 400) next(); };
-  $('tapL').onclick = function () { if (Date.now() - swiped > 400) prev(); };
+  /* Tap / click anywhere on a slide: left third = back, the rest = next.
+     Buttons, links, the QR code and the top bar do their own thing instead
+     (this is why Donate / Discord used to skip the slide). */
+  $('story').addEventListener('click', function (e) {
+    if (Date.now() - swiped < 400 || !slides.length || $('start').style.display !== 'none') return;
+    if (e.target.closest && e.target.closest('a, button, input, .qr, .amt, .top, #bars')) return;
+    var r = $('story').getBoundingClientRect();
+    if (e.clientX - r.left < r.width * 0.34) prev(); else next();
+  });
 
   /* Click (or tap) a progress bar to jump to that slide. */
   $('bars').addEventListener('click', function (e) {
