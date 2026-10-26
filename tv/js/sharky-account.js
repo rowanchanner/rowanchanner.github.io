@@ -34,6 +34,10 @@
   var DEVICES = [['tv_browser', 'TV browser'], ['tv_app', 'TV app'], ['firestick', 'Fire Stick app'],
                  ['phone', 'Phone'], ['computer', 'Computer'], ['other', 'Other']];
   var devAsked = false;
+  /* "Where did you find out about Sharky?" - one answer, at sign-up. */
+  var FOUND = [['friends', 'Friends / family'], ['word', 'Word of mouth'], ['reddit', 'Reddit'], ['tiktok', 'TikTok'],
+               ['youtube', 'YouTube'], ['discord', 'Discord'], ['instagram', 'Instagram'], ['google', 'Google'],
+               ['twitter', 'X / Twitter'], ['other', 'Other']];
   var AVATARS = [
     ['🦈', '#0e7490'], ['🍿', '#b91c1c'], ['👽', '#15803d'],
     ['🐱', '#a16207'], ['🐶', '#7c2d12'], ['🦊', '#c2410c'],
@@ -532,9 +536,20 @@
     }
     return h + '</div>';
   }
+  function foundPicker() {
+    var h = '<div class="sa-devs"><div class="sa-devq">Where did you find out about Sharky?</div>';
+    for (var i = 0; i < FOUND.length; i++) {
+      h += '<button type="button" class="sa-dev sa-src sa-f" data-a="src:' + FOUND[i][0] + '">' + FOUND[i][1] + '</button>';
+    }
+    return h + '</div>';
+  }
+  function foundPicked() {
+    var b = root && root.querySelector('.sa-src.sa-sel');
+    return b ? b.getAttribute('data-a').slice(4) : '';
+  }
   function devPicked() {
     var out = [];
-    [].forEach.call(root ? root.querySelectorAll('.sa-dev.sa-sel') : [], function (b) { out.push(b.getAttribute('data-a').slice(4)); });
+    [].forEach.call(root ? root.querySelectorAll('.sa-dev.sa-sel:not(.sa-src)') : [], function (b) { out.push(b.getAttribute('data-a').slice(4)); });
     return out;
   }
   /* Signed in, profile chosen, nothing else on screen, never answered: ask once. */
@@ -607,7 +622,7 @@
         '<p class="sa-p" style="margin-bottom:12px">It\'s free - always. No card needed.</p><form>' +
         field('email', 'email', 'Email') + field('pw', 'password', 'Password (6+ characters)') +
         field('pw2', 'password', 'Password again') +
-        (tv ? '<div class="sa-kb" id="sa-kb"></div>' : '') + devPicker() +
+        (tv ? '<div class="sa-kb" id="sa-kb"></div>' : '') + devPicker() + foundPicker() +
         '<div class="sa-err" id="sa-err"></div>' +
         '<button class="sa-btn sa-pri sa-f" data-a="signup" type="submit">Create account</button></form>' +
         '<button class="sa-link sa-f" data-a="go:signin">Already have one? Sign in</button>' +
@@ -754,11 +769,19 @@
       if (val('pw') !== val('pw2')) { err('The two passwords don’t match'); return; }
       var devs = devPicked();
       if (!devs.length) { err('Tick at least one thing you watch Sharky on'); return; }
+      var found = foundPicked();
+      if (!found) { err('Pick where you found out about Sharky'); return; }
       busy(true);
       var em2 = val('email').trim();
       lsSet('sharky_acct_last', em2);
-      call('signup', { email: em2, password: val('pw'), devices: devs }).then(signedIn)
+      call('signup', { email: em2, password: val('pw'), devices: devs, found: found }).then(signedIn)
         .catch(function (e) { err(e.message); }).then(function () { busy(false); });
+      return;
+    }
+    if (cmd === 'src') {      // only one answer: picking one un-picks the rest
+      [].forEach.call(root.querySelectorAll('.sa-src'), function (b) {
+        b.classList.toggle('sa-sel', b.getAttribute('data-a') === 'src:' + arg);
+      });
       return;
     }
     if (cmd === 'dev') {
