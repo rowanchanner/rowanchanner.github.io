@@ -597,7 +597,8 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeDetails
 /* ── Actions ────────────────────────────────────────────── */
 function playItem(item) {
   if (isUpcoming(item)) { openDetails(item.id, item.media_type); return; }
-  saveContinueWatching(item);
+  /* Continue Watching is filled by the film / episode page once the player
+     has really been playing for 30s - not by pressing a button here. */
   if (item.media_type === "tv") {
     const s = item.season || 1, ep = item.episode || 1;
     location.href = `tv.html?id=${encodeURIComponent(item.id)}&s=${s}&e=${ep}`;

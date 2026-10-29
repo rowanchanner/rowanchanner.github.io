@@ -765,8 +765,9 @@
     var playBtn = el('button', 'btn btn-white');
     var resume = null, label = 'Play';
     if (item.kind === 'tv') {
-      resume = Store.resumePoint(item.id);
-      if (resume) label = 'Resume S' + resume.season + ':E' + resume.episode;
+      item.__seasons = d.seasons || [];
+      resume = fixNext(Store.resumePoint(item.id), item.__seasons);
+      if (resume) label = (resume.again ? 'Watch again S' : resume.next ? 'Next: S' : 'Resume S') + resume.season + ':E' + resume.episode;
     } else {
       var p = Store.progress(item);
       if (p && p.pct > 2 && p.pct < 92) { resume = p; label = 'Resume'; }
@@ -913,9 +914,26 @@
   var ctx = null;          // what is playing: {item, season, episode, epName}
   var loadT = null;
 
+  /* Resume after a FINISHED episode points at the next one (store.js):
+     past the end of a season = next season's first; after the very last
+     episode, the last one again. */
+  function fixNext(r, seasons) {
+    if (!r || !r.next) return r;
+    seasons = (seasons || []).filter(function (s) { return s.season_number > 0 && (s.episode_count || 0) > 0; });
+    if (!seasons.length) return r;
+    var cur = seasons.filter(function (s) { return s.season_number === r.season; })[0];
+    if (!cur || r.episode <= cur.episode_count) return r;
+    var nxt = seasons.filter(function (s) { return s.season_number > r.season; })[0];
+    if (nxt) return { kind: 'tv', id: r.id, season: nxt.season_number, episode: 1, pct: 0, next: true };
+    return { kind: 'tv', id: r.id, season: r.after.season, episode: r.after.episode, pct: 0, again: true };
+  }
+
   function playItem(item) {
     if (item.kind === 'tv') {
-      var r = Store.resumePoint(item.id);
+      var r = fixNext(Store.resumePoint(item.id), item.__seasons);
+      /* Next episode after a finished one, but we don't know the episode
+         count yet: the details page does - go there. */
+      if (r && r.next && !(item.__seasons && item.__seasons.length)) { if (!(detail && detail.item === item)) openDetails(item); return; }
       play(item, r ? r.season : 1, r ? r.episode : 1, r ? r.epName : '');
     } else play(item);
   }

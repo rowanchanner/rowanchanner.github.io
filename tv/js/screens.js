@@ -269,7 +269,7 @@
     var p = item.kind === 'tv' ? Store.resumePoint(item.id)
                                : Store.progress({ id: item.id, kind: 'movie' });
     if (p && p.season) {
-      host.appendChild(UI.el('span', 'bb-resume', 'S' + p.season + ' E' + p.episode));
+      host.appendChild(UI.el('span', 'bb-resume', (p.next ? 'Next: S' : 'S') + p.season + ' E' + p.episode));
     } else if (p && p.pct > 2 && p.pct < 92) {
       host.appendChild(UI.el('span', 'bb-resume', p.pct + '% watched'));
     }
@@ -287,6 +287,9 @@
       if (!billboardItem) return;
       if (billboardItem.kind === 'tv') {
         var r = Store.resumePoint(billboardItem.id);
+        /* After a finished episode we don't know here if there IS a next
+           one - the details page does, so go there. */
+        if (r && r.next) { go('details', { item: billboardItem }); return; }
         Player.play(billboardItem, r ? r.season : 1, r ? r.episode : 1, '');
       } else {
         Player.play(billboardItem, 0, 0, '');
@@ -410,6 +413,25 @@
      visit so finishing an episode is reflected the moment you come back. */
   function renderPersonalRows(host) {
     host = host || document.getElementById('homeRows');
+    /* These rows get rebuilt when the account syncs (every 90s if anything
+       changed). If the highlight was on one of them it was left on a card
+       that no longer existed, and the next press jumped somewhere random.
+       Remember it and put it back on the same card. */
+    var cur = w.Nav && Nav.current, keepKey = '';
+    if (cur && cur.closest && cur.closest('#block-continue, #block-mylist') && host.contains(cur)) {
+      keepKey = cur.getAttribute('data-key') || '';
+    }
+    try { renderPersonalRowsNow(host); }
+    finally {
+      if (keepKey) {
+        var again = host.querySelector('[data-key="' + keepKey.replace(/["\\]/g, '\\$&') + '"]') ||
+                    host.querySelector('#block-continue .f, #block-mylist .f');
+        if (again) Nav.focus(again, { noScroll: true });
+        else if (w.Nav && Nav.focusFirst) Nav.focusFirst(host);
+      }
+    }
+  }
+  function renderPersonalRowsNow(host) {
     var existing = host.querySelector('#block-continue');
     if (existing) existing.parentNode.removeChild(existing);
     var listBlock = host.querySelector('#block-mylist');
@@ -785,6 +807,18 @@
 
   var detail = null;   // {item, tmdb, season, episodes}
 
+  /* Resume after a FINISHED episode points at the next one: past the end
+     of a season that's the next season's first; after the very last
+     episode there's nothing new, so offer the last one again. */
+  function fixNext(r, seasons) {
+    if (!r || !r.next || !seasons || !seasons.length) return r;
+    var cur = seasons.filter(function (s) { return s.season_number === r.season; })[0];
+    if (!cur || !cur.episode_count || r.episode <= cur.episode_count) return r;
+    var nxt = seasons.filter(function (s) { return s.season_number > r.season && (s.episode_count || 0) > 0; })[0];
+    if (nxt) return { kind: 'tv', id: r.id, season: nxt.season_number, episode: 1, pct: 0, next: true };
+    return { kind: 'tv', id: r.id, season: r.after.season, episode: r.after.episode, pct: 0, again: true };
+  }
+
   function renderDetails(item) {
     var host = document.getElementById('detailsBody');
     document.getElementById('detailsBackdrop').style.backgroundImage =
@@ -815,7 +849,7 @@
         if (!seasons.length) seasons = [{ season_number: 1, episode_count: 0 }];
         detail.seasons = seasons;
 
-        var resume = Store.resumePoint(item.id);
+        var resume = fixNext(Store.resumePoint(item.id), seasons);
         detail.season = resume && resume.season ? resume.season : seasons[0].season_number;
         if (!seasons.some(function (s) { return s.season_number === detail.season; })) {
           detail.season = seasons[0].season_number;
@@ -855,12 +889,13 @@
 
     var actions = UI.el('div', 'det-actions');
 
-    var resume = item.kind === 'tv' ? Store.resumePoint(item.id) : null;
+    var seasonsNow = (d.seasons || []).filter(function (s) { return s.season_number > 0 && (s.episode_count || 0) > 0; });
+    var resume = item.kind === 'tv' ? fixNext(Store.resumePoint(item.id), seasonsNow) : null;
     var prog = item.kind === 'movie' ? Store.progress({ id: item.id, kind: 'movie' }) : null;
 
     var playLabel = 'Play';
     if (item.kind === 'tv' && resume) {
-      playLabel = 'Resume S' + resume.season + ' E' + resume.episode;
+      playLabel = (resume.again ? 'Watch again S' : resume.next ? 'Next: S' : 'Resume S') + resume.season + ' E' + resume.episode;
     } else if (prog && prog.pct > 2 && prog.pct < 92) {
       playLabel = 'Resume  ·  ' + UI.timeText(prog.t) + ' in';
     }
@@ -873,7 +908,7 @@
     play.addEventListener('click', function () {
       if (notOut) { SharkyReco.toast('Not out yet - ' + playLabel); return; }
       if (item.kind === 'tv') {
-        var r = Store.resumePoint(item.id);
+        var r = fixNext(Store.resumePoint(item.id), seasonsNow);
         Player.play(item, r ? r.season : detail.season, r ? r.episode : 1, '');
       } else {
         Player.play(item, 0, 0, '');

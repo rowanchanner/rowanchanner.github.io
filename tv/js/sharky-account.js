@@ -157,7 +157,10 @@
         if (k === 'sharky_wrapped' && s && lv != null && lv !== s.v) {
           try {
             var m = wrapMerge(JSON.parse(s.v), JSON.parse(lv)), mv = JSON.stringify(m);
-            if (mv !== lv) { apply(k, mv); changed = true; }
+            /* Same numbers in a different key order is NOT a change - it used
+               to count as one, so every sync redrew the home rows (and the
+               TV's highlight jumped). */
+            if (canon(m) !== canon(JSON.parse(lv))) { apply(k, mv); changed = true; }
             mod[k] = Math.max(s.at || 0, Date.now());
             return;
           } catch (e) {}
@@ -192,6 +195,11 @@
   function idOf(x) {
     if (!x || typeof x !== 'object') return JSON.stringify(x);
     return x.key || ((x.kind || x.media_type || 'movie') + ':' + x.id);
+  }
+  function canon(x) {
+    if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']';
+    if (x && typeof x === 'object') return '{' + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ':' + canon(x[k]); }).join(',') + '}';
+    return JSON.stringify(x);
   }
   function wrapMerge(a, b) {
     if (!a || typeof a !== 'object') return b;

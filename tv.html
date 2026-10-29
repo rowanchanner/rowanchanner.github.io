@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#e50914" />
   <!-- TV remote / D-pad navigation. Loaded early so page
        scripts can read window.SharkyTV when building URLs. -->
-  <script src="sharky-account.js?v=20261026-found"></script>
+  <script src="sharky-account.js?v=20261029-fix"></script>
   <script src="account-web.js?v=20261024-real"></script>
   <script src="sharky-extras.js?v=20261018c" defer></script>
   <script src="tvnav.js?v=20261016b"></script>
@@ -164,8 +164,9 @@
         userPickedEpisode = false;
         if (window.SharkyPlayer) window.SharkyPlayer.open(currentPlayUrl);
       }
-      saveContinueWatching();
-      saveTvProgress();
+      /* Opening an episode is NOT watching it: Continue Watching and "where
+         you're up to" only move once the player says it's really playing
+         (see 'sharky:progress' below). Browsing used to move them. */
       updateUrl();
     }
 
@@ -212,7 +213,17 @@
       if (PLAYER_ORIGIN && ev.origin !== PLAYER_ORIGIN) return;
 
       if (d.type === 'sharky:progress' && d.kind === 'tv' && String(d.id) === String(tvId)) {
+        /* 30+ seconds in = really watching. Before that (or a stream that
+           never got going) nothing is recorded. */
+        if (!(Number(d.t) >= 30) || (Number(d.d) && Number(d.d) < 120)) return;   // under 2 min = not the episode
         markWatched(d.season, d.episode, d.pct);
+        if (!window.__sharkyProgSaved || Date.now() - window.__sharkyProgSaved > 30000 ||
+            window.__sharkyProgEp !== d.season + ':' + d.episode) {
+          window.__sharkyProgSaved = Date.now();
+          window.__sharkyProgEp = d.season + ':' + d.episode;
+          saveTvProgress(d.season, d.episode);
+          saveContinueWatching(d.season, d.episode);
+        }
         const row = episodeList.querySelector('.episode-item[data-ep="' + d.episode + '"]');
         if (row && Number(d.season) === Number(selectedSeason)) {
           row.classList.add('watched');
@@ -236,10 +247,8 @@
         selectedSeason  = Number(d.season) || selectedSeason;
         document.querySelectorAll('.episode-item').forEach(x => x.classList.remove('playing'));
         const row = episodeList.querySelector('.episode-item[data-ep="' + selectedEpisode + '"]');
-        if (row) { row.classList.add('playing', 'watched'); row.scrollIntoView({block:'nearest', behavior:'smooth'}); }
-        markWatched(selectedSeason, selectedEpisode, 0);
-        saveTvProgress();
-        saveContinueWatching();
+        if (row) { row.classList.add('playing'); row.scrollIntoView({block:'nearest', behavior:'smooth'}); }
+        /* Not marked watched here - it hasn't been yet. Progress does that. */
         updateUrl();
       }
 
@@ -285,14 +294,14 @@
       try { return (JSON.parse(localStorage.getItem(STORAGE_TV_PROGRESS)) || {})[tvId] || null; }
       catch { return null; }
     }
-    function saveTvProgress() {
+    function saveTvProgress(s, e) {
       if (!tvId) return;
       let all = {};
       try { all = JSON.parse(localStorage.getItem(STORAGE_TV_PROGRESS)) || {}; } catch {}
-      all[tvId] = { season: selectedSeason, episode: selectedEpisode, updatedAt: Date.now() };
+      all[tvId] = { season: Number(s || selectedSeason), episode: Number(e || selectedEpisode), updatedAt: Date.now() };
       localStorage.setItem(STORAGE_TV_PROGRESS, JSON.stringify(all));
     }
-    function saveContinueWatching() {
+    function saveContinueWatching(s, e) {
       if (!currentShow) return;
       let list = [];
       try { list = JSON.parse(localStorage.getItem(STORAGE_CONTINUE)) || []; } catch {}
@@ -301,7 +310,7 @@
         sharky_title: currentShow.name, sharky_date: currentShow.first_air_date || '',
         poster_path: currentShow.poster_path, backdrop_path: currentShow.backdrop_path,
         vote_average: currentShow.vote_average, overview: currentShow.overview,
-        season: selectedSeason, episode: selectedEpisode, lastWatched: Date.now()
+        season: Number(s || selectedSeason), episode: Number(e || selectedEpisode), lastWatched: Date.now()
       };
       const filtered = list.filter(x => !(Number(x.id) === Number(currentShow.id) && x.media_type === 'tv'));
       localStorage.setItem(STORAGE_CONTINUE, JSON.stringify([item, ...filtered].slice(0, 20)));
@@ -379,10 +388,6 @@
             selectedEpisode = Number(ep.episode_number);
             document.querySelectorAll('.episode-item').forEach(x => x.classList.remove('playing'));
             li.classList.add('playing');
-            li.classList.add('watched');
-            markWatched(seasonNum, ep.episode_number, 0);
-            saveTvProgress();
-            saveContinueWatching();
             updateUrl();
             loadSharkyPlayer();
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -391,11 +396,8 @@
         });
 
         applyBackdropFallback();
-        /* Opening the page on an episode counts as starting it. */
-        markWatched(seasonNum, selectedEpisode, 0);
-        const cur = episodeList.querySelector('.episode-item.playing');
-        if (cur) cur.classList.add('watched');
-
+        /* Opening the page (or another season) is just looking - it used to
+           mark the episode watched and move "where you're up to". */
         loadSharkyPlayer();
       } catch (err) {
         episodeList.innerHTML = `<div class="episode-item" style="grid-template-columns:1fr;padding:40px;color:var(--muted);text-align:center">Failed to load episodes.</div>`;
@@ -427,7 +429,6 @@
     seasonSelect.addEventListener('change', () => {
       selectedSeason  = Number(seasonSelect.value);
       selectedEpisode = 1;
-      saveTvProgress();
       updateUrl();
       loadEpisodes(selectedSeason, 1);
     });

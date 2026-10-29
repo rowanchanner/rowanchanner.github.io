@@ -368,11 +368,22 @@
     if (w.CardOptions) w.CardOptions.keyUp();
   }, true);
 
-  /* A mouse or a touchscreen still works — handy when testing on a laptop. */
-  document.addEventListener('mouseover', function (e) {
+  /* A mouse or a touchscreen still works — handy when testing on a laptop.
+     But only a mouse that really MOVED. The browser also fires "mouseover"
+     when the page moves under a pointer that is standing still - search
+     results appearing, the episode list scrolling - and on the Fire Stick
+     that was stealing the highlight: typing on the keyboard jumped to a
+     film, and Up/Down in the episodes jumped the whole page. */
+  var mx = null, my = null, keyAt = 0;
+  document.addEventListener('keydown', function () { keyAt = Date.now(); }, true);
+  document.addEventListener('mousemove', function (e) {
+    var moved = mx !== null && (e.screenX !== mx || e.screenY !== my);
+    mx = e.screenX; my = e.screenY;
+    if (!moved) return;                              // pointer didn't move: the page did
+    if (Date.now() - keyAt < 1000) return;           // using the remote right now
     var el = e.target && e.target.closest ? e.target.closest(FOCUSABLE) : null;
     if (el && el !== current && visible(el)) setFocus(el, { noScroll: true });
-  });
+  }, true);
 
   w.Nav = {
     focus: setFocus,

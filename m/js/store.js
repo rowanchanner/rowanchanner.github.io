@@ -71,6 +71,10 @@
     /* Called every few seconds while something plays. Finished titles drop
        off the row rather than sitting there at 100%. */
     touch: function (item, pct, t, d) {
+      /* A clip under 2 minutes isn't the episode or film - it's a broken
+         stream's placeholder or an advert. Counting it marked things as
+         100% watched. */
+      if (d && d < 120) return;
       var rows = read(K_CONTINUE, []);
       if (!Array.isArray(rows)) rows = [];
       var k = key(item);
@@ -133,6 +137,24 @@
         if (r.kind !== 'tv' || String(r.id) !== String(tvId)) return;
         if (!best || (r.at || 0) > (best.at || 0)) best = r;
       });
+      /* A finished episode drops off Continue Watching, so "the newest row"
+         used to be some older episode you'd half-watched weeks ago - Resume
+         jumped back to it. If the episode you watched most recently was
+         FINISHED, carry on with the one after it instead. (next: true - the
+         caller checks it against the real episode count.) */
+      var all = read(K_PROGRESS, {}) || {}, last = null, pre = 'tv:' + tvId + ':';
+      Object.keys(all).forEach(function (k) {
+        if (k.indexOf(pre) !== 0) return;
+        var v = all[k] || {};
+        if (!last || (v.at || 0) > (last.at || 0)) {
+          var p = k.split(':');
+          last = { season: Number(p[2]) || 1, episode: Number(p[3]) || 1, pct: v.pct || 0, at: v.at || 0 };
+        }
+      });
+      if (last && last.pct >= 92 && (!best || last.at > (best.at || 0))) {
+        return { kind: 'tv', id: tvId, season: last.season, episode: last.episode + 1, pct: 0, t: 0, d: 0,
+                 at: last.at, next: true, after: { season: last.season, episode: last.episode } };
+      }
       return best;
     },
 

@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#e50914" />
   <!-- TV remote / D-pad navigation. Loaded early so page
        scripts can read window.SharkyTV when building URLs. -->
-  <script src="sharky-account.js?v=20261026-found"></script>
+  <script src="sharky-account.js?v=20261029-fix"></script>
   <script src="account-web.js?v=20261024-real"></script>
   <script src="sharky-extras.js?v=20261018c" defer></script>
   <script src="tvnav.js?v=20261016b"></script>
@@ -247,13 +247,26 @@
           });
         }
 
-        saveContinueWatching(m);
+        /* Opening a film's page is not watching it: it goes on Continue
+           Watching once the player says it has really been playing for 30s
+           (it used to go on just by looking at the page). */
+        window.__sharkyFilm = m;
       } catch (err) {
         console.error(err);
         titleEl.textContent = 'Failed to load movie.';
       }
     }
 
+    window.addEventListener('message', (ev) => {
+      const d = ev.data;
+      if (!d || typeof d !== 'object' || d.type !== 'sharky:progress' || d.kind !== 'movie') return;
+      if (!/^https:\/\/api\.sharkmovie\.co\.uk$/.test(ev.origin || '')) return;
+      const m = window.__sharkyFilm;
+      if (!m || String(d.id) !== String(m.id) || !(Number(d.t) >= 30)) return;
+      if (window.__sharkyFilmSaved && Date.now() - window.__sharkyFilmSaved < 60000) return;
+      window.__sharkyFilmSaved = Date.now();
+      saveContinueWatching(m);
+    });
     function saveContinueWatching(movie) {
       const key = 'sharky_movies_2_continue_watching';
       let list = [];
