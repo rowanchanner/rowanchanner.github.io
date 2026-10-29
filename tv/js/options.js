@@ -47,6 +47,9 @@
         Player.play(asItem(resume), resume.season, resume.episode, resume.epName);
       } else if (item.kind === 'tv') {
         var r = Store.resumePoint(item.id);
+        /* After a finished episode Resume means "the next one" - the
+           details page knows whether there is one, so go there. */
+        if (r && r.next) { Screens.go('details', { item: item }); return; }
         Player.play(item, r ? r.season : 1, r ? r.episode : 1, '');
       } else {
         Player.play(item, 0, 0, '');
