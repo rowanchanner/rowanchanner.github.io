@@ -105,21 +105,112 @@
       ';margin:' + (isTV ? '10px 48px 26px' : '6px 14px 18px') + ';padding:' + (isTV ? '22px 28px' : '14px 16px') +
       ';border:0;border-radius:16px;cursor:pointer;color:#fff;font-family:inherit;' +
       'background:linear-gradient(110deg,#ff3d6e 0%,#7a00ff 55%,#0050ff 100%);box-shadow:0 10px 30px rgba(122,0,255,.35)';
-    b.addEventListener('click', function () {
-      if (isTV || inApp) openFrame();
-      else location.href = '/wrapped.html' + (PREVIEW ? '?preview=1' : '');
-    });
+    b.addEventListener('click', play);
     return b;
+  }
+  function play() {
+    if (isTV || inApp) openFrame();
+    else location.href = '/wrapped.html' + (PREVIEW ? '?preview=1' : '');
+  }
+
+  /* ── The one-time "Your Wrapped is here" pop-up ──
+     Once per profile per year, the first time Wrapped is open for them.
+     After that the banner at the top of Home is how they get back to it.
+     Waits for any announcement / account pop-up to close first. */
+  function popKey() {
+    var A = w.SharkyAccount, id = (A && A.profile && A.profile.id) || 'x';
+    return 'sharky_wrapped_popped_' + new Date().getFullYear() + '_' + id;
+  }
+  function popSeen() { try { return !!localStorage.getItem(popKey()); } catch (e) { return true; } }
+  function busyElsewhere() {
+    if (D.getElementById('sharkyAnnouncement') || D.getElementById('wrappedFrame') || D.getElementById('wrappedPop')) return true;
+    var sa = D.getElementById('sa-root');
+    return !!(sa && sa.offsetWidth && sa.children.length);
+  }
+  function keyKind(e) {
+    var k = e.key, c = e.keyCode;
+    if (k === 'Escape' || k === 'GoBack' || k === 'BrowserBack' || c === 27 || c === 4 || c === 10009 || c === 461 || k === 'Backspace' || c === 8) return 'back';
+    if (k === 'Enter' || c === 13 || c === 23) return 'ok';
+    if (c >= 37 && c <= 40) return 'move';
+    return '';
+  }
+  function popup() {
+    if (popSeen() || busyElsewhere()) return;
+    try { localStorage.setItem(popKey(), '1'); } catch (e) {}
+    var y = new Date().getFullYear();
+    var tv = isTV;
+    var css =
+      '#wrappedPop{position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483500;display:flex;align-items:center;justify-content:center;' +
+        'background:rgba(6,3,14,.82);opacity:0;transition:opacity .3s;padding:16px;box-sizing:border-box}' +
+      '#wrappedPop.show{opacity:1}' +
+      '#wrappedPop .wp-card{position:relative;width:100%;max-width:' + (tv ? '46vw' : '440px') + ';border-radius:' + (tv ? '1.6vw' : '24px') + ';overflow:hidden;color:#fff;text-align:center;' +
+        'padding:' + (tv ? '4vw 3.4vw 3vw' : '38px 26px 26px') + ';box-sizing:border-box;font-family:inherit;' +
+        'background:linear-gradient(140deg,#ff3d6e 0%,#c026d3 38%,#7a00ff 68%,#0050ff 100%);box-shadow:0 30px 90px rgba(161,0,255,.55)}' +
+      '#wrappedPop .wp-card:before{content:"";position:absolute;left:-30%;top:-60%;width:90%;height:120%;background:radial-gradient(circle,rgba(255,255,255,.28),rgba(255,255,255,0) 60%);pointer-events:none}' +
+      '#wrappedPop .wp-shark{font-size:' + (tv ? '5vw' : '64px') + ';line-height:1;display:block;margin-bottom:' + (tv ? '1vw' : '10px') + '}' +
+      '#wrappedPop .wp-yr{display:inline-block;font-weight:900;letter-spacing:.18em;font-size:' + (tv ? '.95vw' : '12px') + ';background:rgba(0,0,0,.28);padding:' + (tv ? '.4vw 1vw' : '5px 12px') + ';border-radius:999px;color:#ffd166}' +
+      '#wrappedPop h2{font-family:Unbounded,inherit;font-weight:900;letter-spacing:-.02em;line-height:1.05;margin:' + (tv ? '1.2vw 0 .8vw' : '14px 0 10px') + ';font-size:' + (tv ? '3vw' : '32px') + '}' +
+      '#wrappedPop p{margin:0 0 ' + (tv ? '2vw' : '22px') + ';opacity:.92;font-size:' + (tv ? '1.25vw' : '16px') + ';line-height:1.4}' +
+      '#wrappedPop button{display:block;width:100%;border:0;cursor:pointer;font-family:inherit;font-weight:900;border-radius:999px;outline:none;' +
+        'font-size:' + (tv ? '1.4vw' : '17px') + ';padding:' + (tv ? '1.1vw' : '15px') + ';transition:transform .15s,box-shadow .15s}' +
+      '#wrappedPop .wp-go{background:#fff;color:#2a0a4a;box-shadow:0 10px 30px rgba(0,0,0,.25)}' +
+      '#wrappedPop .wp-later{background:transparent;color:#fff;opacity:.85;margin-top:' + (tv ? '.8vw' : '8px') + ';font-weight:700}' +
+      '#wrappedPop button:focus,#wrappedPop button.focused{transform:scale(1.04);box-shadow:0 0 0 ' + (tv ? '.25vw' : '3px') + ' #ffd166}';
+    var st = D.createElement('style'); st.appendChild(D.createTextNode(css));
+    var wrap = D.createElement('div');
+    wrap.id = 'wrappedPop';
+    wrap.setAttribute('role', 'dialog');
+    wrap.setAttribute('aria-modal', 'true');
+    wrap.innerHTML = '<div class="wp-card"><span class="wp-shark">&#129416;</span><span class="wp-yr">SHARKY WRAPPED ' + y + '</span>' +
+      '<h2>Your year on Sharky is ready</h2><p>Every film, every show, every late night. See how your ' + y + ' went.</p>' +
+      '<button type="button" class="wp-go">&#9654;&nbsp; Watch my Wrapped</button><button type="button" class="wp-later">Maybe later</button>' +
+      '<p style="margin:' + (tv ? '1vw 0 0' : '12px 0 0') + ';font-size:' + (tv ? '.95vw' : '12px') + ';opacity:.75">It\'s always at the top of Home too.</p></div>';
+    wrap.appendChild(st);
+    D.body.appendChild(wrap);
+    var go = wrap.querySelector('.wp-go'), later = wrap.querySelector('.wp-later'), done = false;
+    function close(thenPlay) {
+      if (done) return;
+      done = true;
+      w.removeEventListener('keydown', onKey, true);
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      if (thenPlay) play();
+      else { var b = D.getElementById('wrappedBanner'); try { if (b && w.Nav && Nav.focus) Nav.focus(b); } catch (e) {} }
+    }
+    function focusBtn(b) {
+      go.className = 'wp-go'; later.className = 'wp-later';
+      b.className += ' focused';
+      try { b.focus(); } catch (e) {}
+    }
+    function onKey(e) {
+      var k = keyKind(e);
+      if (!k) return;
+      e.preventDefault();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      e.stopPropagation();
+      if (k === 'back') close(false);
+      else if (k === 'ok') close(D.activeElement !== later && later.className.indexOf('focused') < 0);
+      else focusBtn(go.className.indexOf('focused') >= 0 ? later : go);
+    }
+    go.addEventListener('click', function () { close(true); });
+    later.addEventListener('click', function () { close(false); });
+    wrap.addEventListener('click', function (e) { if (e.target === wrap) close(false); });
+    w.addEventListener('keydown', onKey, true);
+    setTimeout(function () { wrap.className = 'show'; focusBtn(go); }, 30);
   }
 
   function check() {
     var h = host(), have = D.getElementById('wrappedBanner');
     if (!h) return;
     if (!wanted()) { if (have) have.parentNode.removeChild(have); return; }
-    if (have && have.parentNode === h && h.firstChild === have) return;
-    if (have) have.parentNode.removeChild(have);
-    h.insertBefore(banner(), h.firstChild);
+    if (!have || have.parentNode !== h || h.firstChild !== have) {
+      if (have) have.parentNode.removeChild(have);
+      h.insertBefore(banner(), h.firstChild);
+    }
+    /* Pop-up once, a moment after Home has settled. ?wrapped=1 testing
+       doesn't use up the real one. */
+    if (!PREVIEW && !popSeen() && !popT) popT = setTimeout(function () { popT = 0; if (wanted() && host()) popup(); }, 2500);
   }
+  var popT = 0;
 
   D.addEventListener('sharky:account', function () { setTimeout(check, 50); });
   D.addEventListener('sharky:account-data', function () { setTimeout(check, 50); });
