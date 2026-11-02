@@ -16,7 +16,8 @@
   account). Cost: GET api.sharkmovie.co.uk/wrapped/rate gives the server's
   real "£ per hour watched" this year; we multiply by this profile's hours.
 
-  Open in December. Anyone can preview it any time with ?preview=1.
+  Opens when Rowan switches it on in /admin/wrapped (On / Off / Scheduled;
+  December if never set). Anyone can preview it any time with ?preview=1.
   Music: drop MP3s you have the rights to into /music as 1.mp3, 2.mp3 ...
   (up to 8). One is picked at random. No files = no music, nothing breaks.
   TV / Fire Stick: ?tv=1 (left/right/OK/Back on the remote).
@@ -659,11 +660,41 @@ SharkyAccount.init({ api: 'https://api.sharkmovie.co.uk', mode: 'web', required:
   }
   boot();
 
+  /* Open or not: Rowan's switch in /admin/wrapped (On / Off / Scheduled),
+     asked from the server. No answer in 4 s -> December, like before. */
   function boot() {
+    if (PREVIEW) return boot2(true, null);
+    var done = false;
+    function go(open, opens) { if (done) return; done = true; boot2(open, opens); }
+    var t = setTimeout(function () { go(new Date().getMonth() === 11, null); }, 4000);
+    try {
+      var x = new XMLHttpRequest();
+      x.open('GET', API + '/wrapped/state?_=' + Date.now(), true);
+      x.onreadystatechange = function () {
+        if (x.readyState !== 4) return;
+        clearTimeout(t);
+        var s = null;
+        try { s = x.status === 200 ? JSON.parse(x.responseText) : null; } catch (e) {}
+        if (s && typeof s.wrapped === 'boolean') go(s.wrapped, s.opens);
+        else go(new Date().getMonth() === 11, null);
+      };
+      x.send();
+    } catch (e) { clearTimeout(t); go(new Date().getMonth() === 11, null); }
+  }
+  function landsText(opens) {
+    if (!opens) return '1 December';
+    var d = new Date(opens * 1000);
+    var M = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var txt = d.getDate() + ' ' + M[d.getMonth()];
+    if (d.getHours() || d.getMinutes()) txt += ', ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    return txt;
+  }
+
+  function boot2(open, opens) {
   var now = new Date();
   var A = window.SharkyAccount;
-  if (!PREVIEW && now.getMonth() !== 11) {
-    startScreen('<h1 style="margin-top:14px">Wrapped lands<br>1 December</h1><p class="lead">We\'re keeping count all year. Keep watching!</p>' +
+  if (!PREVIEW && !open) {
+    startScreen('<h1 style="margin-top:14px">Wrapped lands<br>' + landsText(opens) + '</h1><p class="lead">We\'re keeping count all year. Keep watching!</p>' +
       '<div class="btns" style="width:100%;max-width:340px"><button class="btn w" type="button">Back to Sharky</button></div>', close);
     return;
   }

@@ -1,8 +1,9 @@
 /* wrapped-entry.js - the "Your Sharky Wrapped is here" banner at the top of
  * Home on the website, the phone app and the TV / Fire Stick app.
  *
- * Shows in December only (or any time with ?wrapped=1 on the page URL, for
- * testing), for a signed-in profile that has watched 10+ minutes this year.
+ * Shows while Wrapped is open - Rowan's On / Off / Scheduled switch in
+ * /admin/wrapped (December if never set) - or any time with ?wrapped=1 on
+ * the page URL for testing, for a signed-in profile that has watched 10+ minutes this year.
  * Website + phone: opens /wrapped.html. TV: opens it full screen over the
  * app (?tv=1) and closes again on Back.
  * Plain ES5 (old Fire TV WebViews).
@@ -42,9 +43,16 @@
     } catch (e) {}
     return yes;
   }
+  /* Open or not comes from the server (Rowan's switch in /admin/wrapped,
+     via wrapped-theme.js). If that hasn't loaded, December as before. */
+  function isOpen() {
+    var s = w.SharkyWrappedState;
+    if (s && typeof s.wrapped === 'boolean') return s.wrapped;
+    return new Date().getMonth() === 11;
+  }
   function wanted() {
     var A = w.SharkyAccount;
-    return (PREVIEW || new Date().getMonth() === 11) && A && A.profile && (minutes() >= 10 || pastWatching());
+    return (PREVIEW || isOpen()) && A && A.profile && (minutes() >= 10 || pastWatching());
   }
 
   function closeFrame() {
@@ -115,6 +123,8 @@
 
   D.addEventListener('sharky:account', function () { setTimeout(check, 50); });
   D.addEventListener('sharky:account-data', function () { setTimeout(check, 50); });
+  /* Admin flipped Wrapped on / off: banner appears / goes straight away. */
+  D.addEventListener('sharky:wrapped-state', function () { setTimeout(check, 50); });
   /* Home redraws itself (profile switch, refresh) - keep the banner on top. */
   setInterval(check, 2500);
   if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', check); else check();
