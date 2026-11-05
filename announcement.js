@@ -72,6 +72,10 @@
     '#sharkyAnnouncement .sa-opt.on:before{background:#e50914;border-color:#e50914}' +
     '#sharkyAnnouncement .sa-opt:focus{outline:3px solid #fff;outline-offset:1px}' +
     '#sharkyAnnouncement .sa-hint{margin:18px 0 0;font-size:.85rem;color:#8a8a99}' +
+    '#sharkyAnnouncement .sa-txt{display:block;width:100%;box-sizing:border-box;margin:4px 0 14px;padding:14px 16px;border-radius:10px;' +
+      'border:2px solid #2a2a38;background:#15151e;color:#fff;font-size:1.05rem;font-family:inherit;outline:none;resize:none}' +
+    '#sharkyAnnouncement .sa-txt:focus{border-color:#7c3aed}' +
+    '#sharkyAnnouncement .sa-txt::placeholder{color:#77778a}' +
     '@media (max-width:560px){#sharkyAnnouncement .sa-card{padding:26px 20px 22px}#sharkyAnnouncement h2{font-size:1.4rem}' +
       '#sharkyAnnouncement p{font-size:1rem}#sharkyAnnouncement .sa-close{width:46px;height:46px;line-height:38px}}' +
     '@media (min-width:1700px){#sharkyAnnouncement .sa-card{max-width:900px}#sharkyAnnouncement h2{font-size:2.4rem}' +
@@ -246,13 +250,22 @@
       '<h2>' + esc(s.question) + '</h2>' +
       (multi ? '<p style="font-size:.95rem;color:#9a9aab;margin-top:-6px">Pick as many as you like.</p>' : '') +
       '<div class="sa-opts">' + opts + '</div>' +
+      (s.custom ? '<input type="text" class="sa-txt" maxlength="500" placeholder="' +
+        (s.options.length ? 'Or write your own...' : 'Write your answer...') + '">' : '') +
       '<button type="button" class="sa-go sa-send" disabled>Send answer</button>' +
       '<p class="sa-hint">' + (isTV() ? 'Arrows to move, OK to pick. Back to skip.' : 'Anonymous - takes two seconds.') + '</p>',
       function () { markSurvey(s.id); });
     var wrap = p.wrap, picked = [];
     var optEls = [].slice.call(wrap.querySelectorAll('.sa-opt'));
     var send = wrap.querySelector('.sa-send');
-    var order = [wrap.querySelector('.sa-close')].concat(optEls, [send]);
+    var txt = wrap.querySelector('.sa-txt');
+    var order = [wrap.querySelector('.sa-close')].concat(optEls, txt ? [txt] : [], [send]);
+    function typed() { return txt ? txt.value.replace(/^\s+|\s+$/g, '') : ''; }
+    function canSend() { send.disabled = !picked.length && !typed(); }
+    if (txt) {
+      txt.addEventListener('input', canSend);
+      txt.addEventListener('keyup', canSend);
+    }
 
     function toggle(el) {
       var i = +el.getAttribute('data-i');
@@ -265,10 +278,10 @@
       for (var j = 0; j < optEls.length; j++) {
         optEls[j].className = 'sa-opt' + (multi ? ' multi' : '') + (picked.indexOf(j) >= 0 ? ' on' : '');
       }
-      send.disabled = !picked.length;
+      canSend();
     }
     function submit() {
-      if (!picked.length || send.getAttribute('data-sent')) return;
+      if ((!picked.length && !typed()) || send.getAttribute('data-sent')) return;
       send.setAttribute('data-sent', '1');
       send.disabled = true;
       send.textContent = 'Sending...';
@@ -277,7 +290,7 @@
         x.open('POST', BASE + '/survey', true);
         x.setRequestHeader('Content-Type', 'text/plain');
         x.timeout = 12000;
-        x.send(JSON.stringify({ id: s.id, choices: picked, who: who() }));
+        x.send(JSON.stringify({ id: s.id, choices: picked, who: who(), text: typed() }));
       } catch (e) {}
       markSurvey(s.id);
       var card = wrap.querySelector('.sa-card');
@@ -296,6 +309,13 @@
     p.onKey = function (e) {
       var k = keyKind(e);
       if (!k) return;
+      /* Typing in the text box: let Backspace and Left/Right edit the text
+         instead of closing the pop-up or jumping away. */
+      if (txt && document.activeElement === txt) {
+        var c = e.keyCode;
+        if (e.key === 'Backspace' || c === 8 || c === 37 || c === 39) return;
+        if (k === 'ok') { swallow(e); canSend(); if (!send.disabled) send.focus(); return; }
+      }
       swallow(e);
       if (k === 'back') { p.close(); return; }
       var at = order.indexOf(document.activeElement);
@@ -351,7 +371,7 @@
   function survey() {
     if (surveyShown) return;
     get('/survey', function (s) {
-      if (!s || !s.id || !s.question || !s.options || s.options.length < 2 || surveyDone(s.id)) return;
+      if (!s || !s.id || !s.question || !s.options || (s.options.length < 2 && !s.custom) || surveyDone(s.id)) return;
       whenClear(function () { if (!surveyDone(s.id)) setTimeout(function () { buildSurvey(s); }, 600); });
     });
   }
