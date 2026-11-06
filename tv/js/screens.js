@@ -25,6 +25,8 @@
     { id: 'horror',      title: 'Horror',           ep: '/discover/movie?with_genres=27&sort_by=popularity.desc', kind: 'movie' },
     { id: 'scifi',       title: 'Sci-Fi',           ep: '/discover/movie?with_genres=878&sort_by=popularity.desc', kind: 'movie' },
     { id: 'topTv',       title: 'Top Rated Series', ep: '/tv/top_rated',        kind: 'tv' },
+    /* Only anime in it: strict = no topping up from the other rows. */
+    { id: 'anime',       title: 'Anime',            ep: '/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&vote_count.gte=50', kind: 'tv', strict: true },
     { id: 'animation',   title: 'Animation',        ep: '/discover/movie?with_genres=16&sort_by=popularity.desc', kind: 'movie' },
     { id: 'docs',        title: 'Documentaries',    ep: '/discover/movie?with_genres=99&sort_by=popularity.desc', kind: 'movie' }
   ];
@@ -391,7 +393,8 @@
       var usedRecently = {};
       HOME_ROWS.forEach(function (def, i) {
         var owned = lists[i].filter(function (item) { return !keep || keep[item.key]; });
-        var items = fill(owned, pools[def.kind], CFG.ROW_TARGET, usedRecently);
+        var items = def.strict ? dedupe(owned).slice(0, CFG.ROW_TARGET)
+                               : fill(owned, pools[def.kind], CFG.ROW_TARGET, usedRecently);
         if (items.length < CFG.ROW_MIN) return;
         items.forEach(function (it) { usedRecently[it.key] = (usedRecently[it.key] || 0) + 1; });
         host.appendChild(UI.row(def.id, def.title, items));

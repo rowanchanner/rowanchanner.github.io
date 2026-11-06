@@ -44,6 +44,9 @@
   /* ── Row definitions ────────────────────────────────────────────────── */
   var G = '/discover/movie?sort_by=popularity.desc&with_genres=';
   var GT = '/discover/tv?sort_by=popularity.desc&with_genres=';
+  /* Anime: Japanese animated series / films (TMDB has no "anime" genre). */
+  var AN_TV = '/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&vote_count.gte=50';
+  var AN_MOV = '/discover/movie?with_genres=16&with_original_language=ja&sort_by=popularity.desc&vote_count.gte=100';
   var ROWS = {
     all: [
       { t: 'Trending Now', ep: '/trending/all/week', kind: null },
@@ -52,6 +55,7 @@
       { t: 'Action', ep: G + '28', kind: 'movie' },
       { t: 'Comedy', ep: G + '35', kind: 'movie' },
       { t: 'Crime Series', ep: GT + '80', kind: 'tv' },
+      { t: 'Anime', ep: AN_TV, kind: 'tv' },
       { t: 'Horror', ep: G + '27', kind: 'movie' },
       { t: 'Sci-Fi', ep: G + '878', kind: 'movie' },
       { t: 'Animation', ep: G + '16', kind: 'movie' },
@@ -72,6 +76,7 @@
       { t: 'Crime', ep: G + '80', kind: 'movie' },
       { t: 'Romance', ep: G + '10749', kind: 'movie' },
       { t: 'Animation', ep: G + '16', kind: 'movie' },
+      { t: 'Anime Films', ep: AN_MOV, kind: 'movie' },
       { t: 'Family', ep: G + '10751', kind: 'movie' },
       { t: 'Top Rated Films', ep: '/movie/top_rated', kind: 'movie' },
       { t: 'Documentaries', ep: G + '99', kind: 'movie' }
@@ -83,6 +88,7 @@
       { t: 'Comedy', ep: GT + '35', kind: 'tv' },
       { t: 'Drama', ep: GT + '18', kind: 'tv' },
       { t: 'Sci-Fi & Fantasy', ep: GT + '10765', kind: 'tv' },
+      { t: 'Anime', ep: AN_TV, kind: 'tv' },
       { t: 'Animation', ep: GT + '16', kind: 'tv' },
       { t: 'Reality', ep: GT + '10764', kind: 'tv' },
       { t: 'Documentary Series', ep: GT + '99', kind: 'tv' },
@@ -940,8 +946,11 @@
 
   function embedUrl(item, s, e) {
     var base = CFG.API + '/embed/';
-    return item.kind === 'tv' ? base + 'tv/' + item.id + '/' + (s || 1) + '/' + (e || 1) + '?app=android'
-                              : base + 'movie/' + item.id + '?app=android';
+    /* Your profile name, so a watch party shows you as you. */
+    var pn = (window.SharkyAccount && SharkyAccount.profile && SharkyAccount.profile.name)
+      ? '&pname=' + encodeURIComponent(SharkyAccount.profile.name) : '';
+    return item.kind === 'tv' ? base + 'tv/' + item.id + '/' + (s || 1) + '/' + (e || 1) + '?app=android' + pn
+                              : base + 'movie/' + item.id + '?app=android' + pn;
   }
 
   function play(item, season, episode, epName) {

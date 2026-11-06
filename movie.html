@@ -63,7 +63,7 @@
         <div class="watch-actions">
           <button class="watch-action-btn primary" id="playBtn"><span class="ic">&#9654;</span> Play</button>
           <button class="watch-action-btn" id="downloadBtn"><span class="ic">&#x2913;</span> <span id="downloadLabel">Download</span></button>
-          <button class="watch-action-btn" id="gwBtn"><span class="ic">&#9749;</span> Group Watch</button>
+          <button class="watch-action-btn" id="gwBtn"><span class="ic">&#127871;</span> Watch Party</button>
           <button class="watch-action-btn" id="shareBtn"><span class="ic">&#8599;</span> Share</button>
           <span class="download-status" id="downloadStatus">
             <span id="downloadStatusText">Downloading…</span>
@@ -377,12 +377,14 @@
       history.replaceState(null, '', `?id=${movieId}&room=${code}`);
     }
 
+    /* Watch Party: opens the player straight into a new party. The party
+       itself (sync, chat, invite link, code) lives in the player, so it works
+       the same on the website, the phone app and the Fire Stick. */
     gwBtn?.addEventListener('click', () => {
-      if (room) { gwPanel.classList.toggle('on'); return; }
-      if (window.sharkyNeedAccount && !window.sharkyNeedAccount('start a Group Watch', () => gwBtn.click())) return;
-      const existing = new URLSearchParams(location.search).get('room');
-      const code = existing || window.GroupWatch.createCode();
-      openRoom(code);
+      if (sharkyComingSoon || !currentPlayUrl) return;
+      if (window.sharkyNeedAccount && !window.sharkyNeedAccount('start a Watch Party', () => gwBtn.click())) return;
+      const u = currentPlayUrl + (currentPlayUrl.includes('?') ? '&' : '?') + 'party=new' + (window.SharkyAccount && SharkyAccount.profile && SharkyAccount.profile.name ? '&pname=' + encodeURIComponent(SharkyAccount.profile.name) : '');
+      if (window.SharkyPlayer) window.SharkyPlayer.open(u);
     });
     gwClose?.addEventListener('click', () => gwPanel.classList.remove('on'));
     gwCopy?.addEventListener('click', () => {
@@ -400,8 +402,8 @@
     }
     gwSend?.addEventListener('click', sendChat);
     gwInput?.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
-    // Auto-join if room param in URL
-    if (new URLSearchParams(location.search).get('room')) {
+    // Old Group Watch links (?room=) - those rooms never synced anything.
+    if (false) {
       setTimeout(() => {
         const code = new URLSearchParams(location.search).get('room');
         if (window.sharkyNeedAccount && !window.sharkyNeedAccount('join this Group Watch', () => { if (!room) openRoom(code); })) return;

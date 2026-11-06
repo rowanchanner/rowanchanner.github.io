@@ -63,7 +63,7 @@
         <div class="watch-actions">
           <button class="watch-action-btn primary" id="playBtn"><span class="ic">&#9654;</span> Play</button>
           <button class="watch-action-btn" id="downloadBtn"><span class="ic">&#x2913;</span> <span id="downloadLabel">Download Episode</span></button>
-          <button class="watch-action-btn" id="gwBtn"><span class="ic">&#9749;</span> Group Watch</button>
+          <button class="watch-action-btn" id="gwBtn"><span class="ic">&#127871;</span> Watch Party</button>
           <button class="watch-action-btn" id="shareBtn"><span class="ic">&#8599;</span> Share</button>
           <span class="download-status" id="downloadStatus">
             <span id="downloadStatusText">Downloading…</span>
@@ -594,11 +594,14 @@
       history.replaceState(null, '', `?${q.toString()}`);
     }
 
+    /* Watch Party: the selected episode, straight into a new party (the
+       party lives in the player - see shark2/player_template.py). */
     gwBtn?.addEventListener('click', () => {
-      if (room) { gwPanel.classList.toggle('on'); return; }
-      if (window.sharkyNeedAccount && !window.sharkyNeedAccount('start a Group Watch', () => gwBtn.click())) return;
-      const existing = new URLSearchParams(location.search).get('room');
-      openRoom(existing || window.GroupWatch.createCode());
+      if (!tvId) return;
+      if (window.sharkyNeedAccount && !window.sharkyNeedAccount('start a Watch Party', () => gwBtn.click())) return;
+      const base = `${SHARKY_API}/embed/tv/${tvId}/${selectedSeason}/${selectedEpisode}` + (window.SharkyTV && window.SharkyTV.active ? '?tv=1' : '');
+      const u = base + (base.includes('?') ? '&' : '?') + 'party=new' + (window.SharkyAccount && SharkyAccount.profile && SharkyAccount.profile.name ? '&pname=' + encodeURIComponent(SharkyAccount.profile.name) : '');
+      if (window.SharkyPlayer) window.SharkyPlayer.open(u);
     });
     gwClose?.addEventListener('click', () => gwPanel.classList.remove('on'));
     gwCopy?.addEventListener('click', () => {
@@ -615,7 +618,7 @@
     }
     gwSend?.addEventListener('click', sendChat);
     gwInput?.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
-    if (new URLSearchParams(location.search).get('room')) {
+    if (false) {      // old Group Watch links (?room=) - those rooms never synced anything
       setTimeout(() => {
         const code = new URLSearchParams(location.search).get('room');
         if (window.sharkyNeedAccount && !window.sharkyNeedAccount('join this Group Watch', () => { if (!room) openRoom(code); })) return;

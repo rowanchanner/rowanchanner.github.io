@@ -63,6 +63,7 @@ const rowMap = {
   romance:        document.getElementById("romanceRow"),
   animation:      document.getElementById("animationRow"),
   doc:            document.getElementById("docRow"),
+  anime:          document.getElementById("animeRow"),
   myList:         document.getElementById("myListRow"),
 };
 
@@ -1275,6 +1276,7 @@ async function init() {
     trendingMovies, popularMovies, topMovies,
     trendingTv, popularTv, topTv,
     action, comedy, horror, scifi, romance, animation, doc,
+    animeTv, animeMovies,
   ] = await Promise.all([
     getListPages("/trending/all/day", undefined, 3),
     getListPages("/trending/movie/week", "movie", ROW_PAGES),
@@ -1290,6 +1292,9 @@ async function init() {
     getListPages("/discover/movie?with_genres=10749&sort_by=popularity.desc", "movie", ROW_PAGES),
     getListPages("/discover/movie?with_genres=16&sort_by=popularity.desc", "movie", ROW_PAGES),
     getListPages("/discover/movie?with_genres=99&sort_by=popularity.desc", "movie", ROW_PAGES),
+    /* Anime: Japanese animated series (+ the big anime films mixed in). */
+    getListPages("/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&vote_count.gte=50", "tv", ROW_PAGES),
+    getListPages("/discover/movie?with_genres=16&with_original_language=ja&sort_by=popularity.desc&vote_count.gte=100", "movie", 1),
   ]);
 
   /* One round trip for the whole page, then render each row from the answer.
@@ -1297,7 +1302,8 @@ async function init() {
   const keep = await libraryAvailable([
     ...trendingMovies, ...popularMovies, ...topMovies,
     ...trendingTv, ...popularTv, ...topTv,
-    ...action, ...comedy, ...horror, ...scifi, ...romance, ...animation, ...doc
+    ...action, ...comedy, ...horror, ...scifi, ...romance, ...animation, ...doc,
+    ...animeTv, ...animeMovies
   ]);
 
   const movieFallback = playableOnly([
@@ -1330,6 +1336,14 @@ async function init() {
   rememberRow(tvRecentRows, rendered);
   rendered = renderLibraryRow(rowMap.topTv, topTv, keep, tvFallback, 8, recentTitleSet(tvRecentRows));
   rememberRow(tvRecentRows, rendered);
+  /* Anime gets no top-up from other rows - only anime goes in it. A film
+     every 4th card, the rest series. */
+  const animeMix = [];
+  animeTv.forEach((it, i) => {
+    animeMix.push(it);
+    if (i % 3 === 2 && animeMovies.length) animeMix.push(animeMovies.shift());
+  });
+  renderLibraryRow(rowMap.anime, animeMix.concat(animeMovies), keep, [], 8);
   rendered = renderLibraryRow(rowMap.action, action, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
   rememberRow(movieRecentRows, rendered);
   rendered = renderLibraryRow(rowMap.comedy, comedy, keep, movieFallback, 8, recentTitleSet(movieRecentRows));
@@ -1376,6 +1390,7 @@ async function init() {
     [rowMap.romance,   "/discover/movie?with_genres=10749&sort_by=popularity.desc", "movie", romance],
     [rowMap.animation, "/discover/movie?with_genres=16&sort_by=popularity.desc",    "movie", animation],
     [rowMap.doc,       "/discover/movie?with_genres=99&sort_by=popularity.desc",    "movie", doc],
+    [rowMap.anime,     "/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&vote_count.gte=50", "tv", animeTv],
   ].forEach(([row, ep, type, first]) => makeRowEndless(row, ep, type, playableOnly(first, keep), ROW_PAGES + 1));
 }
 

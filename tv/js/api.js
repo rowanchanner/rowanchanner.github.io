@@ -387,11 +387,14 @@
 
     embedUrl: function (item, season, episode) {
       var base = CFG.API + '/embed/';
+      /* Your profile name, so a watch party shows you as you. */
+      var pn = (w.SharkyAccount && SharkyAccount.profile && SharkyAccount.profile.name)
+        ? '&pname=' + encodeURIComponent(SharkyAccount.profile.name) : '';
       if ((item.kind || 'movie') === 'tv') {
         return base + 'tv/' + item.id + '/' + (season || 1) + '/' + (episode || 1) + '?tv=1' +
-          (CFG.NEXT_CONFIRM ? '&nextconfirm=1' : '');
+          (CFG.NEXT_CONFIRM ? '&nextconfirm=1' : '') + pn;
       }
-      return base + 'movie/' + item.id + '?tv=1';
+      return base + 'movie/' + item.id + '?tv=1' + pn;
     }
   };
 
