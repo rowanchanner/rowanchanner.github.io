@@ -753,22 +753,85 @@
 
   function initSearch() {
     var kb = document.getElementById('kbHost');
-    if (kb.childNodes.length) return;
+    if (kb.childNodes.length) { phoneTyping(); return; }
     Keyboard.build(kb, function (op, ch) {
       if (op === 'add') searchTerm += ch;
       else if (op === 'del') searchTerm = searchTerm.slice(0, -1);
       else if (op === 'clear') searchTerm = '';
-      document.getElementById('searchTerm').textContent = searchTerm || 'Type a title';
-      document.getElementById('searchTerm').classList.toggle('placeholder', !searchTerm);
+      showSearchTerm();
       queueSearch();
     });
+    phoneTyping();
+  }
+
+  function showSearchTerm() {
+    document.getElementById('searchTerm').textContent = searchTerm || 'Type a title';
+    document.getElementById('searchTerm').classList.toggle('placeholder', !searchTerm);
+  }
+
+  /* ── Type with your phone ─────────────────────────────────────────────
+     A QR code under the keyboard opens www.sharkmovie.co.uk/type.html on the
+     phone. Whatever is typed there is sent to the server's room channel
+     (/room/<code>/event) and arrives here over /room/<code>/stream, so the
+     search fills in live. The code is random per TV session; the room
+     only exists while this screen is listening. */
+  var typeCode = '', typeStream = null, typeLiveT = null;
+  function phoneTyping() {
+    var box = document.getElementById('searchQr'), img = document.getElementById('searchQrImg');
+    if (!box || !img || !w.EventSource) { if (box) box.style.display = 'none'; return; }
+    if (!typeCode) {
+      var A = 'abcdefghjkmnpqrstuvwxyz23456789', c = 'type-';
+      for (var i = 0; i < 10; i++) c += A.charAt(Math.floor(Math.random() * A.length));
+      typeCode = c;
+      box.setAttribute('data-code', typeCode);
+      try {
+        var q = w.qrcode(0, 'M');
+        q.addData('https://www.sharkmovie.co.uk/type.html?c=' + typeCode);
+        q.make();
+        img.innerHTML = q.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
+      } catch (e) { box.style.display = 'none'; return; }
+    }
+    if (typeStream) return;
+    try {
+      typeStream = new EventSource(CFG.API + '/room/' + typeCode + '/stream');
+    } catch (e) { box.style.display = 'none'; return; }
+    typeStream.onmessage = function (ev) {
+      var m = null;
+      try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (!m || m.type !== 'type') return;
+      var text = String(m.text == null ? '' : m.text).replace(/\s+/g, ' ').slice(0, 80);
+      box.classList.add('live');
+      document.getElementById('searchQrSub').textContent = 'Phone connected - type away.';
+      clearTimeout(typeLiveT);
+      typeLiveT = setTimeout(function () {
+        box.classList.remove('live');
+        document.getElementById('searchQrSub').textContent = 'Scan with the camera: whatever you type appears here.';
+      }, 90000);
+      if (text === searchTerm && !m.go) return;
+      searchTerm = text;
+      showSearchTerm();
+      if (!text) { queueSearch(); return; }
+      if (m.go) {
+        /* "Search" pressed on the phone: run it now and put the remote on
+           the first result, so OK plays it. */
+        clearTimeout(searchTimer);
+        runSearch(true);
+      } else queueSearch();
+    };
+    typeStream.onerror = function () { /* EventSource reconnects by itself */ };
   }
 
   function queueSearch() {
     clearTimeout(searchTimer);
     var host = document.getElementById('searchResults');
     if (!searchTerm.trim()) { host.innerHTML = ''; return; }
-    searchTimer = setTimeout(function () {
+    searchTimer = setTimeout(function () { runSearch(false); }, 420);
+  }
+
+  function runSearch(focusFirst) {
+    var host = document.getElementById('searchResults');
+    if (!searchTerm.trim()) { host.innerHTML = ''; return; }
+    (function () {
       var term = searchTerm;
       smartSearch(term).then(function (items) {
         if (term !== searchTerm) return null;
@@ -802,8 +865,10 @@
           scope: 'search',
           cardOpts: function (i) { return { ready: !!(keep && keep[i.key]) }; }
         }));
+        /* The phone pressed Search: land the remote on the first result. */
+        if (focusFirst && w.Nav && Nav.focusFirst) setTimeout(function () { Nav.focusFirst(host); }, 60);
       });
-    }, 420);
+    })();
   }
 
   /* ── Details ──────────────────────────────────────────────────────────── */

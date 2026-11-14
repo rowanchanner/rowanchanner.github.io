@@ -665,6 +665,16 @@ body.scrolled #topnav { background: #0a0a0a; }
 }
 .search-term.placeholder { color: #5a5a5a; font-weight: 500; }
 
+/* Scan to type with your phone (under the on-screen keyboard) */
+.search-qr { display: flex; flex-direction: row; align-items: center; width: 22.4vw; margin-top: 3vh;
+  padding: 1vw; border-radius: 0.8vw; background: rgba(255,255,255,0.05); border: 0.1vw solid rgba(255,255,255,0.1); }
+.search-qr .sq-img { flex: 0 0 auto; width: 6.2vw; height: 6.2vw; background: #fff; border-radius: 0.5vw; padding: 0.35vw; box-sizing: border-box; }
+.search-qr .sq-img svg { display: block; width: 100%; height: 100%; }
+.search-qr .sq-txt { padding-left: 1vw; font-size: 0.95vw; line-height: 1.35; color: #bdbdbd; }
+.search-qr .sq-txt b { display: block; color: #fff; font-size: 1.1vw; margin-bottom: 0.3vh; }
+.search-qr.live { border-color: rgba(34,197,94,0.6); }
+.search-qr.live .sq-txt b { color: #22c55e; }
+
 .kb-grid { display: flex; flex-direction: row; flex-wrap: wrap; width: 22.4vw; }
 .kb-key {
   width: 2.8vw;

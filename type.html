@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Type on your TV - Sharky</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root { --red: #e50914; --bg: #0b0b12; --card: #15151f; --line: #2a2a3d; --text: #f2f2f5; --mute: #8e8ea0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: Outfit, system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: max(24px, env(safe-area-inset-top)) 20px 30px; }
+  .logo { color: var(--red); font-weight: 800; font-size: 1.6rem; letter-spacing: -1px; margin-bottom: 6px; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; text-align: center; }
+  p.sub { color: var(--mute); margin: 0 0 22px; text-align: center; font-size: .95rem; }
+  .box { width: 100%; max-width: 480px; }
+  .field { position: relative; }
+  input { width: 100%; font: inherit; font-size: 1.35rem; font-weight: 600; color: #fff; background: var(--card);
+    border: 2px solid var(--line); border-radius: 16px; padding: 18px 56px 18px 18px; outline: none; }
+  input:focus { border-color: var(--red); }
+  input::placeholder { color: #5a5a6a; font-weight: 400; }
+  input::-webkit-search-cancel-button, input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+  .clr { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border-radius: 50%;
+    border: 0; background: #2a2a3d; color: #fff; font-size: 1.1rem; display: none; }
+  .field.has .clr { display: block; }
+  .go { display: block; width: 100%; margin-top: 14px; font: inherit; font-weight: 800; font-size: 1.1rem; color: #fff;
+    background: var(--red); border: 0; border-radius: 14px; padding: 16px; }
+  .go:active { transform: scale(.98); }
+  .state { margin-top: 18px; text-align: center; font-size: .9rem; color: var(--mute); min-height: 1.3em; }
+  .state b { color: #22c55e; font-weight: 600; }
+  .state.bad b { color: #f87171; }
+  .hint { margin-top: 26px; color: #5a5a6a; font-size: .82rem; text-align: center; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="logo">SHARKY</div>
+  <h1>Type on your TV</h1>
+  <p class="sub">Whatever you type here shows up in the search on your TV.</p>
+  <div class="box">
+    <div class="field" id="field">
+      <input id="q" type="search" placeholder="Film or show name" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" maxlength="80" enterkeyhint="search">
+      <button class="clr" id="clr" type="button" aria-label="Clear">&#10005;</button>
+    </div>
+    <button class="go" id="go" type="button">Search on TV</button>
+    <div class="state" id="state"></div>
+    <div class="hint">Keep this page open while you type. Close it when you're done - nothing is saved.</div>
+  </div>
+<script>
+(function () {
+  var API = 'https://api.sharkmovie.co.uk';
+  var code = (new URLSearchParams(location.search).get('c') || '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 40);
+  var q = document.getElementById('q'), st = document.getElementById('state'), field = document.getElementById('field');
+  if (!code || code.indexOf('type-') !== 0) {
+    st.className = 'state bad';
+    st.innerHTML = '<b>This link is missing its code.</b> Scan the QR code on the TV\'s Search screen again.';
+    q.disabled = true;
+    return;
+  }
+  var timer = null, lastSent = null, pending = false, okOnce = false;
+  function send(go) {
+    var text = q.value.replace(/\s+/g, ' ').slice(0, 80);
+    if (!go && text === lastSent) return;
+    lastSent = text;
+    pending = true;
+    fetch(API + '/room/' + encodeURIComponent(code) + '/event', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'type', text: text, go: !!go, src: 'phone' })
+    }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      pending = false;
+      if (!d) { st.className = 'state bad'; st.innerHTML = '<b>Could not reach Sharky.</b> Check your internet.'; return; }
+      okOnce = true;
+      st.className = 'state';
+      if (d.delivered > 0) st.innerHTML = go ? '<b>Sent.</b> Searching on the TV' : '<b>Connected</b> - the TV sees what you type';
+      else st.innerHTML = '<b style="color:#fbbf24">TV not listening.</b> Open Search on the TV, or scan the code again.';
+    }).catch(function () {
+      pending = false;
+      st.className = 'state bad'; st.innerHTML = '<b>Could not reach Sharky.</b> Check your internet.';
+    });
+  }
+  q.addEventListener('input', function () {
+    field.classList.toggle('has', !!q.value);
+    clearTimeout(timer);
+    timer = setTimeout(function () { send(false); }, 120);
+  });
+  q.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); send(true); q.blur(); } });
+  document.getElementById('go').addEventListener('click', function () { clearTimeout(timer); send(true); q.blur(); });
+  document.getElementById('clr').addEventListener('click', function () { q.value = ''; field.classList.remove('has'); clearTimeout(timer); send(false); q.focus(); });
+  /* Say hello so the TV shows "phone connected" before anything is typed. */
+  send(false);
+  setTimeout(function () { try { q.focus(); } catch (e) {} }, 300);
+})();
+</script>
+</body>
+</html>
