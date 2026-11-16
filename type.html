@@ -49,21 +49,35 @@
 <script>
 (function () {
   var API = 'https://api.sharkmovie.co.uk';
-  var code = (new URLSearchParams(location.search).get('c') || '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 40);
+  var code = (new URLSearchParams(location.search).get('c') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
   var q = document.getElementById('q'), st = document.getElementById('state'), field = document.getElementById('field');
-  if (!code || code.indexOf('type-') !== 0) {
-    st.className = 'state bad';
-    st.innerHTML = '<b>This link is missing its code.</b> Scan the QR code on the TV\'s Search screen again.';
-    q.disabled = true;
+  if (code.length < 6) {
+    /* Opened without scanning: ask for the code shown under the TV's QR. */
+    document.querySelector('p.sub').textContent = 'Enter the code shown on the TV\'s Search screen.';
+    q.placeholder = 'Code on the TV, e.g. ABCD 2345';
+    q.setAttribute('autocapitalize', 'characters');
+    q.setAttribute('maxlength', '9');
+    document.getElementById('go').textContent = 'Connect';
+    var tryCode = function () {
+      var v = q.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (v.length < 6) { st.className = 'state bad'; st.innerHTML = '<b>That code is too short.</b>'; return; }
+      location.replace(location.pathname + '?c=' + v);
+    };
+    q.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); tryCode(); } });
+    document.getElementById('go').addEventListener('click', tryCode);
+    document.getElementById('clr').addEventListener('click', function () { q.value = ''; field.classList.remove('has'); q.focus(); });
+    q.addEventListener('input', function () { field.classList.toggle('has', !!q.value); });
+    setTimeout(function () { try { q.focus(); } catch (e) {} }, 300);
     return;
   }
+  var room = 'type-' + code;
   var timer = null, lastSent = null, pending = false, okOnce = false;
   function send(go) {
     var text = q.value.replace(/\s+/g, ' ').slice(0, 80);
     if (!go && text === lastSent) return;
     lastSent = text;
     pending = true;
-    fetch(API + '/room/' + encodeURIComponent(code) + '/event', {
+    fetch(API + '/room/' + room + '/event', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'type', text: text, go: !!go, src: 'phone' })
     }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {

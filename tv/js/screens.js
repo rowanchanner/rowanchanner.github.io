@@ -780,20 +780,27 @@
     var box = document.getElementById('searchQr'), img = document.getElementById('searchQrImg');
     if (!box || !img || !w.EventSource) { if (box) box.style.display = 'none'; return; }
     if (!typeCode) {
-      var A = 'abcdefghjkmnpqrstuvwxyz23456789', c = 'type-';
-      for (var i = 0; i < 10; i++) c += A.charAt(Math.floor(Math.random() * A.length));
+      /* 8 chars, no 0/O/1/I, so it can be read off the screen and typed.
+         The QR holds a SHORT UPPERCASE link (api /T/<code> bounces to the
+         type page): QR codes store A-Z 0-9 far more compactly than a normal
+         URL, so the squares come out ~2.5x bigger - scannable from the
+         sofa on an old TV or a projector. */
+      var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', c = '';
+      for (var i = 0; i < 8; i++) c += A.charAt(Math.floor(Math.random() * A.length));
       typeCode = c;
       box.setAttribute('data-code', typeCode);
+      var codeEl = document.getElementById('searchQrCode');
+      if (codeEl) codeEl.innerHTML = c.slice(0, 4) + '<br>' + c.slice(4);
       try {
-        var q = w.qrcode(0, 'M');
-        q.addData('https://www.sharkmovie.co.uk/type.html?c=' + typeCode);
+        var q = w.qrcode(0, 'L');
+        q.addData('HTTPS://API.SHARKMOVIE.CO.UK/T/' + typeCode, 'Alphanumeric');
         q.make();
-        img.innerHTML = q.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
+        img.innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
       } catch (e) { box.style.display = 'none'; return; }
     }
     if (typeStream) return;
     try {
-      typeStream = new EventSource(CFG.API + '/room/' + typeCode + '/stream');
+      typeStream = new EventSource(CFG.API + '/room/type-' + typeCode + '/stream');
     } catch (e) { box.style.display = 'none'; return; }
     typeStream.onmessage = function (ev) {
       var m = null;
@@ -805,7 +812,7 @@
       clearTimeout(typeLiveT);
       typeLiveT = setTimeout(function () {
         box.classList.remove('live');
-        document.getElementById('searchQrSub').textContent = 'Scan with the camera: whatever you type appears here.';
+        document.getElementById('searchQrSub').textContent = 'Scan with your camera';
       }, 90000);
       if (text === searchTerm && !m.go) return;
       searchTerm = text;
